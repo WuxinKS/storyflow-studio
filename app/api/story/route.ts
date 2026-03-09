@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server';
-import { generateStoryDraft, generateStoryDraftPart, getLatestProject } from '@/features/story/service';
+import {
+  generateNovelChapters,
+  generateStoryDraft,
+  generateStoryDraftPart,
+  getLatestProject,
+} from '@/features/story/service';
 
 export async function GET() {
   try {
@@ -35,6 +40,11 @@ export async function POST(request: Request) {
 
     if (action === 'generate-scenes') {
       const project = await generateStoryDraftPart(body.projectId, 'scenes');
+      return NextResponse.json({ ok: true, project }, { status: 201 });
+    }
+
+    if (action === 'generate-chapters') {
+      const project = await generateNovelChapters(body.projectId);
       return NextResponse.json({ ok: true, project }, { status: 201 });
     }
 

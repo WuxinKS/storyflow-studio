@@ -1,8 +1,10 @@
 "use client";
 
 import { FormEvent, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 export function ChapterCreateForm({ projectId }: { projectId: string }) {
+  const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -24,8 +26,9 @@ export function ChapterCreateForm({ projectId }: { projectId: string }) {
       });
       const data = await response.json();
       if (!response.ok || !data.ok) throw new Error(data.error || '创建章节失败');
-      setMessage(`已创建章节：${data.chapter.title}`);
+      setMessage(`已创建手写章节：${data.chapter.title}`);
       event.currentTarget.reset();
+      router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '创建失败');
     } finally {
@@ -37,17 +40,17 @@ export function ChapterCreateForm({ projectId }: { projectId: string }) {
     <form className="form-card" onSubmit={onSubmit}>
       <div className="form-grid">
         <label>
-          <span>章节标题</span>
+          <span>手写章节标题</span>
           <input name="title" placeholder="例如：第一章 失控核心" />
         </label>
         <label className="full-width">
           <span>章节内容</span>
-          <textarea name="content" rows={6} placeholder="先写一个章节草稿占位，后面再接 AI 自动生成。" />
+          <textarea name="content" rows={6} placeholder="可在这里手写、改写或精修某一章正文，后续会直接进入章节工作台。" />
         </label>
       </div>
       <div className="action-row">
         <button type="submit" className="button-primary" disabled={submitting}>
-          {submitting ? '正在创建…' : '新增章节'}
+          {submitting ? '正在创建…' : '新增手写章节'}
         </button>
         {message ? <span className="success-text">{message}</span> : null}
       </div>

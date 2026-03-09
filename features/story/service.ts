@@ -16,6 +16,22 @@ export type StoryDraftBundle = {
   scenes: StorySceneSeed[];
 };
 
+export const GENERATED_NOVEL_CHAPTER_PREFIX = 'AI生成｜';
+
+export function isStoryEngineChapterTitle(title: string) {
+  return title.startsWith('Story Engine');
+}
+
+type GeneratedNovelChapter = {
+  title: string;
+  content: string;
+  sourceSceneTitle: string;
+};
+
+export function isGeneratedNovelChapterTitle(title: string) {
+  return title.startsWith(GENERATED_NOVEL_CHAPTER_PREFIX);
+}
+
 function normalizeText(text: string | null | undefined) {
   return (text || '').replace(/\s+/g, ' ').trim();
 }
@@ -101,6 +117,37 @@ function buildSceneSeedsFallback(input: {
       emotion: '震动、决断前夜、余波未落',
     },
   ];
+}
+
+
+function getManualChapterCount(chapters: Array<{ title: string }>) {
+  return chapters.filter((chapter) => !isStoryEngineChapterTitle(chapter.title) && !isGeneratedNovelChapterTitle(chapter.title)).length;
+}
+
+function getGeneratedNovelChapterTitle(index: number, scene: StorySceneSeed) {
+  return `${GENERATED_NOVEL_CHAPTER_PREFIX}第${index + 1}章｜${scene.title}`;
+}
+
+function buildNovelChapterFallback(input: {
+  projectTitle: string;
+  premise?: string | null;
+  synopsis: string;
+  beat: string;
+  scene: StorySceneSeed;
+  chapterIndex: number;
+  totalChapters: number;
+  previousEnding?: string;
+}) {
+  const previousBridge = input.previousEnding
+    ? `上一章余波仍停留在“${clip(input.previousEnding, 36)}”，因此这一章开头要自然承接那股未散的压力。`
+    : '开头先稳稳落在人物当前处境上，让读者迅速进入这一章的核心局面。';
+
+  return [
+    `第${input.chapterIndex + 1}章围绕“${input.scene.title}”展开。${previousBridge} 故事主线延续“${clip(input.synopsis, 60)}”，而这一章的节拍重点是：${input.beat}。`,
+    `主角进入这一章时，最直接的目标是${input.scene.goal}。场面先从“${input.scene.summary}”切入，让空间、关系和异常感一起被看见，不急着解释全部信息，而是让人物在行动、观察和试探中逐步逼近核心问题。`,
+    `随着情节推进，冲突很快收束到“${input.scene.conflict}”。人物既要面对外部环境的压力，也要处理自己内部的迟疑、判断和代价感。可以加入更具体的动作描写、环境细节和心理波动，让这一章不只是梗概复述，而是真正可阅读的小说段落。`,
+    `这一章的情绪底色应保持在“${input.scene.emotion}”。结尾不要把问题彻底解决，而是让人物因为一次发现、一次误判、一次对视或一次决定，被推向下一章更高压的位置，形成第${input.chapterIndex + 2 <= input.totalChapters ? input.chapterIndex + 2 : input.totalChapters}章的自然入口。`,
+  ].join('\n\n');
 }
 
 function serializeSceneSeeds(seeds: StorySceneSeed[]) {
@@ -233,6 +280,35 @@ async function generateSceneSeedsWithLlm(input: {
   }
 }
 
+
+async function generateNovelChapterWithLlm(input: {
+  projectTitle: string;
+  premise?: string | null;
+  synopsis: string;
+  beat: string;
+  scene: StorySceneSeed;
+  chapterIndex: number;
+  totalChapters: number;
+  previousEnding?: string;
+}) {
+  const result = await generateText({
+    systemPrompt: '你是中文小说写作助手。请根据故事梗概、结构节拍和单场种子，输出一章可直接阅读的中文小说正文。只输出正文，不要标题，不要分点。篇幅控制在 900 到 1500 字，要求包含环境、动作、心理、关系张力与一个自然的章节收尾。',
+    userPrompt: `项目名：${input.projectTitle}
+故事前提：${input.premise || '暂无'}
+整体梗概：${input.synopsis}
+当前节拍：${input.beat}
+章节序号：第 ${input.chapterIndex + 1} 章，共 ${input.totalChapters} 章
+分场标题：${input.scene.title}
+分场摘要：${input.scene.summary}
+章节目标：${input.scene.goal}
+章节冲突：${input.scene.conflict}
+章节情绪：${input.scene.emotion}
+上一章余波：${input.previousEnding || '无，需自行建立开场承接'}`,
+    temperature: 0.8,
+  });
+  return result?.trim() || null;
+}
+
 async function upsertOutline(projectId: string, title: string, summary: string) {
   return createOutlineVersion(projectId, title, summary);
 }
@@ -253,6 +329,49 @@ async function upsertChapter(projectId: string, title: string, content: string, 
   return prisma.chapter.create({
     data: { projectId, title, content, orderIndex },
   });
+}
+
+
+async function getStoryProjectById(projectId: string) {
+  return prisma.project.findUnique({
+    where: { id: projectId },
+    include: {
+      ideaSeeds: { orderBy: { createdAt: 'desc' }, take: 1 },
+      outlines: { orderBy: { createdAt: 'desc' } },
+      chapters: { orderBy: { orderIndex: 'asc' } },
+    },
+  });
+}
+
+async function replaceGeneratedNovelChapters(
+  projectId: string,
+  chapters: GeneratedNovelChapter[],
+  manualChapterCount: number,
+) {
+  await prisma.chapter.deleteMany({
+    where: {
+      projectId,
+      title: { startsWith: GENERATED_NOVEL_CHAPTER_PREFIX },
+    },
+  });
+
+  for (const [index, chapter] of chapters.entries()) {
+    await prisma.chapter.create({
+      data: {
+        projectId,
+        title: chapter.title,
+        content: chapter.content,
+        orderIndex: manualChapterCount + index + 1,
+      },
+    });
+  }
+}
+
+async function upsertGeneratedNovelOutline(projectId: string, chapters: GeneratedNovelChapter[]) {
+  const summary = chapters
+    .map((chapter, index) => `${index + 1}. ${chapter.title.replace(GENERATED_NOVEL_CHAPTER_PREFIX, '')}｜来源：${chapter.sourceSceneTitle}`)
+    .join('\n');
+  return createOutlineVersion(projectId, 'AI Novel Chapter Index', summary);
 }
 
 export async function getLatestProject() {
@@ -286,15 +405,63 @@ export async function createChapter(input: {
   });
 }
 
-export async function generateStoryDraft(projectId: string) {
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    include: {
-      ideaSeeds: { orderBy: { createdAt: 'desc' }, take: 1 },
-      outlines: { orderBy: { createdAt: 'desc' } },
-      chapters: { orderBy: { orderIndex: 'asc' } },
-    },
+
+export async function generateNovelChapters(projectId: string) {
+  const project = await getStoryProjectById(projectId);
+
+  if (!project) throw new Error('项目不存在');
+
+  const draft = getStoryDraftBundle(project);
+  if (draft.scenes.length === 0) {
+    throw new Error('请先生成 Story Engine 的分场种子，再生成 AI 小说章节');
+  }
+
+  const generatedChapters: GeneratedNovelChapter[] = [];
+  const manualChapterCount = getManualChapterCount(project.chapters);
+  let previousEnding = '';
+
+  for (const [index, scene] of draft.scenes.entries()) {
+    const beat = draft.beats[index] || draft.beats[draft.beats.length - 1] || draft.synopsis;
+    const content = await generateNovelChapterWithLlm({
+      projectTitle: project.title,
+      premise: project.premise,
+      synopsis: draft.synopsis,
+      beat,
+      scene,
+      chapterIndex: index,
+      totalChapters: draft.scenes.length,
+      previousEnding,
+    }).catch(() => null) || buildNovelChapterFallback({
+      projectTitle: project.title,
+      premise: project.premise,
+      synopsis: draft.synopsis,
+      beat,
+      scene,
+      chapterIndex: index,
+      totalChapters: draft.scenes.length,
+      previousEnding,
+    });
+
+    generatedChapters.push({
+      title: getGeneratedNovelChapterTitle(index, scene),
+      content,
+      sourceSceneTitle: scene.title,
+    });
+    previousEnding = content.slice(-120).trim();
+  }
+
+  await replaceGeneratedNovelChapters(project.id, generatedChapters, manualChapterCount);
+  await upsertGeneratedNovelOutline(project.id, generatedChapters);
+  await prisma.project.update({
+    where: { id: project.id },
+    data: { stage: 'STORY' },
   });
+
+  return getStoryProjectById(project.id);
+}
+
+export async function generateStoryDraft(projectId: string) {
+  const project = await getStoryProjectById(projectId);
 
   if (!project) throw new Error('项目不存在');
 
@@ -331,37 +498,18 @@ export async function generateStoryDraft(projectId: string) {
   await upsertOutline(project.id, 'Story Engine Synopsis', synopsis);
   await upsertOutline(project.id, 'Story Engine Beat Sheet', beats.map((item, index) => `${index + 1}. ${item}`).join('\n'));
 
-  const normalChapters = project.chapters.filter((chapter) => !chapter.title.startsWith('Story Engine'));
+  const normalChapters = project.chapters.filter((chapter) => !isStoryEngineChapterTitle(chapter.title));
   await upsertChapter(project.id, 'Story Engine Beat Sheet', beats.join('\n'), normalChapters.length + 1);
   await upsertChapter(project.id, 'Story Engine Scene Seeds', serializeSceneSeeds(scenes), normalChapters.length + 2);
 
-  await prisma.project.update({
-    where: { id: project.id },
-    data: { stage: 'STORY' },
-  });
-
-  return prisma.project.findUnique({
-    where: { id: project.id },
-    include: {
-      ideaSeeds: { orderBy: { createdAt: 'desc' }, take: 1 },
-      outlines: { orderBy: { createdAt: 'desc' } },
-      chapters: { orderBy: { orderIndex: 'asc' } },
-    },
-  });
+  return generateNovelChapters(project.id);
 }
 
 export async function generateStoryDraftPart(
   projectId: string,
   part: 'synopsis' | 'beats' | 'scenes',
 ) {
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    include: {
-      ideaSeeds: { orderBy: { createdAt: 'desc' }, take: 1 },
-      outlines: { orderBy: { createdAt: 'desc' } },
-      chapters: { orderBy: { orderIndex: 'asc' } },
-    },
-  });
+  const project = await getStoryProjectById(projectId);
 
   if (!project) throw new Error('项目不存在');
 
@@ -409,16 +557,17 @@ export async function generateStoryDraftPart(
   if (part === 'beats') {
     await upsertOutline(project.id, 'Story Engine Synopsis', synopsis);
     await upsertOutline(project.id, 'Story Engine Beat Sheet', beats.map((item, index) => `${index + 1}. ${item}`).join('\n'));
-    const normalChapters = project.chapters.filter((chapter) => !chapter.title.startsWith('Story Engine'));
+    const normalChapters = project.chapters.filter((chapter) => !isStoryEngineChapterTitle(chapter.title));
     await upsertChapter(project.id, 'Story Engine Beat Sheet', beats.join('\n'), normalChapters.length + 1);
   }
 
   if (part === 'scenes') {
     await upsertOutline(project.id, 'Story Engine Synopsis', synopsis);
     await upsertOutline(project.id, 'Story Engine Beat Sheet', beats.map((item, index) => `${index + 1}. ${item}`).join('\n'));
-    const normalChapters = project.chapters.filter((chapter) => !chapter.title.startsWith('Story Engine'));
+    const normalChapters = project.chapters.filter((chapter) => !isStoryEngineChapterTitle(chapter.title));
     await upsertChapter(project.id, 'Story Engine Beat Sheet', beats.join('\n'), normalChapters.length + 1);
     await upsertChapter(project.id, 'Story Engine Scene Seeds', serializeSceneSeeds(scenes), normalChapters.length + 2);
+    return generateNovelChapters(project.id);
   }
 
   await prisma.project.update({
@@ -426,15 +575,9 @@ export async function generateStoryDraftPart(
     data: { stage: 'STORY' },
   });
 
-  return prisma.project.findUnique({
-    where: { id: project.id },
-    include: {
-      ideaSeeds: { orderBy: { createdAt: 'desc' }, take: 1 },
-      outlines: { orderBy: { createdAt: 'desc' } },
-      chapters: { orderBy: { orderIndex: 'asc' } },
-    },
-  });
+  return getStoryProjectById(project.id);
 }
+
 
 export function getStoryDraftBundle(project: {
   outlines: Array<{ title: string; summary: string }>;

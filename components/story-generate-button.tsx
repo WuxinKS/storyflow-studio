@@ -1,12 +1,29 @@
 "use client";
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+
+type StoryAction = 'generate' | 'generate-synopsis' | 'generate-beats' | 'generate-scenes' | 'generate-chapters';
+
+const AI_CHAPTER_PREFIX = 'AI生成｜';
+
+function getVisibleChapterStats(project: { chapters: Array<{ title: string }>; outlines: Array<unknown> }) {
+  const visibleChapters = project.chapters.filter((chapter) => !chapter.title.startsWith('Story Engine'));
+  const aiChapters = visibleChapters.filter((chapter) => chapter.title.startsWith(AI_CHAPTER_PREFIX));
+
+  return {
+    outlineCount: project.outlines.length,
+    visibleChapterCount: visibleChapters.length,
+    aiChapterCount: aiChapters.length,
+  };
+}
 
 export function StoryGenerateButton({ projectId }: { projectId: string }) {
-  const [loadingAction, setLoadingAction] = useState<string | null>(null);
+  const router = useRouter();
+  const [loadingAction, setLoadingAction] = useState<StoryAction | null>(null);
   const [message, setMessage] = useState('');
 
-  const runAction = async (action: 'generate' | 'generate-synopsis' | 'generate-beats' | 'generate-scenes') => {
+  const runAction = async (action: StoryAction) => {
     setLoadingAction(action);
     setMessage('');
     try {
@@ -16,16 +33,21 @@ export function StoryGenerateButton({ projectId }: { projectId: string }) {
         body: JSON.stringify({ projectId, action }),
       });
       const data = await response.json();
-      if (!response.ok || !data.ok) throw new Error(data.error || 'Story Engine 生成失败');
-      const outlines = data.project.outlines.length;
-      const chapters = data.project.chapters.length;
-      const actionLabelMap: Record<string, string> = {
-        generate: '整套 story draft',
-        'generate-synopsis': 'synopsis',
-        'generate-beats': 'beat sheet',
-        'generate-scenes': 'scene seeds',
+      if (!response.ok || !data.ok) throw new Error(data.error || '故事引擎执行失败');
+
+      const stats = getVisibleChapterStats(data.project);
+      const actionLabelMap: Record<StoryAction, string> = {
+        generate: '故事骨架与小说正文',
+        'generate-synopsis': '故事梗概',
+        'generate-beats': '结构节拍',
+        'generate-scenes': '分场种子',
+        'generate-chapters': 'AI 小说正文',
       };
-      setMessage(`已更新${actionLabelMap[action]}：${outlines} 条 outline / ${chapters} 个 chapter`);
+
+      setMessage(
+        `已更新${actionLabelMap[action]}：${stats.outlineCount} 条大纲 / ${stats.visibleChapterCount} 章可用章节 / ${stats.aiChapterCount} 章 AI 小说`,
+      );
+      router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '生成失败');
     } finally {
@@ -37,16 +59,19 @@ export function StoryGenerateButton({ projectId }: { projectId: string }) {
     <div className="page-stack">
       <div className="action-row wrap-row">
         <button type="button" className="button-primary" onClick={() => runAction('generate')} disabled={Boolean(loadingAction)}>
-          {loadingAction === 'generate' ? '整套 Story Engine 生成中…' : '整套生成 synopsis / beats / scenes'}
+          {loadingAction === 'generate' ? '生成故事骨架与小说中…' : '生成故事骨架 + 小说正文'}
+        </button>
+        <button type="button" className="button-secondary" onClick={() => runAction('generate-chapters')} disabled={Boolean(loadingAction)}>
+          {loadingAction === 'generate-chapters' ? '刷新小说正文中…' : '只刷新 AI 小说正文'}
         </button>
         <button type="button" className="button-ghost" onClick={() => runAction('generate-synopsis')} disabled={Boolean(loadingAction)}>
-          {loadingAction === 'generate-synopsis' ? '重生 synopsis…' : '只重生 synopsis'}
+          {loadingAction === 'generate-synopsis' ? '重生故事梗概中…' : '只重生故事梗概'}
         </button>
         <button type="button" className="button-ghost" onClick={() => runAction('generate-beats')} disabled={Boolean(loadingAction)}>
-          {loadingAction === 'generate-beats' ? '重生 beat sheet…' : '只重生 beat sheet'}
+          {loadingAction === 'generate-beats' ? '重生结构节拍中…' : '只重生结构节拍'}
         </button>
         <button type="button" className="button-ghost" onClick={() => runAction('generate-scenes')} disabled={Boolean(loadingAction)}>
-          {loadingAction === 'generate-scenes' ? '重生 scene seeds…' : '只重生 scene seeds'}
+          {loadingAction === 'generate-scenes' ? '重生分场种子中…' : '只重生分场种子'}
         </button>
       </div>
       {message ? <span className="success-text">{message}</span> : null}

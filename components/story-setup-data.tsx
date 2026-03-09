@@ -1,5 +1,10 @@
 import Link from 'next/link';
-import { getLatestProject, getStoryDraftBundle } from '@/features/story/service';
+import {
+  getLatestProject,
+  getStoryDraftBundle,
+  isGeneratedNovelChapterTitle,
+  isStoryEngineChapterTitle,
+} from '@/features/story/service';
 import { getSyncStatus } from '@/features/sync/service';
 import { StoryGenerateButton } from '@/components/story-generate-button';
 import { SyncNoticeCard } from '@/components/sync-notice-card';
@@ -21,7 +26,9 @@ export async function StorySetupData() {
   }
 
   const idea = project.ideaSeeds[0];
-  const chapterCount = project.chapters.filter((item) => !item.title.startsWith('Story Engine')).length;
+  const visibleChapters = project.chapters.filter((item) => !isStoryEngineChapterTitle(item.title));
+  const aiChapterCount = visibleChapters.filter((item) => isGeneratedNovelChapterTitle(item.title)).length;
+  const manualChapterCount = visibleChapters.length - aiChapterCount;
   const storyDraft = getStoryDraftBundle(project);
   const syncStatus = await getSyncStatus(project.id).catch(() => null);
 
@@ -35,11 +42,13 @@ export async function StorySetupData() {
           <div className="meta-list">
             <span>题材：{project.genre || '未设定'}</span>
             <span>阶段：{getProjectStageLabel(project.stage)}</span>
-            <span>原始章节数：{chapterCount}</span>
+            <span>手写章节：{manualChapterCount}</span>
+            <span>AI 小说：{aiChapterCount}</span>
           </div>
           <StoryGenerateButton projectId={project.id} />
-          <div className="action-row">
+          <div className="action-row wrap-row">
             <Link href="/idea-lab" className="button-ghost">修改创意</Link>
+            <Link href="/chapter-studio" className="button-secondary">查看小说章节</Link>
             <Link href="/adaptation-lab" className="button-secondary">进入改编工作台</Link>
           </div>
         </div>
@@ -64,8 +73,8 @@ export async function StorySetupData() {
         </div>
         <div className="asset-tile">
           <span className="label">故事引擎</span>
-          <h4>分层重生已接通</h4>
-          <p>当前已支持按层重生故事梗概、结构节拍与分场种子，不再只能整套一键重跑。</p>
+          <h4>分层重生 + 小说正文已接通</h4>
+          <p>当前已支持按层重生故事梗概、结构节拍与分场种子，并直接批量生成 AI 小说章节，方便继续通往分镜与视频。</p>
         </div>
       </div>
 
@@ -151,7 +160,7 @@ export async function StorySetupData() {
         <div className="asset-tile">
           <span className="label">建议路线</span>
           <h4>当前建议</h4>
-          <p>先在这里把三层故事草案调顺，再进入改编实验室做下游改编，这样比先改镜头再回头修故事更省成本。</p>
+          <p>先在这里把三层故事草案调顺，再批量生成 AI 小说正文，最后进入改编实验室做下游分镜和渲染准备。</p>
         </div>
       </div>
     </div>

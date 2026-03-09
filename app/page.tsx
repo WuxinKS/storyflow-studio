@@ -1,4 +1,5 @@
 import { Pipeline } from '@/components/pipeline';
+import { PipelineCommandCenter } from '@/components/pipeline-command-center';
 import { ProjectList } from '@/components/project-list';
 import { ProjectSnapshot } from '@/components/project-snapshot';
 import { SectionCard } from '@/components/section-card';
@@ -9,13 +10,13 @@ export default function HomePage() {
     <div className="page-stack">
       <SectionCard
         title="总览"
-        description="把想法、设定、分镜、参考素材和视频生产统一在一个工作台中。"
+        description="把一句话创意、小说生成、自动分镜、图片与视频生产统一在一个工作台中。"
       >
         <div className="hero-grid">
           <div className="hero-copy">
-            <h3>从一句创意，走到一支成片。</h3>
+            <h3>从一句创意，走到小说、分镜与成片。</h3>
             <p>
-              StoryFlow Studio 聚合故事引擎、改编引擎、分镜引擎和参考解析引擎，
+              StoryFlow Studio 聚合故事引擎、小说引擎、改编引擎、分镜引擎和生成执行链，
               目标是把 AI 写作与 AI 影视生产整合成同一条创作流水线。
             </p>
           </div>
@@ -28,6 +29,7 @@ export default function HomePage() {
       </SectionCard>
 
       <ProjectSnapshot />
+      <PipelineCommandCenter />
       <ProjectList />
 
       <SectionCard
