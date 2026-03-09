@@ -1,0 +1,924 @@
+{
+  "projectId": "cmmhypi3w0000j47ppkk25jml",
+  "projectTitle": "DB Smoke Test",
+  "exportedAt": "2026-03-09T01:33:29.504Z",
+  "scenes": [
+    {
+      "id": "cmmifzqia0001j4td1icw958z",
+      "title": "维修层",
+      "summary": "这一场以“午夜的维修层像一口埋在城市底部的铁井”开局，随后把注意力推向“冷白色警示灯一闪一灭。”。导演处理上强调近景特写，强调手部与面部，情绪保持压迫、恐惧、临界紧张，整体节奏为动作克制、细节强、悬疑节奏。",
+      "orderIndex": 1
+    },
+    {
+      "id": "cmmifzqif000bj4tdf9v1zikn",
+      "title": "管道旁",
+      "summary": "这一场以“林砚跪在失压管道旁”开局，随后把注意力推向“手指沾满黑色冷却液”。导演处理上强调近景特写，强调手部与面部，情绪保持压迫、恐惧、临界紧张，整体节奏为动作克制、细节强、悬疑节奏。",
+      "orderIndex": 2
+    },
+    {
+      "id": "cmmifzqij000lj4tdawqd47ik",
+      "title": "检修现场",
+      "summary": "这一场以“他刚把损坏的能源阀门撬开”开局，随后把注意力推向“阀芯深处却露出一枚不属于这个时代的金属核心”。导演处理上强调近景特写，强调手部与面部，情绪保持压迫、恐惧、临界紧张，整体节奏为动作克制、细节强、悬疑节奏。",
+      "orderIndex": 3
+    },
+    {
+      "id": "cmmifzqil000vj4td6vew4bfz",
+      "title": "异响逼近",
+      "summary": "这一场以“当他试图把核心取出来时”开局，随后把注意力推向“整条管道忽然震动”。导演处理上强调近景特写，强调手部与面部，情绪保持压迫、恐惧、临界紧张，整体节奏为动作克制、细节强、悬疑节奏。",
+      "orderIndex": 4
+    },
+    {
+      "id": "cmmifzqio0015j4tdlcvvt3sk",
+      "title": "核心取出前",
+      "summary": "这一场以“林砚下意识握紧那枚核心”开局，随后把注意力推向“下一秒”。导演处理上强调近景特写，强调手部与面部，情绪保持压迫、恐惧、临界紧张，整体节奏为动作克制、细节强、悬疑节奏。",
+      "orderIndex": 5
+    }
+  ],
+  "shots": [
+    {
+      "id": "cmmifzqic0003j4tdi77mw9a4",
+      "title": "维修层 - 空间建立",
+      "prompt": "从环境与人物相对位置切入，先交代“午夜的维修层像一口埋在城市底部的铁井”所处的空间、时间与压迫关系，让观众在第一眼读懂场域规则。参考构图：近景特写，强调手部与面部。",
+      "cameraNotes": "中远景 / 先交代空间关系与主次层级 / 构图参考：近景特写，强调手部与面部",
+      "orderIndex": 1,
+      "sceneId": "cmmifzqia0001j4td1icw958z"
+    },
+    {
+      "id": "cmmifzqid0005j4tdmdehfe7s",
+      "title": "维修层 - 细节观察",
+      "prompt": "把注意力压到“冷白色警示灯一闪一灭。”这一细节上，通过视线停留、手部动作或环境异响，让观众跟人物一起完成察觉与确认。情绪参考：压迫、恐惧、临界紧张。",
+      "cameraNotes": "近景特写 / 细节物件或感官线索 / 强调察觉过程 / 情绪参考：压迫、恐惧、临界紧张",
+      "orderIndex": 2,
+      "sceneId": "cmmifzqia0001j4td1icw958z"
+    },
+    {
+      "id": "cmmifzqie0007j4tdccsj4fbe",
+      "title": "维修层 - 感官压迫",
+      "prompt": "让环境里的声响、闪烁、液体痕迹或气压变化成为压迫来源，把“冷白色警示灯一闪一灭。”拍成观众能直接感到不安的感官线索。情绪参考：压迫、恐惧、临界紧张。",
+      "cameraNotes": "特写或微距 / 强调环境线索与生理压迫感 / 情绪参考：压迫、恐惧、临界紧张",
+      "orderIndex": 3,
+      "sceneId": "cmmifzqia0001j4td1icw958z"
+    },
+    {
+      "id": "cmmifzqif0009j4tdcjxcqet3",
+      "title": "维修层 - 情绪落点",
+      "prompt": "收在“冷白色警示灯一闪一灭。”带来的情绪余震上，用更近的观察捕捉人物表情、呼吸或停顿，让这一拍成为 scene 的情绪落点。情绪参考：压迫、恐惧、临界紧张。",
+      "cameraNotes": "特写 / 保留停顿与情绪余波 / 表演重点：压迫、恐惧、临界紧张",
+      "orderIndex": 4,
+      "sceneId": "cmmifzqia0001j4td1icw958z"
+    },
+    {
+      "id": "cmmifzqig000dj4td04kkn3ic",
+      "title": "管道旁 - 空间建立",
+      "prompt": "从环境与人物相对位置切入，先交代“林砚跪在失压管道旁”所处的空间、时间与压迫关系，让观众在第一眼读懂场域规则。参考构图：近景特写，强调手部与面部。",
+      "cameraNotes": "中远景 / 先交代空间关系与主次层级 / 构图参考：近景特写，强调手部与面部",
+      "orderIndex": 1,
+      "sceneId": "cmmifzqif000bj4tdf9v1zikn"
+    },
+    {
+      "id": "cmmifzqih000fj4tdyl5zb30x",
+      "title": "管道旁 - 细节观察",
+      "prompt": "把注意力压到“手指沾满黑色冷却液”这一细节上，通过视线停留、手部动作或环境异响，让观众跟人物一起完成察觉与确认。情绪参考：压迫、恐惧、临界紧张。",
+      "cameraNotes": "近景特写 / 细节物件或感官线索 / 强调察觉过程 / 情绪参考：压迫、恐惧、临界紧张",
+      "orderIndex": 2,
+      "sceneId": "cmmifzqif000bj4tdf9v1zikn"
+    },
+    {
+      "id": "cmmifzqii000hj4tdvcq59kyf",
+      "title": "管道旁 - 关系压迫",
+      "prompt": "把人物之间的距离、视线与压迫感拍清楚，让“林砚跪在失压管道旁，手指沾满黑色冷却液，耳边只剩风机低沉的轰鸣。”里的关系张力被看见，而不是只停留在对白说明。情绪参考：压迫、恐惧、临界紧张。",
+      "cameraNotes": "双人近景或过肩镜头 / 强调关系博弈与视线压力 / 情绪参考：压迫、恐惧、临界紧张",
+      "orderIndex": 3,
+      "sceneId": "cmmifzqif000bj4tdf9v1zikn"
+    },
+    {
+      "id": "cmmifzqii000jj4tdhulx2yc4",
+      "title": "管道旁 - 情绪落点",
+      "prompt": "收在“耳边只剩风机低沉的轰鸣。”带来的情绪余震上，用更近的观察捕捉人物表情、呼吸或停顿，让这一拍成为 scene 的情绪落点。情绪参考：压迫、恐惧、临界紧张。",
+      "cameraNotes": "特写 / 保留停顿与情绪余波 / 表演重点：压迫、恐惧、临界紧张",
+      "orderIndex": 4,
+      "sceneId": "cmmifzqif000bj4tdf9v1zikn"
+    },
+    {
+      "id": "cmmifzqij000nj4tdqafo3s83",
+      "title": "检修现场 - 空间建立",
+      "prompt": "从环境与人物相对位置切入，先交代“他刚把损坏的能源阀门撬开”所处的空间、时间与压迫关系，让观众在第一眼读懂场域规则。参考构图：近景特写，强调手部与面部。",
+      "cameraNotes": "中远景 / 先交代空间关系与主次层级 / 构图参考：近景特写，强调手部与面部",
+      "orderIndex": 1,
+      "sceneId": "cmmifzqij000lj4tdawqd47ik"
+    },
+    {
+      "id": "cmmifzqik000pj4tdanc0z84a",
+      "title": "检修现场 - 动作触发",
+      "prompt": "镜头跟进“阀芯深处却露出一枚不属于这个时代的金属核心”这一动作或决定发生的瞬间，不只拍动作本身，还要带出人物为何开始移动或出手。动作节奏参考：动作克制、细节强、悬疑节奏。",
+      "cameraNotes": "中景推进 / 捕捉动作起点与因果触发 / 节奏参考：动作克制、细节强、悬疑节奏",
+      "orderIndex": 2,
+      "sceneId": "cmmifzqij000lj4tdawqd47ik"
+    },
+    {
+      "id": "cmmifzqik000rj4tdae93ys23",
+      "title": "检修现场 - 关系压迫",
+      "prompt": "把人物之间的距离、视线与压迫感拍清楚，让“他刚把损坏的能源阀门撬开，阀芯深处却露出一枚不属于这个时代的金属核心，表面流动着细密…”里的关系张力被看见，而不是只停留在对白说明。情绪参考：压迫、恐惧、临界紧张。",
+      "cameraNotes": "双人近景或过肩镜头 / 强调关系博弈与视线压力 / 情绪参考：压迫、恐惧、临界紧张",
+      "orderIndex": 3,
+      "sceneId": "cmmifzqij000lj4tdawqd47ik"
+    },
+    {
+      "id": "cmmifzqil000tj4tdmuus1aq5",
+      "title": "检修现场 - 情绪落点",
+      "prompt": "收在“表面流动着细密蓝纹。”带来的情绪余震上，用更近的观察捕捉人物表情、呼吸或停顿，让这一拍成为 scene 的情绪落点。情绪参考：压迫、恐惧、临界紧张。",
+      "cameraNotes": "特写 / 保留停顿与情绪余波 / 表演重点：压迫、恐惧、临界紧张",
+      "orderIndex": 4,
+      "sceneId": "cmmifzqij000lj4tdawqd47ik"
+    },
+    {
+      "id": "cmmifzqim000xj4tdjtpebroz",
+      "title": "异响逼近 - 空间建立",
+      "prompt": "从环境与人物相对位置切入，先交代“当他试图把核心取出来时”所处的空间、时间与压迫关系，让观众在第一眼读懂场域规则。参考构图：近景特写，强调手部与面部。",
+      "cameraNotes": "中远景 / 先交代空间关系与主次层级 / 构图参考：近景特写，强调手部与面部",
+      "orderIndex": 1,
+      "sceneId": "cmmifzqil000vj4td6vew4bfz"
+    },
+    {
+      "id": "cmmifzqim000zj4tdc3ek3ju0",
+      "title": "异响逼近 - 细节观察",
+      "prompt": "把注意力压到“整条管道忽然震动”这一细节上，通过视线停留、手部动作或环境异响，让观众跟人物一起完成察觉与确认。情绪参考：压迫、恐惧、临界紧张。",
+      "cameraNotes": "近景特写 / 细节物件或感官线索 / 强调察觉过程 / 情绪参考：压迫、恐惧、临界紧张",
+      "orderIndex": 2,
+      "sceneId": "cmmifzqil000vj4td6vew4bfz"
+    },
+    {
+      "id": "cmmifzqin0011j4tdd34bwmjp",
+      "title": "异响逼近 - 关系压迫",
+      "prompt": "把人物之间的距离、视线与压迫感拍清楚，让“当他试图把核心取出来时，整条管道忽然震动，红色警报在头顶爆开，远处传来安保靴底急促撞…”里的关系张力被看见，而不是只停留在对白说明。情绪参考：压迫、恐惧、临界紧张。",
+      "cameraNotes": "双人近景或过肩镜头 / 强调关系博弈与视线压力 / 情绪参考：压迫、恐惧、临界紧张",
+      "orderIndex": 3,
+      "sceneId": "cmmifzqil000vj4td6vew4bfz"
+    },
+    {
+      "id": "cmmifzqin0013j4tdjks6x89w",
+      "title": "异响逼近 - 情绪落点",
+      "prompt": "收在“远处传来安保靴底急促撞击钢板的声音。”带来的情绪余震上，用更近的观察捕捉人物表情、呼吸或停顿，让这一拍成为 scene 的情绪落点。情绪参考：压迫、恐惧、临界紧张。",
+      "cameraNotes": "特写 / 保留停顿与情绪余波 / 表演重点：压迫、恐惧、临界紧张",
+      "orderIndex": 4,
+      "sceneId": "cmmifzqil000vj4td6vew4bfz"
+    },
+    {
+      "id": "cmmifzqio0017j4tdvcjtzgue",
+      "title": "核心取出前 - 空间建立",
+      "prompt": "从环境与人物相对位置切入，先交代“林砚下意识握紧那枚核心”所处的空间、时间与压迫关系，让观众在第一眼读懂场域规则。参考构图：近景特写，强调手部与面部。",
+      "cameraNotes": "中远景 / 先交代空间关系与主次层级 / 构图参考：近景特写，强调手部与面部",
+      "orderIndex": 1,
+      "sceneId": "cmmifzqio0015j4tdlcvvt3sk"
+    },
+    {
+      "id": "cmmifzqip0019j4tdht00251k",
+      "title": "核心取出前 - 动作触发",
+      "prompt": "镜头跟进“下一秒”这一动作或决定发生的瞬间，不只拍动作本身，还要带出人物为何开始移动或出手。动作节奏参考：动作克制、细节强、悬疑节奏。",
+      "cameraNotes": "中景推进 / 捕捉动作起点与因果触发 / 节奏参考：动作克制、细节强、悬疑节奏",
+      "orderIndex": 2,
+      "sceneId": "cmmifzqio0015j4tdlcvvt3sk"
+    },
+    {
+      "id": "cmmifzqip001bj4tdueihbvog",
+      "title": "核心取出前 - 关系压迫",
+      "prompt": "把人物之间的距离、视线与压迫感拍清楚，让“林砚下意识握紧那枚核心，下一秒，一道冰冷而清晰的机械女声直接在他脑海里响起：权限确认…”里的关系张力被看见，而不是只停留在对白说明。情绪参考：压迫、恐惧、临界紧张。",
+      "cameraNotes": "双人近景或过肩镜头 / 强调关系博弈与视线压力 / 情绪参考：压迫、恐惧、临界紧张",
+      "orderIndex": 3,
+      "sceneId": "cmmifzqio0015j4tdlcvvt3sk"
+    },
+    {
+      "id": "cmmifzqiq001dj4tdanmtzigv",
+      "title": "核心取出前 - 情绪落点",
+      "prompt": "收在“残魂协议开始接管。”带来的情绪余震上，用更近的观察捕捉人物表情、呼吸或停顿，让这一拍成为 scene 的情绪落点。情绪参考：压迫、恐惧、临界紧张。",
+      "cameraNotes": "特写 / 保留停顿与情绪余波 / 表演重点：压迫、恐惧、临界紧张",
+      "orderIndex": 4,
+      "sceneId": "cmmifzqio0015j4tdlcvvt3sk"
+    }
+  ],
+  "renderJobs": [
+    {
+      "id": "cmmigle100000j4nea6ozaeir",
+      "provider": "image-sequence",
+      "status": "queued",
+      "outputUrl": "shots:20|kinds:空间建立:5,细节观察:3,感官压迫:1,情绪落点:5,关系压迫:4,动作触发:2"
+    },
+    {
+      "id": "cmmigle100001j4nereknocjp",
+      "provider": "voice-synthesis",
+      "status": "queued",
+      "outputUrl": "scenes:5|directorReady:5"
+    },
+    {
+      "id": "cmmigle100002j4ne5rvnw4y3",
+      "provider": "video-assembly",
+      "status": "queued",
+      "outputUrl": "referenceReady:20|storyboard-to-video-placeholder"
+    }
+  ],
+  "presets": [
+    {
+      "shotId": "cmmifzqic0003j4tdi77mw9a4",
+      "shotTitle": "维修层 - 空间建立",
+      "kind": "空间建立",
+      "visualStyle": "wide cinematic environment",
+      "cameraMotion": "slow push or slow pan",
+      "pacing": "slow-open",
+      "emphasis": "space relation and staging",
+      "audioFocus": "ambient hum and scene atmosphere"
+    },
+    {
+      "shotId": "cmmifzqid0005j4tdmdehfe7s",
+      "shotTitle": "维修层 - 细节观察",
+      "kind": "细节观察",
+      "visualStyle": "macro close-up with texture emphasis",
+      "cameraMotion": "micro move / focus pull",
+      "pacing": "tight-observation",
+      "emphasis": "object detail and noticing process",
+      "audioFocus": "small tactile sounds and breathing"
+    },
+    {
+      "shotId": "cmmifzqie0007j4tdccsj4fbe",
+      "shotTitle": "维修层 - 感官压迫",
+      "kind": "感官压迫",
+      "visualStyle": "tight framing with flicker contrast",
+      "cameraMotion": "subtle shake / pressure drift",
+      "pacing": "pressure-build",
+      "emphasis": "sensory stress and environmental threat",
+      "audioFocus": "alarm, rumble, pressure noise"
+    },
+    {
+      "shotId": "cmmifzqif0009j4tdcjxcqet3",
+      "shotTitle": "维修层 - 情绪落点",
+      "kind": "情绪落点",
+      "visualStyle": "close-up emotional isolation",
+      "cameraMotion": "still hold",
+      "pacing": "linger-on-emotion",
+      "emphasis": "face, breath, emotional residue",
+      "audioFocus": "breath, silence, emotional tail"
+    },
+    {
+      "shotId": "cmmifzqig000dj4td04kkn3ic",
+      "shotTitle": "管道旁 - 空间建立",
+      "kind": "空间建立",
+      "visualStyle": "wide cinematic environment",
+      "cameraMotion": "slow push or slow pan",
+      "pacing": "slow-open",
+      "emphasis": "space relation and staging",
+      "audioFocus": "ambient hum and scene atmosphere"
+    },
+    {
+      "shotId": "cmmifzqih000fj4tdyl5zb30x",
+      "shotTitle": "管道旁 - 细节观察",
+      "kind": "细节观察",
+      "visualStyle": "macro close-up with texture emphasis",
+      "cameraMotion": "micro move / focus pull",
+      "pacing": "tight-observation",
+      "emphasis": "object detail and noticing process",
+      "audioFocus": "small tactile sounds and breathing"
+    },
+    {
+      "shotId": "cmmifzqii000hj4tdvcq59kyf",
+      "shotTitle": "管道旁 - 关系压迫",
+      "kind": "关系压迫",
+      "visualStyle": "compressed over-shoulder confrontation",
+      "cameraMotion": "push-in tension",
+      "pacing": "locked-tension",
+      "emphasis": "eyeline pressure and distance conflict",
+      "audioFocus": "silence under tension and reactive movement"
+    },
+    {
+      "shotId": "cmmifzqii000jj4tdhulx2yc4",
+      "shotTitle": "管道旁 - 情绪落点",
+      "kind": "情绪落点",
+      "visualStyle": "close-up emotional isolation",
+      "cameraMotion": "still hold",
+      "pacing": "linger-on-emotion",
+      "emphasis": "face, breath, emotional residue",
+      "audioFocus": "breath, silence, emotional tail"
+    },
+    {
+      "shotId": "cmmifzqij000nj4tdqafo3s83",
+      "shotTitle": "检修现场 - 空间建立",
+      "kind": "空间建立",
+      "visualStyle": "wide cinematic environment",
+      "cameraMotion": "slow push or slow pan",
+      "pacing": "slow-open",
+      "emphasis": "space relation and staging",
+      "audioFocus": "ambient hum and scene atmosphere"
+    },
+    {
+      "shotId": "cmmifzqik000pj4tdanc0z84a",
+      "shotTitle": "检修现场 - 动作触发",
+      "kind": "动作触发",
+      "visualStyle": "action-first directional framing",
+      "cameraMotion": "dynamic reframing",
+      "pacing": "trigger-acceleration",
+      "emphasis": "decision point and motion start",
+      "audioFocus": "impact cues and motion hits"
+    },
+    {
+      "shotId": "cmmifzqik000rj4tdae93ys23",
+      "shotTitle": "检修现场 - 关系压迫",
+      "kind": "关系压迫",
+      "visualStyle": "compressed over-shoulder confrontation",
+      "cameraMotion": "push-in tension",
+      "pacing": "locked-tension",
+      "emphasis": "eyeline pressure and distance conflict",
+      "audioFocus": "silence under tension and reactive movement"
+    },
+    {
+      "shotId": "cmmifzqil000tj4tdmuus1aq5",
+      "shotTitle": "检修现场 - 情绪落点",
+      "kind": "情绪落点",
+      "visualStyle": "close-up emotional isolation",
+      "cameraMotion": "still hold",
+      "pacing": "linger-on-emotion",
+      "emphasis": "face, breath, emotional residue",
+      "audioFocus": "breath, silence, emotional tail"
+    },
+    {
+      "shotId": "cmmifzqim000xj4tdjtpebroz",
+      "shotTitle": "异响逼近 - 空间建立",
+      "kind": "空间建立",
+      "visualStyle": "wide cinematic environment",
+      "cameraMotion": "slow push or slow pan",
+      "pacing": "slow-open",
+      "emphasis": "space relation and staging",
+      "audioFocus": "ambient hum and scene atmosphere"
+    },
+    {
+      "shotId": "cmmifzqim000zj4tdc3ek3ju0",
+      "shotTitle": "异响逼近 - 细节观察",
+      "kind": "细节观察",
+      "visualStyle": "macro close-up with texture emphasis",
+      "cameraMotion": "micro move / focus pull",
+      "pacing": "tight-observation",
+      "emphasis": "object detail and noticing process",
+      "audioFocus": "small tactile sounds and breathing"
+    },
+    {
+      "shotId": "cmmifzqin0011j4tdd34bwmjp",
+      "shotTitle": "异响逼近 - 关系压迫",
+      "kind": "关系压迫",
+      "visualStyle": "compressed over-shoulder confrontation",
+      "cameraMotion": "push-in tension",
+      "pacing": "locked-tension",
+      "emphasis": "eyeline pressure and distance conflict",
+      "audioFocus": "silence under tension and reactive movement"
+    },
+    {
+      "shotId": "cmmifzqin0013j4tdjks6x89w",
+      "shotTitle": "异响逼近 - 情绪落点",
+      "kind": "情绪落点",
+      "visualStyle": "close-up emotional isolation",
+      "cameraMotion": "still hold",
+      "pacing": "linger-on-emotion",
+      "emphasis": "face, breath, emotional residue",
+      "audioFocus": "breath, silence, emotional tail"
+    },
+    {
+      "shotId": "cmmifzqio0017j4tdvcjtzgue",
+      "shotTitle": "核心取出前 - 空间建立",
+      "kind": "空间建立",
+      "visualStyle": "wide cinematic environment",
+      "cameraMotion": "slow push or slow pan",
+      "pacing": "slow-open",
+      "emphasis": "space relation and staging",
+      "audioFocus": "ambient hum and scene atmosphere"
+    },
+    {
+      "shotId": "cmmifzqip0019j4tdht00251k",
+      "shotTitle": "核心取出前 - 动作触发",
+      "kind": "动作触发",
+      "visualStyle": "action-first directional framing",
+      "cameraMotion": "dynamic reframing",
+      "pacing": "trigger-acceleration",
+      "emphasis": "decision point and motion start",
+      "audioFocus": "impact cues and motion hits"
+    },
+    {
+      "shotId": "cmmifzqip001bj4tdueihbvog",
+      "shotTitle": "核心取出前 - 关系压迫",
+      "kind": "关系压迫",
+      "visualStyle": "compressed over-shoulder confrontation",
+      "cameraMotion": "push-in tension",
+      "pacing": "locked-tension",
+      "emphasis": "eyeline pressure and distance conflict",
+      "audioFocus": "silence under tension and reactive movement"
+    },
+    {
+      "shotId": "cmmifzqiq001dj4tdanmtzigv",
+      "shotTitle": "核心取出前 - 情绪落点",
+      "kind": "情绪落点",
+      "visualStyle": "close-up emotional isolation",
+      "cameraMotion": "still hold",
+      "pacing": "linger-on-emotion",
+      "emphasis": "face, breath, emotional residue",
+      "audioFocus": "breath, silence, emotional tail"
+    }
+  ],
+  "payloads": {
+    "imageSequence": [
+      {
+        "provider": "image-sequence",
+        "shotId": "cmmifzqic0003j4tdi77mw9a4",
+        "shotTitle": "维修层 - 空间建立",
+        "sceneTitle": "维修层",
+        "prompt": "从环境与人物相对位置切入，先交代“午夜的维修层像一口埋在城市底部的铁井”所处的空间、时间与压迫关系，让观众在第一眼读懂场域规则。参考构图：近景特写，强调手部与面部。",
+        "cameraNotes": "中远景 / 先交代空间关系与主次层级 / 构图参考：近景特写，强调手部与面部",
+        "visualStyle": "wide cinematic environment",
+        "cameraMotion": "slow push or slow pan",
+        "pacing": "slow-open",
+        "emphasis": "space relation and staging"
+      },
+      {
+        "provider": "image-sequence",
+        "shotId": "cmmifzqid0005j4tdmdehfe7s",
+        "shotTitle": "维修层 - 细节观察",
+        "sceneTitle": "维修层",
+        "prompt": "把注意力压到“冷白色警示灯一闪一灭。”这一细节上，通过视线停留、手部动作或环境异响，让观众跟人物一起完成察觉与确认。情绪参考：压迫、恐惧、临界紧张。",
+        "cameraNotes": "近景特写 / 细节物件或感官线索 / 强调察觉过程 / 情绪参考：压迫、恐惧、临界紧张",
+        "visualStyle": "macro close-up with texture emphasis",
+        "cameraMotion": "micro move / focus pull",
+        "pacing": "tight-observation",
+        "emphasis": "object detail and noticing process"
+      },
+      {
+        "provider": "image-sequence",
+        "shotId": "cmmifzqie0007j4tdccsj4fbe",
+        "shotTitle": "维修层 - 感官压迫",
+        "sceneTitle": "维修层",
+        "prompt": "让环境里的声响、闪烁、液体痕迹或气压变化成为压迫来源，把“冷白色警示灯一闪一灭。”拍成观众能直接感到不安的感官线索。情绪参考：压迫、恐惧、临界紧张。",
+        "cameraNotes": "特写或微距 / 强调环境线索与生理压迫感 / 情绪参考：压迫、恐惧、临界紧张",
+        "visualStyle": "tight framing with flicker contrast",
+        "cameraMotion": "subtle shake / pressure drift",
+        "pacing": "pressure-build",
+        "emphasis": "sensory stress and environmental threat"
+      },
+      {
+        "provider": "image-sequence",
+        "shotId": "cmmifzqif0009j4tdcjxcqet3",
+        "shotTitle": "维修层 - 情绪落点",
+        "sceneTitle": "维修层",
+        "prompt": "收在“冷白色警示灯一闪一灭。”带来的情绪余震上，用更近的观察捕捉人物表情、呼吸或停顿，让这一拍成为 scene 的情绪落点。情绪参考：压迫、恐惧、临界紧张。",
+        "cameraNotes": "特写 / 保留停顿与情绪余波 / 表演重点：压迫、恐惧、临界紧张",
+        "visualStyle": "close-up emotional isolation",
+        "cameraMotion": "still hold",
+        "pacing": "linger-on-emotion",
+        "emphasis": "face, breath, emotional residue"
+      },
+      {
+        "provider": "image-sequence",
+        "shotId": "cmmifzqig000dj4td04kkn3ic",
+        "shotTitle": "管道旁 - 空间建立",
+        "sceneTitle": "管道旁",
+        "prompt": "从环境与人物相对位置切入，先交代“林砚跪在失压管道旁”所处的空间、时间与压迫关系，让观众在第一眼读懂场域规则。参考构图：近景特写，强调手部与面部。",
+        "cameraNotes": "中远景 / 先交代空间关系与主次层级 / 构图参考：近景特写，强调手部与面部",
+        "visualStyle": "wide cinematic environment",
+        "cameraMotion": "slow push or slow pan",
+        "pacing": "slow-open",
+        "emphasis": "space relation and staging"
+      },
+      {
+        "provider": "image-sequence",
+        "shotId": "cmmifzqih000fj4tdyl5zb30x",
+        "shotTitle": "管道旁 - 细节观察",
+        "sceneTitle": "管道旁",
+        "prompt": "把注意力压到“手指沾满黑色冷却液”这一细节上，通过视线停留、手部动作或环境异响，让观众跟人物一起完成察觉与确认。情绪参考：压迫、恐惧、临界紧张。",
+        "cameraNotes": "近景特写 / 细节物件或感官线索 / 强调察觉过程 / 情绪参考：压迫、恐惧、临界紧张",
+        "visualStyle": "macro close-up with texture emphasis",
+        "cameraMotion": "micro move / focus pull",
+        "pacing": "tight-observation",
+        "emphasis": "object detail and noticing process"
+      },
+      {
+        "provider": "image-sequence",
+        "shotId": "cmmifzqii000hj4tdvcq59kyf",
+        "shotTitle": "管道旁 - 关系压迫",
+        "sceneTitle": "管道旁",
+        "prompt": "把人物之间的距离、视线与压迫感拍清楚，让“林砚跪在失压管道旁，手指沾满黑色冷却液，耳边只剩风机低沉的轰鸣。”里的关系张力被看见，而不是只停留在对白说明。情绪参考：压迫、恐惧、临界紧张。",
+        "cameraNotes": "双人近景或过肩镜头 / 强调关系博弈与视线压力 / 情绪参考：压迫、恐惧、临界紧张",
+        "visualStyle": "compressed over-shoulder confrontation",
+        "cameraMotion": "push-in tension",
+        "pacing": "locked-tension",
+        "emphasis": "eyeline pressure and distance conflict"
+      },
+      {
+        "provider": "image-sequence",
+        "shotId": "cmmifzqii000jj4tdhulx2yc4",
+        "shotTitle": "管道旁 - 情绪落点",
+        "sceneTitle": "管道旁",
+        "prompt": "收在“耳边只剩风机低沉的轰鸣。”带来的情绪余震上，用更近的观察捕捉人物表情、呼吸或停顿，让这一拍成为 scene 的情绪落点。情绪参考：压迫、恐惧、临界紧张。",
+        "cameraNotes": "特写 / 保留停顿与情绪余波 / 表演重点：压迫、恐惧、临界紧张",
+        "visualStyle": "close-up emotional isolation",
+        "cameraMotion": "still hold",
+        "pacing": "linger-on-emotion",
+        "emphasis": "face, breath, emotional residue"
+      },
+      {
+        "provider": "image-sequence",
+        "shotId": "cmmifzqij000nj4tdqafo3s83",
+        "shotTitle": "检修现场 - 空间建立",
+        "sceneTitle": "检修现场",
+        "prompt": "从环境与人物相对位置切入，先交代“他刚把损坏的能源阀门撬开”所处的空间、时间与压迫关系，让观众在第一眼读懂场域规则。参考构图：近景特写，强调手部与面部。",
+        "cameraNotes": "中远景 / 先交代空间关系与主次层级 / 构图参考：近景特写，强调手部与面部",
+        "visualStyle": "wide cinematic environment",
+        "cameraMotion": "slow push or slow pan",
+        "pacing": "slow-open",
+        "emphasis": "space relation and staging"
+      },
+      {
+        "provider": "image-sequence",
+        "shotId": "cmmifzqik000pj4tdanc0z84a",
+        "shotTitle": "检修现场 - 动作触发",
+        "sceneTitle": "检修现场",
+        "prompt": "镜头跟进“阀芯深处却露出一枚不属于这个时代的金属核心”这一动作或决定发生的瞬间，不只拍动作本身，还要带出人物为何开始移动或出手。动作节奏参考：动作克制、细节强、悬疑节奏。",
+        "cameraNotes": "中景推进 / 捕捉动作起点与因果触发 / 节奏参考：动作克制、细节强、悬疑节奏",
+        "visualStyle": "action-first directional framing",
+        "cameraMotion": "dynamic reframing",
+        "pacing": "trigger-acceleration",
+        "emphasis": "decision point and motion start"
+      },
+      {
+        "provider": "image-sequence",
+        "shotId": "cmmifzqik000rj4tdae93ys23",
+        "shotTitle": "检修现场 - 关系压迫",
+        "sceneTitle": "检修现场",
+        "prompt": "把人物之间的距离、视线与压迫感拍清楚，让“他刚把损坏的能源阀门撬开，阀芯深处却露出一枚不属于这个时代的金属核心，表面流动着细密…”里的关系张力被看见，而不是只停留在对白说明。情绪参考：压迫、恐惧、临界紧张。",
+        "cameraNotes": "双人近景或过肩镜头 / 强调关系博弈与视线压力 / 情绪参考：压迫、恐惧、临界紧张",
+        "visualStyle": "compressed over-shoulder confrontation",
+        "cameraMotion": "push-in tension",
+        "pacing": "locked-tension",
+        "emphasis": "eyeline pressure and distance conflict"
+      },
+      {
+        "provider": "image-sequence",
+        "shotId": "cmmifzqil000tj4tdmuus1aq5",
+        "shotTitle": "检修现场 - 情绪落点",
+        "sceneTitle": "检修现场",
+        "prompt": "收在“表面流动着细密蓝纹。”带来的情绪余震上，用更近的观察捕捉人物表情、呼吸或停顿，让这一拍成为 scene 的情绪落点。情绪参考：压迫、恐惧、临界紧张。",
+        "cameraNotes": "特写 / 保留停顿与情绪余波 / 表演重点：压迫、恐惧、临界紧张",
+        "visualStyle": "close-up emotional isolation",
+        "cameraMotion": "still hold",
+        "pacing": "linger-on-emotion",
+        "emphasis": "face, breath, emotional residue"
+      },
+      {
+        "provider": "image-sequence",
+        "shotId": "cmmifzqim000xj4tdjtpebroz",
+        "shotTitle": "异响逼近 - 空间建立",
+        "sceneTitle": "异响逼近",
+        "prompt": "从环境与人物相对位置切入，先交代“当他试图把核心取出来时”所处的空间、时间与压迫关系，让观众在第一眼读懂场域规则。参考构图：近景特写，强调手部与面部。",
+        "cameraNotes": "中远景 / 先交代空间关系与主次层级 / 构图参考：近景特写，强调手部与面部",
+        "visualStyle": "wide cinematic environment",
+        "cameraMotion": "slow push or slow pan",
+        "pacing": "slow-open",
+        "emphasis": "space relation and staging"
+      },
+      {
+        "provider": "image-sequence",
+        "shotId": "cmmifzqim000zj4tdc3ek3ju0",
+        "shotTitle": "异响逼近 - 细节观察",
+        "sceneTitle": "异响逼近",
+        "prompt": "把注意力压到“整条管道忽然震动”这一细节上，通过视线停留、手部动作或环境异响，让观众跟人物一起完成察觉与确认。情绪参考：压迫、恐惧、临界紧张。",
+        "cameraNotes": "近景特写 / 细节物件或感官线索 / 强调察觉过程 / 情绪参考：压迫、恐惧、临界紧张",
+        "visualStyle": "macro close-up with texture emphasis",
+        "cameraMotion": "micro move / focus pull",
+        "pacing": "tight-observation",
+        "emphasis": "object detail and noticing process"
+      },
+      {
+        "provider": "image-sequence",
+        "shotId": "cmmifzqin0011j4tdd34bwmjp",
+        "shotTitle": "异响逼近 - 关系压迫",
+        "sceneTitle": "异响逼近",
+        "prompt": "把人物之间的距离、视线与压迫感拍清楚，让“当他试图把核心取出来时，整条管道忽然震动，红色警报在头顶爆开，远处传来安保靴底急促撞…”里的关系张力被看见，而不是只停留在对白说明。情绪参考：压迫、恐惧、临界紧张。",
+        "cameraNotes": "双人近景或过肩镜头 / 强调关系博弈与视线压力 / 情绪参考：压迫、恐惧、临界紧张",
+        "visualStyle": "compressed over-shoulder confrontation",
+        "cameraMotion": "push-in tension",
+        "pacing": "locked-tension",
+        "emphasis": "eyeline pressure and distance conflict"
+      },
+      {
+        "provider": "image-sequence",
+        "shotId": "cmmifzqin0013j4tdjks6x89w",
+        "shotTitle": "异响逼近 - 情绪落点",
+        "sceneTitle": "异响逼近",
+        "prompt": "收在“远处传来安保靴底急促撞击钢板的声音。”带来的情绪余震上，用更近的观察捕捉人物表情、呼吸或停顿，让这一拍成为 scene 的情绪落点。情绪参考：压迫、恐惧、临界紧张。",
+        "cameraNotes": "特写 / 保留停顿与情绪余波 / 表演重点：压迫、恐惧、临界紧张",
+        "visualStyle": "close-up emotional isolation",
+        "cameraMotion": "still hold",
+        "pacing": "linger-on-emotion",
+        "emphasis": "face, breath, emotional residue"
+      },
+      {
+        "provider": "image-sequence",
+        "shotId": "cmmifzqio0017j4tdvcjtzgue",
+        "shotTitle": "核心取出前 - 空间建立",
+        "sceneTitle": "核心取出前",
+        "prompt": "从环境与人物相对位置切入，先交代“林砚下意识握紧那枚核心”所处的空间、时间与压迫关系，让观众在第一眼读懂场域规则。参考构图：近景特写，强调手部与面部。",
+        "cameraNotes": "中远景 / 先交代空间关系与主次层级 / 构图参考：近景特写，强调手部与面部",
+        "visualStyle": "wide cinematic environment",
+        "cameraMotion": "slow push or slow pan",
+        "pacing": "slow-open",
+        "emphasis": "space relation and staging"
+      },
+      {
+        "provider": "image-sequence",
+        "shotId": "cmmifzqip0019j4tdht00251k",
+        "shotTitle": "核心取出前 - 动作触发",
+        "sceneTitle": "核心取出前",
+        "prompt": "镜头跟进“下一秒”这一动作或决定发生的瞬间，不只拍动作本身，还要带出人物为何开始移动或出手。动作节奏参考：动作克制、细节强、悬疑节奏。",
+        "cameraNotes": "中景推进 / 捕捉动作起点与因果触发 / 节奏参考：动作克制、细节强、悬疑节奏",
+        "visualStyle": "action-first directional framing",
+        "cameraMotion": "dynamic reframing",
+        "pacing": "trigger-acceleration",
+        "emphasis": "decision point and motion start"
+      },
+      {
+        "provider": "image-sequence",
+        "shotId": "cmmifzqip001bj4tdueihbvog",
+        "shotTitle": "核心取出前 - 关系压迫",
+        "sceneTitle": "核心取出前",
+        "prompt": "把人物之间的距离、视线与压迫感拍清楚，让“林砚下意识握紧那枚核心，下一秒，一道冰冷而清晰的机械女声直接在他脑海里响起：权限确认…”里的关系张力被看见，而不是只停留在对白说明。情绪参考：压迫、恐惧、临界紧张。",
+        "cameraNotes": "双人近景或过肩镜头 / 强调关系博弈与视线压力 / 情绪参考：压迫、恐惧、临界紧张",
+        "visualStyle": "compressed over-shoulder confrontation",
+        "cameraMotion": "push-in tension",
+        "pacing": "locked-tension",
+        "emphasis": "eyeline pressure and distance conflict"
+      },
+      {
+        "provider": "image-sequence",
+        "shotId": "cmmifzqiq001dj4tdanmtzigv",
+        "shotTitle": "核心取出前 - 情绪落点",
+        "sceneTitle": "核心取出前",
+        "prompt": "收在“残魂协议开始接管。”带来的情绪余震上，用更近的观察捕捉人物表情、呼吸或停顿，让这一拍成为 scene 的情绪落点。情绪参考：压迫、恐惧、临界紧张。",
+        "cameraNotes": "特写 / 保留停顿与情绪余波 / 表演重点：压迫、恐惧、临界紧张",
+        "visualStyle": "close-up emotional isolation",
+        "cameraMotion": "still hold",
+        "pacing": "linger-on-emotion",
+        "emphasis": "face, breath, emotional residue"
+      }
+    ],
+    "voiceSynthesis": [
+      {
+        "provider": "voice-synthesis",
+        "sceneId": "cmmifzqia0001j4td1icw958z",
+        "sceneTitle": "维修层",
+        "summary": "这一场以“午夜的维修层像一口埋在城市底部的铁井”开局，随后把注意力推向“冷白色警示灯一闪一灭。”。导演处理上强调近景特写，强调手部与面部，情绪保持压迫、恐惧、临界紧张，整体节奏为动作克制、细节强、悬疑节奏。",
+        "audioPlan": "dialogue+ambience"
+      },
+      {
+        "provider": "voice-synthesis",
+        "sceneId": "cmmifzqif000bj4tdf9v1zikn",
+        "sceneTitle": "管道旁",
+        "summary": "这一场以“林砚跪在失压管道旁”开局，随后把注意力推向“手指沾满黑色冷却液”。导演处理上强调近景特写，强调手部与面部，情绪保持压迫、恐惧、临界紧张，整体节奏为动作克制、细节强、悬疑节奏。",
+        "audioPlan": "dialogue+ambience"
+      },
+      {
+        "provider": "voice-synthesis",
+        "sceneId": "cmmifzqij000lj4tdawqd47ik",
+        "sceneTitle": "检修现场",
+        "summary": "这一场以“他刚把损坏的能源阀门撬开”开局，随后把注意力推向“阀芯深处却露出一枚不属于这个时代的金属核心”。导演处理上强调近景特写，强调手部与面部，情绪保持压迫、恐惧、临界紧张，整体节奏为动作克制、细节强、悬疑节奏。",
+        "audioPlan": "dialogue+ambience"
+      },
+      {
+        "provider": "voice-synthesis",
+        "sceneId": "cmmifzqil000vj4td6vew4bfz",
+        "sceneTitle": "异响逼近",
+        "summary": "这一场以“当他试图把核心取出来时”开局，随后把注意力推向“整条管道忽然震动”。导演处理上强调近景特写，强调手部与面部，情绪保持压迫、恐惧、临界紧张，整体节奏为动作克制、细节强、悬疑节奏。",
+        "audioPlan": "dialogue+ambience"
+      },
+      {
+        "provider": "voice-synthesis",
+        "sceneId": "cmmifzqio0015j4tdlcvvt3sk",
+        "sceneTitle": "核心取出前",
+        "summary": "这一场以“林砚下意识握紧那枚核心”开局，随后把注意力推向“下一秒”。导演处理上强调近景特写，强调手部与面部，情绪保持压迫、恐惧、临界紧张，整体节奏为动作克制、细节强、悬疑节奏。",
+        "audioPlan": "dialogue+ambience"
+      }
+    ],
+    "videoAssembly": [
+      {
+        "provider": "video-assembly",
+        "shotId": "cmmifzqic0003j4tdi77mw9a4",
+        "shotTitle": "维修层 - 空间建立",
+        "sceneTitle": "维修层",
+        "visualStyle": "wide cinematic environment",
+        "cameraMotion": "slow push or slow pan",
+        "pacing": "slow-open",
+        "audioFocus": "ambient hum and scene atmosphere",
+        "referenceReady": true
+      },
+      {
+        "provider": "video-assembly",
+        "shotId": "cmmifzqid0005j4tdmdehfe7s",
+        "shotTitle": "维修层 - 细节观察",
+        "sceneTitle": "维修层",
+        "visualStyle": "macro close-up with texture emphasis",
+        "cameraMotion": "micro move / focus pull",
+        "pacing": "tight-observation",
+        "audioFocus": "small tactile sounds and breathing",
+        "referenceReady": true
+      },
+      {
+        "provider": "video-assembly",
+        "shotId": "cmmifzqie0007j4tdccsj4fbe",
+        "shotTitle": "维修层 - 感官压迫",
+        "sceneTitle": "维修层",
+        "visualStyle": "tight framing with flicker contrast",
+        "cameraMotion": "subtle shake / pressure drift",
+        "pacing": "pressure-build",
+        "audioFocus": "alarm, rumble, pressure noise",
+        "referenceReady": true
+      },
+      {
+        "provider": "video-assembly",
+        "shotId": "cmmifzqif0009j4tdcjxcqet3",
+        "shotTitle": "维修层 - 情绪落点",
+        "sceneTitle": "维修层",
+        "visualStyle": "close-up emotional isolation",
+        "cameraMotion": "still hold",
+        "pacing": "linger-on-emotion",
+        "audioFocus": "breath, silence, emotional tail",
+        "referenceReady": true
+      },
+      {
+        "provider": "video-assembly",
+        "shotId": "cmmifzqig000dj4td04kkn3ic",
+        "shotTitle": "管道旁 - 空间建立",
+        "sceneTitle": "管道旁",
+        "visualStyle": "wide cinematic environment",
+        "cameraMotion": "slow push or slow pan",
+        "pacing": "slow-open",
+        "audioFocus": "ambient hum and scene atmosphere",
+        "referenceReady": true
+      },
+      {
+        "provider": "video-assembly",
+        "shotId": "cmmifzqih000fj4tdyl5zb30x",
+        "shotTitle": "管道旁 - 细节观察",
+        "sceneTitle": "管道旁",
+        "visualStyle": "macro close-up with texture emphasis",
+        "cameraMotion": "micro move / focus pull",
+        "pacing": "tight-observation",
+        "audioFocus": "small tactile sounds and breathing",
+        "referenceReady": true
+      },
+      {
+        "provider": "video-assembly",
+        "shotId": "cmmifzqii000hj4tdvcq59kyf",
+        "shotTitle": "管道旁 - 关系压迫",
+        "sceneTitle": "管道旁",
+        "visualStyle": "compressed over-shoulder confrontation",
+        "cameraMotion": "push-in tension",
+        "pacing": "locked-tension",
+        "audioFocus": "silence under tension and reactive movement",
+        "referenceReady": true
+      },
+      {
+        "provider": "video-assembly",
+        "shotId": "cmmifzqii000jj4tdhulx2yc4",
+        "shotTitle": "管道旁 - 情绪落点",
+        "sceneTitle": "管道旁",
+        "visualStyle": "close-up emotional isolation",
+        "cameraMotion": "still hold",
+        "pacing": "linger-on-emotion",
+        "audioFocus": "breath, silence, emotional tail",
+        "referenceReady": true
+      },
+      {
+        "provider": "video-assembly",
+        "shotId": "cmmifzqij000nj4tdqafo3s83",
+        "shotTitle": "检修现场 - 空间建立",
+        "sceneTitle": "检修现场",
+        "visualStyle": "wide cinematic environment",
+        "cameraMotion": "slow push or slow pan",
+        "pacing": "slow-open",
+        "audioFocus": "ambient hum and scene atmosphere",
+        "referenceReady": true
+      },
+      {
+        "provider": "video-assembly",
+        "shotId": "cmmifzqik000pj4tdanc0z84a",
+        "shotTitle": "检修现场 - 动作触发",
+        "sceneTitle": "检修现场",
+        "visualStyle": "action-first directional framing",
+        "cameraMotion": "dynamic reframing",
+        "pacing": "trigger-acceleration",
+        "audioFocus": "impact cues and motion hits",
+        "referenceReady": true
+      },
+      {
+        "provider": "video-assembly",
+        "shotId": "cmmifzqik000rj4tdae93ys23",
+        "shotTitle": "检修现场 - 关系压迫",
+        "sceneTitle": "检修现场",
+        "visualStyle": "compressed over-shoulder confrontation",
+        "cameraMotion": "push-in tension",
+        "pacing": "locked-tension",
+        "audioFocus": "silence under tension and reactive movement",
+        "referenceReady": true
+      },
+      {
+        "provider": "video-assembly",
+        "shotId": "cmmifzqil000tj4tdmuus1aq5",
+        "shotTitle": "检修现场 - 情绪落点",
+        "sceneTitle": "检修现场",
+        "visualStyle": "close-up emotional isolation",
+        "cameraMotion": "still hold",
+        "pacing": "linger-on-emotion",
+        "audioFocus": "breath, silence, emotional tail",
+        "referenceReady": true
+      },
+      {
+        "provider": "video-assembly",
+        "shotId": "cmmifzqim000xj4tdjtpebroz",
+        "shotTitle": "异响逼近 - 空间建立",
+        "sceneTitle": "异响逼近",
+        "visualStyle": "wide cinematic environment",
+        "cameraMotion": "slow push or slow pan",
+        "pacing": "slow-open",
+        "audioFocus": "ambient hum and scene atmosphere",
+        "referenceReady": true
+      },
+      {
+        "provider": "video-assembly",
+        "shotId": "cmmifzqim000zj4tdc3ek3ju0",
+        "shotTitle": "异响逼近 - 细节观察",
+        "sceneTitle": "异响逼近",
+        "visualStyle": "macro close-up with texture emphasis",
+        "cameraMotion": "micro move / focus pull",
+        "pacing": "tight-observation",
+        "audioFocus": "small tactile sounds and breathing",
+        "referenceReady": true
+      },
+      {
+        "provider": "video-assembly",
+        "shotId": "cmmifzqin0011j4tdd34bwmjp",
+        "shotTitle": "异响逼近 - 关系压迫",
+        "sceneTitle": "异响逼近",
+        "visualStyle": "compressed over-shoulder confrontation",
+        "cameraMotion": "push-in tension",
+        "pacing": "locked-tension",
+        "audioFocus": "silence under tension and reactive movement",
+        "referenceReady": true
+      },
+      {
+        "provider": "video-assembly",
+        "shotId": "cmmifzqin0013j4tdjks6x89w",
+        "shotTitle": "异响逼近 - 情绪落点",
+        "sceneTitle": "异响逼近",
+        "visualStyle": "close-up emotional isolation",
+        "cameraMotion": "still hold",
+        "pacing": "linger-on-emotion",
+        "audioFocus": "breath, silence, emotional tail",
+        "referenceReady": true
+      },
+      {
+        "provider": "video-assembly",
+        "shotId": "cmmifzqio0017j4tdvcjtzgue",
+        "shotTitle": "核心取出前 - 空间建立",
+        "sceneTitle": "核心取出前",
+        "visualStyle": "wide cinematic environment",
+        "cameraMotion": "slow push or slow pan",
+        "pacing": "slow-open",
+        "audioFocus": "ambient hum and scene atmosphere",
+        "referenceReady": true
+      },
+      {
+        "provider": "video-assembly",
+        "shotId": "cmmifzqip0019j4tdht00251k",
+        "shotTitle": "核心取出前 - 动作触发",
+        "sceneTitle": "核心取出前",
+        "visualStyle": "action-first directional framing",
+        "cameraMotion": "dynamic reframing",
+        "pacing": "trigger-acceleration",
+        "audioFocus": "impact cues and motion hits",
+        "referenceReady": true
+      },
+      {
+        "provider": "video-assembly",
+        "shotId": "cmmifzqip001bj4tdueihbvog",
+        "shotTitle": "核心取出前 - 关系压迫",
+        "sceneTitle": "核心取出前",
+        "visualStyle": "compressed over-shoulder confrontation",
+        "cameraMotion": "push-in tension",
+        "pacing": "locked-tension",
+        "audioFocus": "silence under tension and reactive movement",
+        "referenceReady": true
+      },
+      {
+        "provider": "video-assembly",
+        "shotId": "cmmifzqiq001dj4tdanmtzigv",
+        "shotTitle": "核心取出前 - 情绪落点",
+        "sceneTitle": "核心取出前",
+        "visualStyle": "close-up emotional isolation",
+        "cameraMotion": "still hold",
+        "pacing": "linger-on-emotion",
+        "audioFocus": "breath, silence, emotional tail",
+        "referenceReady": true
+      }
+    ]
+  }
+}

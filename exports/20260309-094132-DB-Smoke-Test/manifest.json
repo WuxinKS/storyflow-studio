@@ -1,0 +1,16 @@
+{
+  "projectId": "cmmhypi3w0000j47ppkk25jml",
+  "projectTitle": "DB Smoke Test",
+  "exportedAt": "2026-03-09T01:41:32.393Z",
+  "bundleDir": "/Users/hema/.openclaw/workspace/storyflow-studio/exports/20260309-094132-DB-Smoke-Test",
+  "files": [
+    "render-presets.json",
+    "provider-payloads.json",
+    "production-bundle.json"
+  ],
+  "usage": [
+    "先看 production-bundle.json 获取全量总览",
+    "provider-payloads.json 直接用于对接 image / voice / video provider",
+    "render-presets.json 用于单镜头渲染预设调试与复核"
+  ]
+}
