@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { generateText } from '@/lib/llm';
 import { parseCharacterDrafts, type CharacterDraft } from '@/features/characters/service';
+import { isGeneratedNovelChapterTitle, isStoryEngineChapterTitle } from '@/features/story/service';
 import { normalizeShotKind, type AllowedShotTitle } from '@/lib/shot-taxonomy';
 
 type StructuredSceneSeed = {
@@ -437,6 +438,26 @@ async function resolveAdaptationSource(projectId: string) {
 
   if (!project) throw new Error('没有可用于改编的章节');
 
+  const latestGeneratedNovelChapter = project.chapters.find((chapter) => isGeneratedNovelChapterTitle(chapter.title));
+  if (latestGeneratedNovelChapter) {
+    return {
+      project,
+      sourceType: 'novel-chapter' as const,
+      sourceChapter: latestGeneratedNovelChapter,
+      sceneSeeds: ensureSceneSeedCount(splitIntoSceneSeeds(latestGeneratedNovelChapter.content || '').map((item) => ({ raw: item, meta: null }))),
+    };
+  }
+
+  const latestManualChapter = project.chapters.find((chapter) => !isStoryEngineChapterTitle(chapter.title));
+  if (latestManualChapter) {
+    return {
+      project,
+      sourceType: 'chapter' as const,
+      sourceChapter: latestManualChapter,
+      sceneSeeds: ensureSceneSeedCount(splitIntoSceneSeeds(latestManualChapter.content || '').map((item) => ({ raw: item, meta: null }))),
+    };
+  }
+
   const storySceneChapter = project.chapters.find((chapter) => chapter.title === 'Story Engine Scene Seeds');
   if (storySceneChapter) {
     const structuredSeeds = parseStructuredSceneSeeds(storySceneChapter.content || '');
@@ -451,17 +472,7 @@ async function resolveAdaptationSource(projectId: string) {
     };
   }
 
-  const latestNormalChapter = project.chapters.find((chapter) => !chapter.title.startsWith('Story Engine'));
-  if (!latestNormalChapter) {
-    throw new Error('没有可用于改编的章节');
-  }
-
-  return {
-    project,
-    sourceType: 'chapter' as const,
-    sourceChapter: latestNormalChapter,
-    sceneSeeds: ensureSceneSeedCount(splitIntoSceneSeeds(latestNormalChapter.content || '').map((item) => ({ raw: item, meta: null }))),
-  };
+  throw new Error('没有可用于改编的章节');
 }
 
 export async function generateAdaptationFromLatestChapter(projectId: string) {

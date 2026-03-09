@@ -1,6 +1,7 @@
 import { AdaptationGenerateButton } from '@/components/adaptation-generate-button';
 import { SyncNoticeCard } from '@/components/sync-notice-card';
 import { getLatestProjectWithChapters } from '@/features/adaptation/service';
+import { isGeneratedNovelChapterTitle, isStoryEngineChapterTitle } from '@/features/story/service';
 import { getSyncStatus } from '@/features/sync/service';
 
 function extractReferenceTitle(notes: string | null) {
@@ -17,6 +18,37 @@ function getShotKind(title: string) {
   return kind;
 }
 
+function resolveAdaptationSource(chapters: Array<{ title: string }>) {
+  const latestAiChapter = chapters.find((chapter) => isGeneratedNovelChapterTitle(chapter.title));
+  if (latestAiChapter) {
+    return {
+      label: 'AI 小说正文',
+      detail: latestAiChapter.title,
+    };
+  }
+
+  const latestManualChapter = chapters.find((chapter) => !isStoryEngineChapterTitle(chapter.title));
+  if (latestManualChapter) {
+    return {
+      label: '手写 / 普通章节',
+      detail: latestManualChapter.title,
+    };
+  }
+
+  const sceneSeedChapter = chapters.find((chapter) => chapter.title === 'Story Engine Scene Seeds');
+  if (sceneSeedChapter) {
+    return {
+      label: '结构分场种子',
+      detail: sceneSeedChapter.title,
+    };
+  }
+
+  return {
+    label: '暂无可用源',
+    detail: '请先生成小说或故事结构。',
+  };
+}
+
 export async function AdaptationData() {
   const project = await getLatestProjectWithChapters().catch(() => null);
 
@@ -30,7 +62,7 @@ export async function AdaptationData() {
     );
   }
 
-  const latestChapter = project.chapters[project.chapters.length - 1];
+  const adaptationSource = resolveAdaptationSource(project.chapters);
   const groupedShots = project.scenes.map((scene) => ({
     scene,
     shots: project.shots.filter((shot) => shot.sceneId === scene.id),
@@ -45,9 +77,10 @@ export async function AdaptationData() {
       <div className="snapshot-card">
         <p className="eyebrow">改编源</p>
         <h3>{project.title}</h3>
-        <p>{latestChapter ? `当前使用章节：${latestChapter.title}` : '当前还没有章节内容可供改编。'}</p>
+        <p>当前改编优先读取小说正文；若还没有正文，再回退到手写章节或 Story Engine 分场种子。</p>
         <div className="meta-list">
-          <span>章节数：{project.chapters.length}</span>
+          <span>当前源类型：{adaptationSource.label}</span>
+          <span>当前源内容：{adaptationSource.detail}</span>
           <span>分场：{project.scenes.length}</span>
           <span>镜头：{project.shots.length}</span>
           <span>参考：{references.length}</span>
@@ -72,8 +105,8 @@ export async function AdaptationData() {
         </div>
         <div className="asset-tile">
           <span className="label">改编模式</span>
-          <h4>改编引擎 v2.4</h4>
-          <p>当前分场标题已切换为白名单稳定版：地点词 / 状态词优先，未命中则安全回退为场次编号。</p>
+          <h4>改编引擎 v2.5</h4>
+          <p>当前已优先从 AI 小说正文出发做自动分镜，让分场和镜头更贴近真实长文本内容，而不只是结构层占位。</p>
         </div>
       </div>
 
@@ -97,7 +130,7 @@ export async function AdaptationData() {
         <div className="asset-tile">
           <span className="label">输出状态</span>
           <h4>当前输出状态</h4>
-          <p>标题已不再做危险自由拼接，优先保证稳定、可读、可交付。</p>
+          <p>改编链现在优先吃小说正文，再回退结构种子，更接近“一句话 → 小说 → 分镜”的真实主链。</p>
         </div>
       </div>
 
@@ -106,7 +139,7 @@ export async function AdaptationData() {
           <div className="asset-tile">
             <span className="label">空状态</span>
             <h4>还没有分场 / 镜头</h4>
-            <p>点击上方按钮，基于最新章节自动生成第一版结构化改编结果。</p>
+            <p>点击上方按钮，基于当前优先源自动生成第一版结构化改编结果。</p>
           </div>
         ) : (
           groupedShots.map(({ scene, shots }) => (
