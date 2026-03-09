@@ -7,6 +7,7 @@ import {
   getRenderProviderLabel,
 } from '@/lib/display';
 import { getRenderPresetForShot, getRenderProject, parseRenderJobOutput } from '@/features/render/service';
+import { getGeneratedMediaEntries, summarizeGeneratedMediaCounts } from '@/features/media/service';
 import { getSyncStatus } from '@/features/sync/service';
 import { getVisualBibleBundle } from '@/features/visual/service';
 import { getShotKindFromTitle } from '@/lib/shot-taxonomy';
@@ -75,6 +76,13 @@ function getRenderStrategy(kind: string) {
   };
 }
 
+function getGeneratedMediaTypeLabel(type: string) {
+  if (type === 'generated-image') return '生成图片';
+  if (type === 'generated-audio') return '生成音频';
+  if (type === 'generated-video') return '生成视频';
+  return '生成产物';
+}
+
 export async function RenderStudioData() {
   const project = await getRenderProject().catch(() => null);
 
@@ -90,13 +98,13 @@ export async function RenderStudioData() {
 
   const summary = summarizeStatus(project.renderJobs.map((job) => job.status));
   const syncStatus = await getSyncStatus(project.id).catch(() => null);
+  const generatedMedia = getGeneratedMediaEntries(project);
+  const mediaCounts = summarizeGeneratedMediaCounts(generatedMedia);
   const jobOutputs = project.renderJobs.map((job) => ({
     job,
     meta: parseRenderJobOutput(job.outputUrl),
   }));
-  const finalPreviewReady = jobOutputs.some(
-    ({ job, meta }) => job.provider === 'video-assembly' && meta.summary.some((item) => item.includes('final-cut:preview-ready')),
-  );
+  const finalPreviewReady = generatedMedia.some((item) => item.type === 'generated-video');
   const flavoredCount = project.shots.filter((shot) => hasReferenceFlavor(shot.prompt)).length;
   const directorReadyCount = project.scenes.filter((scene) => hasDirectorLanguage(scene.summary)).length;
   const shotKinds = Array.from(new Set(project.shots.map((shot) => getShotKindFromTitle(shot.title))));
@@ -111,7 +119,7 @@ export async function RenderStudioData() {
       <div className="snapshot-card">
         <p className="eyebrow">生成总览</p>
         <h3>{project.title}</h3>
-        <p>当前生成工作台已支持真实 Provider 调用入口；若未配置真实 endpoint，会自动回退到模拟执行，但仍会生成请求 / 响应工件，方便质量检查与交付复验。</p>
+        <p>当前生成工作台不仅能组织任务，还会把图片、音频、视频产物回写到统一媒体索引，方便后续资产管理、交付和复验。</p>
         <div className="meta-list">
           <span>分场：{project.scenes.length}</span>
           <span>镜头：{project.shots.length}</span>
@@ -124,6 +132,7 @@ export async function RenderStudioData() {
         <div className="action-row">
           <Link href="/storyboard" className="button-ghost">返回分镜板</Link>
           <Link href="/visual-bible" className="button-secondary">查看视觉圣经</Link>
+          <Link href="/assets" className="button-secondary">查看资产中心</Link>
         </div>
       </div>
 
@@ -139,7 +148,7 @@ export async function RenderStudioData() {
         <div className="asset-tile">
           <span className="label">交付状态</span>
           <h4>成片状态</h4>
-          <p>{finalPreviewReady ? 'final-cut 已准备预览' : '成片尚未准备好，继续执行任务或重试失败项。'}</p>
+          <p>{finalPreviewReady ? '已有视频产物进入媒体索引，可继续走交付。' : '成片尚未准备好，继续执行任务或重试失败项。'}</p>
         </div>
         <div className="asset-tile">
           <span className="label">执行模式</span>
@@ -153,6 +162,24 @@ export async function RenderStudioData() {
           <SyncNoticeCard card={syncStatus.cards.render} />
         </div>
       ) : null}
+
+      <div className="asset-grid three-up">
+        <div className="asset-tile">
+          <span className="label">媒体索引</span>
+          <h4>已沉淀产物</h4>
+          <p>总计 {mediaCounts.total} 条，图片 {mediaCounts.images} / 音频 {mediaCounts.audio} / 视频 {mediaCounts.videos}</p>
+        </div>
+        <div className="asset-tile">
+          <span className="label">产物模式</span>
+          <h4>真实与模拟</h4>
+          <p>真实产物 {mediaCounts.remote} 条 / 模拟产物 {mediaCounts.mock} 条</p>
+        </div>
+        <div className="asset-tile">
+          <span className="label">媒体回写</span>
+          <h4>资产中心联动</h4>
+          <p>{mediaCounts.total > 0 ? '当前生成结果已同步到媒体索引，可在资产中心统一查看。' : '当前还没有可沉淀的媒体产物，建议先执行渲染任务。'}</p>
+        </div>
+      </div>
 
       <div className="asset-grid three-up">
         <div className="asset-tile">
@@ -234,8 +261,32 @@ export async function RenderStudioData() {
         <div className="asset-tile">
           <span className="label">交付包导出</span>
           <h4>生产交付包</h4>
-          <p>可通过 <code>/api/render?action=export-production-bundle&amp;projectId={project.id}</code> 在 <code>exports/</code> 目录落盘完整交付包。</p>
+          <p>交付包现在会同时带上媒体索引，便于把生成产物和结构数据一起归档。</p>
         </div>
+      </div>
+
+      <div className="asset-grid three-up">
+        {generatedMedia.length === 0 ? (
+          <div className="asset-tile">
+            <span className="label">空状态</span>
+            <h4>还没有生成产物</h4>
+            <p>执行渲染任务后，这里会展示最新沉淀的图片、音频和视频产物。</p>
+          </div>
+        ) : (
+          generatedMedia.slice(0, 6).map((item) => (
+            <div key={item.id} className="asset-tile scene-tile">
+              <span className="label">{getGeneratedMediaTypeLabel(item.type)}</span>
+              <h4>{item.title}</h4>
+              <p>{item.summary}</p>
+              <div className="meta-list">
+                <span>模式：{getRenderExecutionModeLabel(item.mode)}</span>
+                <span>Provider：{getRenderProviderLabel(item.provider)}</span>
+              </div>
+              {item.localPath ? <p>文件：{item.localPath}</p> : null}
+              {item.sourceUrl ? <p>链接：{item.sourceUrl}</p> : null}
+            </div>
+          ))
+        )}
       </div>
 
       <div className="asset-grid three-up">
@@ -255,8 +306,10 @@ export async function RenderStudioData() {
                 <span>模式：{getRenderExecutionModeLabel(meta.mode)}</span>
                 <span>重试：{meta.retryCount}</span>
                 <span>载荷：{meta.payloadCount}</span>
+                <span>产物：{meta.assetCount || 0}</span>
               </div>
               {meta.preview ? <p>响应摘要：{meta.preview}</p> : null}
+              {meta.artifactIndexPath ? <p>索引：{meta.artifactIndexPath}</p> : null}
               {meta.lastError ? <p>错误：{meta.lastError}</p> : null}
             </div>
           ))

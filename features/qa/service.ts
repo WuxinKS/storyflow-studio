@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { getShotKindFromTitle, ALLOWED_SHOT_TITLES } from '@/lib/shot-taxonomy';
 import { parseCharacterDrafts } from '@/features/characters/service';
+import { getGeneratedMediaEntries, summarizeGeneratedMediaCounts } from '@/features/media/service';
 import { parseVisualBibleDraft } from '@/features/visual/service';
 import { exportProductionBundle, exportProviderPayloads, exportRenderPresets } from '@/features/render/service';
 import { getSyncStatus } from '@/features/sync/service';
@@ -53,6 +54,8 @@ export async function getQaReport() {
   const visualBible = visualOutline ? parseVisualBibleDraft(visualOutline.summary) : null;
   const characters = characterOutline ? parseCharacterDrafts(characterOutline.summary) : [];
   const syncStatus = await getSyncStatus(project.id).catch(() => null);
+  const generatedMedia = getGeneratedMediaEntries(project);
+  const mediaCounts = summarizeGeneratedMediaCounts(generatedMedia);
 
   const shotKinds = project.shots.map((shot) => getShotKindFromTitle(shot.title));
   const invalidShotKinds = shotKinds.filter((kind) => !ALLOWED_SHOT_TITLES.includes(kind));
@@ -75,6 +78,7 @@ export async function getQaReport() {
 
   const [presetExport, providerExport, bundleExport] = exportChecks;
   const failedRenderJobs = project.renderJobs.filter((job) => job.status === 'failed');
+  const doneRenderJobs = project.renderJobs.filter((job) => job.status === 'done');
   const staleLabels = syncStatus?.staleChecks || [];
 
   const checks: QaCheck[] = [
@@ -157,6 +161,39 @@ export async function getQaReport() {
       group: 'render',
       severity: project.renderJobs.length === 0 ? 'blocker' : 'warning',
       blocksDelivery: project.renderJobs.length === 0,
+    },
+    {
+      key: 'render-completed',
+      label: '至少一类渲染任务已完成',
+      passed: doneRenderJobs.length > 0,
+      detail: doneRenderJobs.length > 0
+        ? doneRenderJobs.map((job) => `${job.provider}:done`).join(' / ')
+        : '当前还没有完成的渲染任务。',
+      group: 'render',
+      severity: 'blocker',
+      blocksDelivery: true,
+    },
+    {
+      key: 'generated-media-index',
+      label: '生成产物已沉淀到媒体索引',
+      passed: doneRenderJobs.length > 0 && mediaCounts.total > 0,
+      detail: mediaCounts.total > 0
+        ? `图片:${mediaCounts.images} / 音频:${mediaCounts.audio} / 视频:${mediaCounts.videos}`
+        : '当前媒体索引还没有生成产物。',
+      group: 'render',
+      severity: doneRenderJobs.length > 0 ? 'blocker' : 'warning',
+      blocksDelivery: doneRenderJobs.length > 0,
+    },
+    {
+      key: 'final-video',
+      label: '至少已有一条视频产物',
+      passed: mediaCounts.videos > 0,
+      detail: mediaCounts.videos > 0
+        ? `当前已有 ${mediaCounts.videos} 条视频产物。`
+        : '当前还没有沉淀出视频产物。',
+      group: 'render',
+      severity: 'warning',
+      blocksDelivery: false,
     },
     {
       key: 'export-presets',

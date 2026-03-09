@@ -2,8 +2,17 @@ import { prisma } from '@/lib/prisma';
 import { getLatestOutlineByTitle, createOutlineVersion } from '@/lib/outline-store';
 import { parseCharacterDrafts } from '@/features/characters/service';
 import { parseVisualBibleDraft } from '@/features/visual/service';
+import { getGeneratedMediaEntries } from '@/features/media/service';
 
-export type AssetType = 'character' | 'scene' | 'prop' | 'style-board' | 'reference-image';
+export type AssetType =
+  | 'character'
+  | 'scene'
+  | 'prop'
+  | 'style-board'
+  | 'reference-image'
+  | 'generated-image'
+  | 'generated-audio'
+  | 'generated-video';
 
 export type AssetEntry = {
   id: string;
@@ -64,11 +73,19 @@ function serializeAssetLibrary(entries: AssetEntry[]) {
   return JSON.stringify({ version: 1, items: entries }, null, 2);
 }
 
-function buildAssetLinks(input: { sceneTitle?: string; shotTitle?: string; characterName?: string }) {
+function buildAssetLinks(input: {
+  sceneTitle?: string;
+  shotTitle?: string;
+  characterName?: string;
+  localPath?: string | null;
+  sourceUrl?: string | null;
+}) {
   return [
     input.sceneTitle ? `场景：${input.sceneTitle}` : null,
     input.shotTitle ? `镜头：${input.shotTitle}` : null,
     input.characterName ? `角色：${input.characterName}` : null,
+    input.localPath ? `文件：${input.localPath}` : null,
+    input.sourceUrl ? `链接：${input.sourceUrl}` : null,
   ].filter(Boolean) as string[];
 }
 
@@ -102,6 +119,7 @@ export function getAssetBundle(project: Awaited<ReturnType<typeof getLatestAsset
   const characters = characterOutline ? parseCharacterDrafts(characterOutline.summary) : [];
   const visualBible = visualOutline ? parseVisualBibleDraft(visualOutline.summary) : null;
   const manualAssets = getManualAssetEntries(project);
+  const generatedMedia = getGeneratedMediaEntries(project);
   const sceneTitleMap = new Map(project.scenes.map((scene) => [scene.id, scene.title]));
   const shotTitleMap = new Map(project.shots.map((shot) => [shot.id, shot.title]));
 
@@ -153,8 +171,24 @@ export function getAssetBundle(project: Awaited<ReturnType<typeof getLatestAsset
       source: 'Reference Analysis',
       links: [],
       mode: 'auto',
-    };
+    } satisfies AssetCard;
   });
+
+  const generatedMediaCards: AssetCard[] = generatedMedia.map((item) => ({
+    id: item.id,
+    type: item.type,
+    title: item.title,
+    summary: item.summary,
+    tags: [item.provider, item.mode, ...item.tags].filter(Boolean),
+    source: item.mode === 'remote' ? 'Render Remote Output' : 'Render Mock Output',
+    links: buildAssetLinks({
+      sceneTitle: item.sceneId ? sceneTitleMap.get(item.sceneId) : undefined,
+      shotTitle: item.shotId ? shotTitleMap.get(item.shotId) : undefined,
+      localPath: item.localPath || item.artifactPath || undefined,
+      sourceUrl: item.sourceUrl || undefined,
+    }),
+    mode: 'auto',
+  }));
 
   const manualCards: AssetCard[] = manualAssets.map((item) => ({
     id: item.id,
@@ -171,7 +205,7 @@ export function getAssetBundle(project: Awaited<ReturnType<typeof getLatestAsset
     mode: 'manual',
   }));
 
-  return [...manualCards, ...characterAssets, ...styleAssets, ...sceneAssets, ...referenceAssets];
+  return [...manualCards, ...generatedMediaCards, ...characterAssets, ...styleAssets, ...sceneAssets, ...referenceAssets];
 }
 
 export function getAssetEditorOptions(project: Awaited<ReturnType<typeof getLatestAssetProject>>) {

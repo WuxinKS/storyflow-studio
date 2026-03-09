@@ -7,6 +7,12 @@ import { parseVisualBibleDraft, type VisualBibleDraft } from '@/features/visual/
 import { parseCharacterDrafts, type CharacterDraft } from '@/features/characters/service';
 import { getShotKindFromTitle } from '@/lib/shot-taxonomy';
 import { getLatestOutlineByTitle } from '@/lib/outline-store';
+import {
+  getGeneratedMediaEntries,
+  replaceGeneratedMediaEntriesForProvider,
+  type GeneratedMediaEntry,
+  type GeneratedMediaType,
+} from '@/features/media/service';
 
 const execFileAsync = promisify(execFile);
 
@@ -25,6 +31,8 @@ type RenderJobMeta = {
   lastError?: string;
   preview?: string;
   executedAt?: string;
+  assetCount?: number;
+  artifactIndexPath?: string;
 };
 
 const DEFAULT_JOB_META: RenderJobMeta = {
@@ -390,6 +398,7 @@ export async function exportProductionBundle(projectId: string) {
 
   const presetsData = await exportRenderPresets(projectId);
   const providerData = await exportProviderPayloads(projectId);
+  const generatedMedia = getGeneratedMediaEntries(project);
   const bundle = {
     projectId: project.id,
     projectTitle: project.title,
@@ -416,6 +425,7 @@ export async function exportProductionBundle(projectId: string) {
       status: job.status,
       output: parseRenderJobOutput(job.outputUrl),
     })),
+    generatedMedia,
     presets: presetsData.presets,
     providerPayloads: providerData.providers,
   };
@@ -427,12 +437,14 @@ export async function exportProductionBundle(projectId: string) {
 
   const presetsPath = path.join(bundleDir, 'render-presets.json');
   const providersPath = path.join(bundleDir, 'provider-payloads.json');
+  const generatedMediaPath = path.join(bundleDir, 'generated-media-library.json');
   const bundlePath = path.join(bundleDir, 'production-bundle.json');
   const manifestPath = path.join(bundleDir, 'manifest.json');
   const zipPath = path.join(baseDir, `${bundleName}.zip`);
 
   await writeFile(presetsPath, JSON.stringify(presetsData, null, 2), 'utf8');
   await writeFile(providersPath, JSON.stringify(providerData, null, 2), 'utf8');
+  await writeFile(generatedMediaPath, JSON.stringify({ version: 1, items: generatedMedia }, null, 2), 'utf8');
   await writeFile(bundlePath, JSON.stringify(bundle, null, 2), 'utf8');
 
   const manifest = {
@@ -445,11 +457,13 @@ export async function exportProductionBundle(projectId: string) {
     files: [
       'render-presets.json',
       'provider-payloads.json',
+      'generated-media-library.json',
       'production-bundle.json',
     ],
     usage: [
       '先看 production-bundle.json 获取全量总览',
       'provider-payloads.json 直接用于对接 image / voice / video provider',
+      'generated-media-library.json 可查看本次沉淀出的媒体资产索引',
       'render-presets.json 用于单镜头渲染预设调试与复核',
     ],
   };
@@ -464,6 +478,7 @@ export async function exportProductionBundle(projectId: string) {
       manifestPath,
       presetsPath,
       providersPath,
+      generatedMediaPath,
       bundlePath,
     },
   };
@@ -572,8 +587,10 @@ async function executeProvider(provider: ProviderKind, project: { id: string; ti
     return {
       mode: 'mock' as const,
       endpoint: null,
+      runDir,
       requestPath,
       responsePath,
+      responseBody: mockResponse,
       preview: mockResponse.message,
       summary: [`mode:mock`, `items:${payload.length}`, `response:${path.basename(responsePath)}`],
     };
@@ -609,11 +626,140 @@ async function executeProvider(provider: ProviderKind, project: { id: string; ti
   return {
     mode: 'remote' as const,
     endpoint,
+    runDir,
     requestPath,
     responsePath,
+    responseBody,
     preview: rawText.slice(0, 180),
     summary: [`mode:remote`, `items:${payload.length}`, `endpoint:${endpoint}`, `response:${path.basename(responsePath)}`],
   };
+}
+
+type RenderPayloadRecord = Record<string, unknown>;
+type ProviderResponseRecord = Record<string, unknown>;
+
+function toRecord(value: unknown) {
+  return value && typeof value === 'object' ? value as ProviderResponseRecord : {} as ProviderResponseRecord;
+}
+
+function pickText(record: ProviderResponseRecord, keys: string[]) {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return null;
+}
+
+function getResponseItems(responseBody: unknown) {
+  if (Array.isArray(responseBody)) return responseBody.map((item) => toRecord(item));
+
+  const record = toRecord(responseBody);
+  const candidates = ['items', 'data', 'outputs', 'results'];
+  for (const key of candidates) {
+    const value = record[key];
+    if (Array.isArray(value)) return value.map((item) => toRecord(item));
+  }
+
+  return [] as ProviderResponseRecord[];
+}
+
+function getGeneratedMediaType(provider: ProviderKind): GeneratedMediaType {
+  if (provider === 'voice-synthesis') return 'generated-audio';
+  if (provider === 'video-assembly') return 'generated-video';
+  return 'generated-image';
+}
+
+function getGeneratedMediaTitle(provider: ProviderKind, payloadRecord: RenderPayloadRecord, index: number) {
+  const shotTitle = typeof payloadRecord.shotTitle === 'string' ? payloadRecord.shotTitle : null;
+  const sceneTitle = typeof payloadRecord.sceneTitle === 'string' ? payloadRecord.sceneTitle : null;
+
+  if (provider === 'voice-synthesis') return `${sceneTitle || `Scene ${index + 1}`} 配音轨`;
+  if (provider === 'video-assembly') return `${shotTitle || `Shot ${index + 1}`} 视频片段`;
+  return `${shotTitle || `Shot ${index + 1}`} 图片结果`;
+}
+
+function getGeneratedMediaSummary(provider: ProviderKind, payloadRecord: RenderPayloadRecord, responseRecord: ProviderResponseRecord, mode: RenderExecutionMode) {
+  const sceneTitle = typeof payloadRecord.sceneTitle === 'string' ? payloadRecord.sceneTitle : '未分场';
+  const shotTitle = typeof payloadRecord.shotTitle === 'string' ? payloadRecord.shotTitle : '未命名镜头';
+  const directSummary = pickText(responseRecord, ['summary', 'message', 'description']);
+  if (directSummary) return directSummary;
+  if (provider === 'voice-synthesis') return `${sceneTitle} 的语音结果已生成并写入媒体索引（${mode === 'remote' ? '真实' : '模拟'}模式）。`;
+  if (provider === 'video-assembly') return `${sceneTitle} / ${shotTitle} 的视频片段已生成并写入媒体索引（${mode === 'remote' ? '真实' : '模拟'}模式）。`;
+  return `${sceneTitle} / ${shotTitle} 的图片结果已生成并写入媒体索引（${mode === 'remote' ? '真实' : '模拟'}模式）。`;
+}
+
+function getGeneratedMediaTags(provider: ProviderKind, payloadRecord: RenderPayloadRecord, mode: RenderExecutionMode) {
+  const tags: string[] = [provider, mode];
+  const sceneTitle = typeof payloadRecord.sceneTitle === 'string' ? payloadRecord.sceneTitle : null;
+  const shotTitle = typeof payloadRecord.shotTitle === 'string' ? payloadRecord.shotTitle : null;
+  if (sceneTitle) tags.push(sceneTitle);
+  if (shotTitle) tags.push(shotTitle);
+  return tags;
+}
+
+async function syncGeneratedMediaArtifacts(input: {
+  projectId: string;
+  provider: ProviderKind;
+  jobId: string;
+  payload: unknown[];
+  runDir: string;
+  requestPath: string;
+  responsePath: string;
+  responseBody: unknown;
+  mode: RenderExecutionMode;
+}) {
+  const outputDir = path.join(input.runDir, 'generated-media');
+  await mkdir(outputDir, { recursive: true });
+
+  const responseItems = getResponseItems(input.responseBody);
+  const createdAt = new Date().toISOString();
+  const entries: GeneratedMediaEntry[] = [];
+
+  for (const [index, payloadItem] of input.payload.entries()) {
+    const payloadRecord = toRecord(payloadItem) as RenderPayloadRecord;
+    const responseRecord = responseItems[index] || {};
+    const title = getGeneratedMediaTitle(input.provider, payloadRecord, index);
+    const artifactName = `${String(index + 1).padStart(2, '0')}-${slugifyProjectTitle(title)}.json`;
+    const artifactPath = path.join(outputDir, artifactName);
+    await writeFile(artifactPath, JSON.stringify({
+      provider: input.provider,
+      mode: input.mode,
+      generatedAt: createdAt,
+      payload: payloadRecord,
+      response: responseRecord,
+      requestPath: input.requestPath,
+      responsePath: input.responsePath,
+    }, null, 2), 'utf8');
+
+    const shotId = typeof payloadRecord.shotId === 'string' ? payloadRecord.shotId : undefined;
+    const sceneId = typeof payloadRecord.sceneId === 'string' ? payloadRecord.sceneId : undefined;
+    const sourceUrl = pickText(responseRecord, ['url', 'outputUrl', 'sourceUrl', 'imageUrl', 'videoUrl', 'audioUrl', 'downloadUrl']);
+    const localPath = pickText(responseRecord, ['localPath', 'path', 'filePath', 'outputPath']) || artifactPath;
+
+    entries.push({
+      id: `media-${input.provider}-${shotId || sceneId || index + 1}`,
+      provider: input.provider,
+      type: getGeneratedMediaType(input.provider),
+      title,
+      summary: getGeneratedMediaSummary(input.provider, payloadRecord, responseRecord, input.mode),
+      tags: getGeneratedMediaTags(input.provider, payloadRecord, input.mode),
+      sceneId,
+      shotId,
+      sourceUrl,
+      localPath,
+      artifactPath,
+      requestPath: input.requestPath,
+      responsePath: input.responsePath,
+      mode: input.mode,
+      createdAt,
+    });
+  }
+
+  const indexPath = path.join(outputDir, `${input.provider}-media-index.json`);
+  await writeFile(indexPath, JSON.stringify({ version: 1, provider: input.provider, generatedAt: createdAt, items: entries }, null, 2), 'utf8');
+  await replaceGeneratedMediaEntriesForProvider(input.projectId, input.provider, entries);
+
+  return { entries, indexPath };
 }
 
 async function executeRenderJob(projectId: string, jobId: string) {
@@ -643,6 +789,17 @@ async function executeRenderJob(projectId: string, jobId: string) {
 
   try {
     const result = await executeProvider(provider, { id: project.id, title: project.title }, payload);
+    const mediaArtifacts = await syncGeneratedMediaArtifacts({
+      projectId,
+      provider,
+      jobId,
+      payload,
+      runDir: result.runDir,
+      requestPath: result.requestPath,
+      responsePath: result.responsePath,
+      responseBody: result.responseBody,
+      mode: result.mode,
+    });
     const summary = provider === 'video-assembly'
       ? [...result.summary, 'final-cut:preview-ready']
       : provider === 'voice-synthesis'
@@ -664,7 +821,9 @@ async function executeRenderJob(projectId: string, jobId: string) {
           preview: result.preview,
           executedAt: new Date().toISOString(),
           lastError: undefined,
-          summary,
+          assetCount: mediaArtifacts.entries.length,
+          artifactIndexPath: mediaArtifacts.indexPath,
+          summary: [...summary, `assets:${mediaArtifacts.entries.length}`],
         }),
       },
     });
