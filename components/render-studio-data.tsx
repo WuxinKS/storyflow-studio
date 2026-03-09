@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { RenderGenerateButton } from '@/components/render-generate-button';
 import { SyncNoticeCard } from '@/components/sync-notice-card';
-import { getRenderPresetForShot, getRenderProject } from '@/features/render/service';
+import { getRenderPresetForShot, getRenderProject, parseRenderJobOutput } from '@/features/render/service';
 import { getSyncStatus } from '@/features/sync/service';
 import { getVisualBibleBundle } from '@/features/visual/service';
 import { getShotKindFromTitle } from '@/lib/shot-taxonomy';
@@ -10,7 +10,8 @@ function summarizeStatus(statuses: string[]) {
   const done = statuses.filter((s) => s === 'done').length;
   const running = statuses.filter((s) => s === 'running').length;
   const queued = statuses.filter((s) => s === 'queued').length;
-  return { done, running, queued };
+  const failed = statuses.filter((s) => s === 'failed').length;
+  return { done, running, queued, failed };
 }
 
 function hasReferenceFlavor(text: string | null) {
@@ -21,11 +22,6 @@ function hasReferenceFlavor(text: string | null) {
 function hasDirectorLanguage(text: string | null) {
   if (!text) return false;
   return text.includes('导演处理上强调') || text.includes('镜头重点放在');
-}
-
-function parseJobSummary(outputUrl: string | null) {
-  if (!outputUrl) return [];
-  return outputUrl.split('|').filter(Boolean);
 }
 
 function getRenderStrategy(kind: string) {
@@ -89,8 +85,12 @@ export async function RenderStudioData() {
 
   const summary = summarizeStatus(project.renderJobs.map((job) => job.status));
   const syncStatus = await getSyncStatus(project.id).catch(() => null);
-  const finalPreviewReady = project.renderJobs.some(
-    (job) => job.provider === 'video-assembly' && (job.outputUrl || '').includes('final-cut:preview-ready'),
+  const jobOutputs = project.renderJobs.map((job) => ({
+    job,
+    meta: parseRenderJobOutput(job.outputUrl),
+  }));
+  const finalPreviewReady = jobOutputs.some(
+    ({ job, meta }) => job.provider === 'video-assembly' && meta.summary.some((item) => item.includes('final-cut:preview-ready')),
   );
   const flavoredCount = project.shots.filter((shot) => hasReferenceFlavor(shot.prompt)).length;
   const directorReadyCount = project.scenes.filter((scene) => hasDirectorLanguage(scene.summary)).length;
@@ -98,19 +98,22 @@ export async function RenderStudioData() {
   const renderReadyShots = project.shots.filter((shot) => hasReferenceFlavor(shot.prompt) && shot.cameraNotes && shot.prompt).length;
   const visualBible = getVisualBibleBundle(project);
   const shotPresets = project.shots.slice(0, 6).map((shot) => getRenderPresetForShot(shot, visualBible));
+  const remoteCount = jobOutputs.filter(({ meta }) => meta.mode === 'remote').length;
+  const mockCount = jobOutputs.filter(({ meta }) => meta.mode === 'mock').length;
 
   return (
     <div className="page-stack">
       <div className="snapshot-card">
         <p className="eyebrow">Render Overview</p>
         <h3>{project.title}</h3>
-        <p>当前 Render Studio 不只读取镜头类型，也会读取视觉圣经中的色彩、光线、镜头语言与材质关键词来统一下游渲染策略。</p>
+        <p>当前 Render Studio 已支持真实 provider 调用入口；若未配置真实 endpoint，则会落到 mock 执行，但同样会生成请求/响应工件，方便 QA 和交付复验。</p>
         <div className="meta-list">
           <span>Scenes：{project.scenes.length}</span>
           <span>Shots：{project.shots.length}</span>
           <span>Reference-enhanced：{flavoredCount}</span>
           <span>Render-ready shots：{renderReadyShots}</span>
-          <span>Render Jobs：{project.renderJobs.length}</span>
+          <span>Remote：{remoteCount}</span>
+          <span>Mock：{mockCount}</span>
         </div>
         <RenderGenerateButton projectId={project.id} />
         <div className="action-row">
@@ -126,16 +129,17 @@ export async function RenderStudioData() {
           <p>queued：{summary.queued}</p>
           <p>running：{summary.running}</p>
           <p>done：{summary.done}</p>
+          <p>failed：{summary.failed}</p>
         </div>
         <div className="asset-tile">
           <span className="label">deliverable</span>
-          <h4>成片占位</h4>
-          <p>{finalPreviewReady ? 'final-cut 已准备预览' : '成片尚未准备好，继续推进任务状态。'}</p>
+          <h4>成片状态</h4>
+          <p>{finalPreviewReady ? 'final-cut 已准备预览' : '成片尚未准备好，继续执行任务或重试失败项。'}</p>
         </div>
         <div className="asset-tile">
-          <span className="label">input quality</span>
-          <h4>镜头输入质量</h4>
-          <p>当前有 {renderReadyShots} 个 shot 已满足“有参考风格 + 有镜头说明 + 有提示词”的渲染底稿条件。</p>
+          <span className="label">execution</span>
+          <h4>执行模式</h4>
+          <p>{remoteCount > 0 ? '已接入真实 provider 调用' : '当前未配置真实 endpoint，使用 mock 执行闭环。'}</p>
         </div>
       </div>
 
@@ -234,14 +238,21 @@ export async function RenderStudioData() {
           <div className="asset-tile">
             <span className="label">empty</span>
             <h4>还没有渲染任务</h4>
-            <p>点击上方按钮创建第一批 render job 占位。</p>
+            <p>点击上方按钮创建第一批 render job。</p>
           </div>
         ) : (
-          project.renderJobs.map((job) => (
-            <div key={job.id} className="asset-tile">
+          jobOutputs.map(({ job, meta }) => (
+            <div key={job.id} className="asset-tile scene-tile">
               <span className="label">{job.status}</span>
               <h4>{job.provider || 'unknown-provider'}</h4>
-              <p>{parseJobSummary(job.outputUrl).join(' / ') || '暂无输出标记'}</p>
+              <p>{meta.summary.join(' / ') || '暂无输出标记'}</p>
+              <div className="meta-list">
+                <span>模式：{meta.mode}</span>
+                <span>重试：{meta.retryCount}</span>
+                <span>载荷：{meta.payloadCount}</span>
+              </div>
+              {meta.preview ? <p>响应摘要：{meta.preview}</p> : null}
+              {meta.lastError ? <p>错误：{meta.lastError}</p> : null}
             </div>
           ))
         )}

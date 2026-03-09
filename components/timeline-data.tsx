@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { TimelineEditor } from '@/components/timeline-editor';
 import { getTimelineBundle } from '@/features/timeline/service';
 
 function formatSeconds(seconds: number) {
@@ -25,11 +26,12 @@ export async function TimelineData() {
       <div className="snapshot-card">
         <p className="eyebrow">时间线总览</p>
         <h3>{timeline.projectTitle}</h3>
-        <p>当前时间线会基于 scene / shot 结构估算镜头时长，先形成节奏预览和影片结构视图。</p>
+        <p>当前时间线已经支持手动修时、情绪曲线和高潮标记，不再只是静态估时，而是能直接服务于节奏调校。</p>
         <div className="meta-list">
           <span>总时长：{timeline.totalDurationLabel}</span>
           <span>场次数：{timeline.scenes.length}</span>
           <span>镜头数：{timeline.scenes.reduce((sum, scene) => sum + scene.shotCount, 0)}</span>
+          <span>异常提示：{timeline.warnings.filter((item) => item.level === 'warning').length}</span>
         </div>
         <div className="action-row">
           <Link href="/storyboard" className="button-ghost">返回分镜板</Link>
@@ -40,19 +42,39 @@ export async function TimelineData() {
       <div className="asset-grid three-up">
         <div className="asset-tile">
           <span className="label">当前说明</span>
-          <h4>时间线 v0</h4>
-          <p>当前版本先基于镜头类型估算时长，帮助快速查看每场节奏与全片结构。</p>
+          <h4>时间线 v1</h4>
+          <p>当前版本已支持镜头时长微调、情绪强度估算、高潮点标记与节奏异常提示。</p>
         </div>
         <div className="asset-tile">
-          <span className="label">当前用途</span>
-          <h4>先看结构与节奏</h4>
-          <p>让 scene / shot 不只停留在文本拆镜，而是开始转成可读的影片时间结构。</p>
+          <span className="label">情绪曲线</span>
+          <h4>场次情绪走势</h4>
+          <p>{timeline.emotionCurve.map((item) => `${item.title}:${item.score}`).join(' / ')}</p>
         </div>
         <div className="asset-tile">
-          <span className="label">后续方向</span>
-          <h4>下一步继续补强</h4>
-          <p>后面会继续加情绪曲线、高潮点、节奏异常提示和手动时长修正能力。</p>
+          <span className="label">节奏提示</span>
+          <h4>自动发现的问题</h4>
+          <p>{timeline.warnings.map((item) => item.label).join(' / ') || '当前没有明显节奏异常。'}</p>
         </div>
+      </div>
+
+      <TimelineEditor projectId={timeline.projectId} scenes={timeline.scenes} />
+
+      <div className="asset-grid">
+        {timeline.warnings.length === 0 ? (
+          <div className="asset-tile">
+            <span className="label">pace status</span>
+            <h4>节奏状态稳定</h4>
+            <p>当前没有发现明显时长异常或峰值缺口，可以继续进入渲染与交付检查。</p>
+          </div>
+        ) : (
+          timeline.warnings.map((warning, index) => (
+            <div key={`${warning.label}-${index}`} className="asset-tile">
+              <span className="label">{warning.level === 'warning' ? 'warning' : 'info'}</span>
+              <h4>{warning.label}</h4>
+              <p>{warning.detail}</p>
+            </div>
+          ))
+        )}
       </div>
 
       <div className="storyboard-grid">
@@ -66,7 +88,9 @@ export async function TimelineData() {
                 <span>时长：{formatSeconds(scene.duration)}</span>
                 <span>起止：{formatSeconds(scene.startAt)} → {formatSeconds(scene.endAt)}</span>
                 <span>镜头数：{scene.shotCount}</span>
+                <span>情绪：{scene.emotionScore} / {scene.emotionLabel}</span>
               </div>
+              {scene.beatMarkers.length > 0 ? <p>标记：{scene.beatMarkers.join(' / ')}</p> : null}
             </div>
             <div className="storyboard-cards">
               {scene.shots.map((shot) => (
@@ -77,7 +101,10 @@ export async function TimelineData() {
                       <span>类型：{shot.kind}</span>
                       <span>时长：{formatSeconds(shot.duration)}</span>
                       <span>时间：{formatSeconds(shot.startAt)} → {formatSeconds(shot.endAt)}</span>
+                      <span>情绪：{shot.emotion} / {shot.emotionLabel}</span>
                     </div>
+                    <p>{shot.beatType ? `节奏标记：${shot.beatType}` : '尚未手动标记节奏节点。'}</p>
+                    {shot.note ? <p>备注：{shot.note}</p> : null}
                   </div>
                 </article>
               ))}

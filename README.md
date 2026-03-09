@@ -23,14 +23,17 @@ StoryFlow Studio 是一个面向内容创作者的 **AI 导演级创作工作台
 
 ## 当前仓库状态
 
-当前版本为 **第一版项目骨架**，重点在：
-- 信息架构
-- 模块划分
-- 工作台 UI 外壳
-- 基础技术栈
-- 文档和数据模型起点
+当前版本已不是单纯骨架，已经具备一条可工作的主链：
+- Story Engine 分层生成与重生
+- Character Studio 锁定字段 + 局部重生
+- Visual Bible 锁定字段 + 局部重生
+- Adaptation 生成 5 scenes / 20 shots
+- Timeline v1：情绪曲线、节奏提示、手动修时
+- Assets v1：手动录入资产并关联角色 / 场景 / 镜头
+- QA v1：成熟度等级、阻断项、sync stale 检查
+- Render 执行链：真实 provider endpoint 接口 + mock fallback + 导出包
 
-尚未实现完整业务逻辑。
+当前仍可继续深化 provider 接入与产品打磨，但核心工作台已经可以演示、验证和交付。
 
 ## 技术栈（当前规划）
 
@@ -88,8 +91,8 @@ http://localhost:3000
 
 ## 后续优先级
 
-- 增加 feature-based 业务目录实现
-- 增加 Prisma migration 与 seed
-- 接入故事生成工作流
-- 接入参考解析工作流
-- 接入异步任务与视频渲染
+- 为真实图像 / 配音 / 视频 provider 配置生产 endpoint
+- 继续补强 reference 分析能力
+- 增加更细的项目版本管理与团队协作
+- 为资产和时间线增加批量编辑体验
+- 继续完善导出与发布模板

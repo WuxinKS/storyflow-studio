@@ -1,13 +1,15 @@
 "use client";
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 export function RenderGenerateButton({ projectId }: { projectId: string }) {
-  const [loading, setLoading] = useState(false);
+  const router = useRouter();
+  const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [message, setMessage] = useState('');
 
-  const callApi = async (action: 'create' | 'advance') => {
-    setLoading(true);
+  const callApi = async (action: 'create' | 'run' | 'retry') => {
+    setLoadingAction(action);
     setMessage('');
     try {
       const response = await fetch('/api/render', {
@@ -20,22 +22,28 @@ export function RenderGenerateButton({ projectId }: { projectId: string }) {
       setMessage(
         action === 'create'
           ? `已创建 ${data.project.renderJobs.length} 个渲染任务`
-          : '已推进一轮任务状态',
+          : action === 'run'
+            ? '已执行可运行的渲染任务'
+            : '已重试失败任务',
       );
+      router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '操作失败');
     } finally {
-      setLoading(false);
+      setLoadingAction(null);
     }
   };
 
   return (
     <div className="action-row wrap-row">
-      <button type="button" className="button-primary" onClick={() => callApi('create')} disabled={loading}>
-        {loading ? '处理中…' : '生成渲染任务占位'}
+      <button type="button" className="button-primary" onClick={() => callApi('create')} disabled={Boolean(loadingAction)}>
+        {loadingAction === 'create' ? '创建任务中…' : '创建渲染任务'}
       </button>
-      <button type="button" className="button-secondary" onClick={() => callApi('advance')} disabled={loading}>
-        推进一步状态
+      <button type="button" className="button-secondary" onClick={() => callApi('run')} disabled={Boolean(loadingAction)}>
+        {loadingAction === 'run' ? '执行任务中…' : '执行全部可运行任务'}
+      </button>
+      <button type="button" className="button-ghost" onClick={() => callApi('retry')} disabled={Boolean(loadingAction)}>
+        {loadingAction === 'retry' ? '重试中…' : '重试失败任务'}
       </button>
       {message ? <span className="success-text">{message}</span> : null}
     </div>

@@ -6,6 +6,8 @@ import {
   exportProviderPayloads,
   exportRenderPresets,
   getRenderProject,
+  retryFailedRenderJobs,
+  runRenderJobs,
 } from '@/features/render/service';
 
 export async function GET(request: Request) {
@@ -52,10 +54,16 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const action = body.action || 'create';
+
     const project =
-      action === 'advance'
-        ? await advanceRenderJobs(body.projectId)
-        : await createRenderJobsForLatestProject(body.projectId);
+      action === 'run'
+        ? await runRenderJobs(body.projectId)
+        : action === 'retry'
+          ? await retryFailedRenderJobs(body.projectId)
+          : action === 'advance'
+            ? await advanceRenderJobs(body.projectId)
+            : await createRenderJobsForLatestProject(body.projectId);
+
     return NextResponse.json({ ok: true, project }, { status: 201 });
   } catch (error) {
     return NextResponse.json(

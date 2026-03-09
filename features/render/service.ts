@@ -6,8 +6,40 @@ import { prisma } from '@/lib/prisma';
 import { parseVisualBibleDraft, type VisualBibleDraft } from '@/features/visual/service';
 import { parseCharacterDrafts, type CharacterDraft } from '@/features/characters/service';
 import { getShotKindFromTitle } from '@/lib/shot-taxonomy';
+import { getLatestOutlineByTitle } from '@/lib/outline-store';
 
 const execFileAsync = promisify(execFile);
+
+type ProviderKind = 'image-sequence' | 'voice-synthesis' | 'video-assembly';
+type RenderExecutionMode = 'mock' | 'remote';
+
+type RenderJobMeta = {
+  version: 1;
+  mode: RenderExecutionMode;
+  retryCount: number;
+  payloadCount: number;
+  summary: string[];
+  endpoint?: string;
+  requestPath?: string;
+  responsePath?: string;
+  lastError?: string;
+  preview?: string;
+  executedAt?: string;
+};
+
+const DEFAULT_JOB_META: RenderJobMeta = {
+  version: 1,
+  mode: 'mock',
+  retryCount: 0,
+  payloadCount: 0,
+  summary: [],
+};
+
+const PROVIDER_ENV_MAP: Record<ProviderKind, string | undefined> = {
+  'image-sequence': process.env.STORYFLOW_IMAGE_PROVIDER_URL,
+  'voice-synthesis': process.env.STORYFLOW_VOICE_PROVIDER_URL,
+  'video-assembly': process.env.STORYFLOW_VIDEO_PROVIDER_URL,
+};
 
 function hasReferenceFlavor(text: string | null) {
   if (!text) return false;
@@ -36,12 +68,12 @@ function timestampTag() {
 }
 
 function getVisualBible(project: { outlines?: Array<{ title: string; summary: string }> }): VisualBibleDraft | null {
-  const outline = project.outlines?.find((item) => item.title === 'Visual Bible');
+  const outline = project.outlines ? getLatestOutlineByTitle(project.outlines, 'Visual Bible') : null;
   return outline ? parseVisualBibleDraft(outline.summary) : null;
 }
 
 function getCharacterDrafts(project: { outlines?: Array<{ title: string; summary: string }> }): CharacterDraft[] {
-  const outline = project.outlines?.find((item) => item.title === 'Character Drafts');
+  const outline = project.outlines ? getLatestOutlineByTitle(project.outlines, 'Character Drafts') : null;
   return outline ? parseCharacterDrafts(outline.summary) : [];
 }
 
@@ -144,31 +176,29 @@ export function getRenderPresetForShot(
     对白博弈: {
       visualStyle: 'shot-reverse-shot reaction framing',
       cameraMotion: 'controlled conversational cadence',
-      pacing: 'pause-response',
-      emphasis: 'line delivery and reaction hierarchy',
-      audioFocus: 'dialogue clarity and pause tension',
+      pacing: 'dialogue-pressure',
+      emphasis: 'spoken power shift and reaction timing',
+      audioFocus: 'voice dynamics and silence between lines',
     },
   };
 
-  const fallback = {
+  const base = presetMap[kind] || {
     visualStyle: 'balanced cinematic framing',
     cameraMotion: 'moderate camera movement',
-    pacing: 'standard-cinematic',
-    emphasis: 'general narrative clarity',
-    audioFocus: 'balanced dialogue and ambience',
+    pacing: 'default',
+    emphasis: 'general narrative beat',
+    audioFocus: 'general ambience',
   };
-
-  const selected = presetMap[kind] || fallback;
 
   return {
     shotId: shot.id,
     shotTitle: shot.title,
     kind,
-    visualStyle: mergeVisualStyle(selected.visualStyle, visualBible),
-    cameraMotion: mergeCameraMotion(selected.cameraMotion, visualBible),
-    pacing: selected.pacing,
-    emphasis: mergeEmphasis(selected.emphasis, visualBible, characterSummary),
-    audioFocus: buildAudioFocus(kind, visualBible, characterSummary, selected.audioFocus),
+    visualStyle: mergeVisualStyle(base.visualStyle, visualBible),
+    cameraMotion: mergeCameraMotion(base.cameraMotion, visualBible),
+    pacing: base.pacing,
+    emphasis: mergeEmphasis(base.emphasis, visualBible, characterSummary),
+    audioFocus: buildAudioFocus(kind, visualBible, characterSummary, base.audioFocus),
     characterSummary,
     visualBibleStyle: visualBible?.styleName,
     palette: visualBible?.palette,
@@ -177,6 +207,57 @@ export function getRenderPresetForShot(
     motionLanguage: visualBible?.motionLanguage,
     textureKeywords: visualBible?.textureKeywords,
   };
+}
+
+function safeJsonParse(text: string | null | undefined) {
+  if (!text) return null;
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+export function parseRenderJobOutput(outputUrl: string | null) {
+  const parsed = safeJsonParse(outputUrl);
+  if (parsed && typeof parsed === 'object' && 'version' in parsed) {
+    const meta = parsed as Partial<RenderJobMeta>;
+    return {
+      ...DEFAULT_JOB_META,
+      ...meta,
+      summary: Array.isArray(meta.summary) ? meta.summary.map((item) => String(item)) : [],
+    } satisfies RenderJobMeta;
+  }
+
+  if (!outputUrl) return DEFAULT_JOB_META;
+  return {
+    ...DEFAULT_JOB_META,
+    summary: outputUrl.split('|').filter(Boolean),
+  } satisfies RenderJobMeta;
+}
+
+function serializeRenderJobOutput(meta: Partial<RenderJobMeta>) {
+  return JSON.stringify({
+    ...DEFAULT_JOB_META,
+    ...meta,
+    summary: meta.summary || [],
+  } satisfies RenderJobMeta);
+}
+
+function getProviderEndpoint(provider: ProviderKind) {
+  return PROVIDER_ENV_MAP[provider] || null;
+}
+
+async function getRenderProjectById(projectId: string) {
+  return prisma.project.findUnique({
+    where: { id: projectId },
+    include: {
+      scenes: { orderBy: { orderIndex: 'asc' } },
+      shots: { orderBy: [{ sceneId: 'asc' }, { orderIndex: 'asc' }] },
+      renderJobs: { orderBy: { createdAt: 'desc' } },
+      outlines: { orderBy: { createdAt: 'desc' } },
+    },
+  });
 }
 
 export async function getRenderProject() {
@@ -333,7 +414,7 @@ export async function exportProductionBundle(projectId: string) {
       id: job.id,
       provider: job.provider,
       status: job.status,
-      outputUrl: job.outputUrl,
+      output: parseRenderJobOutput(job.outputUrl),
     })),
     presets: presetsData.presets,
     providerPayloads: providerData.providers,
@@ -388,6 +469,15 @@ export async function exportProductionBundle(projectId: string) {
   };
 }
 
+function createJobSeedMeta(input: { payloadCount: number; summary: string[] }) {
+  return serializeRenderJobOutput({
+    mode: 'mock',
+    payloadCount: input.payloadCount,
+    retryCount: 0,
+    summary: input.summary,
+  });
+}
+
 export async function createRenderJobsForLatestProject(projectId: string) {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
@@ -401,8 +491,7 @@ export async function createRenderJobsForLatestProject(projectId: string) {
   if (!project) throw new Error('项目不存在');
   if (project.shots.length === 0) throw new Error('没有可用于渲染的 shot');
 
-  await prisma.renderJob.deleteMany({ where: { projectId } });
-
+  const payloads = await exportProviderPayloads(projectId);
   const visualBible = getVisualBible(project);
   const characters = getCharacterDrafts(project);
   const characterSummary = summarizeCharacters(characters);
@@ -414,58 +503,219 @@ export async function createRenderJobsForLatestProject(projectId: string) {
     return `${preset.kind}:${preset.visualStyle}`;
   }).join(';');
 
+  await prisma.renderJob.deleteMany({ where: { projectId } });
+
   await prisma.renderJob.createMany({
     data: [
       {
         projectId,
         status: 'queued',
         provider: 'image-sequence',
-        outputUrl: `shots:${project.shots.length}|kinds:${shotKindsSummary}|style:${visualBible?.styleName || 'none'}|characters:${characterSummary}|presetPreview:${presetPreview}`,
+        outputUrl: createJobSeedMeta({
+          payloadCount: payloads.providers.imageSequence.length,
+          summary: [`shots:${project.shots.length}`, `kinds:${shotKindsSummary}`, `style:${visualBible?.styleName || 'none'}`, `characters:${characterSummary}`, `presetPreview:${presetPreview}`],
+        }),
       },
       {
         projectId,
         status: 'queued',
         provider: 'voice-synthesis',
-        outputUrl: `scenes:${project.scenes.length}|directorReady:${directorReadyScenes}|style:${visualBible?.styleName || 'none'}|characters:${characterSummary}|audioPlan:dialogue+ambience`,
+        outputUrl: createJobSeedMeta({
+          payloadCount: payloads.providers.voiceSynthesis.length,
+          summary: [`scenes:${project.scenes.length}`, `directorReady:${directorReadyScenes}`, `style:${visualBible?.styleName || 'none'}`, `characters:${characterSummary}`, 'audioPlan:dialogue+ambience'],
+        }),
       },
       {
         projectId,
         status: 'queued',
         provider: 'video-assembly',
-        outputUrl: `referenceReady:${referenceReadyShots}|style:${visualBible?.styleName || 'none'}|characters:${characterSummary}|presetLinked:true|storyboard-to-video-placeholder`,
+        outputUrl: createJobSeedMeta({
+          payloadCount: payloads.providers.videoAssembly.length,
+          summary: [`referenceReady:${referenceReadyShots}`, `style:${visualBible?.styleName || 'none'}`, `characters:${characterSummary}`, 'presetLinked:true'],
+        }),
       },
     ],
   });
 
-  return getRenderProject();
+  return getRenderProjectById(projectId);
 }
 
-export async function advanceRenderJobs(projectId: string) {
+function getProviderPayloadByKind(providerPayloads: Awaited<ReturnType<typeof exportProviderPayloads>>['providers'], provider: ProviderKind) {
+  if (provider === 'image-sequence') return providerPayloads.imageSequence;
+  if (provider === 'voice-synthesis') return providerPayloads.voiceSynthesis;
+  return providerPayloads.videoAssembly;
+}
+
+async function writeExecutionArtifacts(projectTitle: string, provider: ProviderKind, payload: unknown) {
+  const runDir = path.join(process.cwd(), 'exports', 'render-runs', `${timestampTag()}-${slugifyProjectTitle(projectTitle)}`);
+  await mkdir(runDir, { recursive: true });
+  const requestPath = path.join(runDir, `${provider}-request.json`);
+  await writeFile(requestPath, JSON.stringify(payload, null, 2), 'utf8');
+  return { runDir, requestPath };
+}
+
+async function executeProvider(provider: ProviderKind, project: { id: string; title: string }, payload: unknown[]) {
+  const endpoint = getProviderEndpoint(provider);
+  const { runDir, requestPath } = await writeExecutionArtifacts(project.title, provider, payload);
+  const responsePath = path.join(runDir, `${provider}-response.json`);
+
+  if (!endpoint) {
+    const mockResponse = {
+      mode: 'mock',
+      provider,
+      projectId: project.id,
+      generatedAt: new Date().toISOString(),
+      itemCount: payload.length,
+      message: '未配置真实 provider endpoint，已生成 mock 执行结果，可继续走 QA / 导出闭环。',
+    };
+    await writeFile(responsePath, JSON.stringify(mockResponse, null, 2), 'utf8');
+    return {
+      mode: 'mock' as const,
+      endpoint: null,
+      requestPath,
+      responsePath,
+      preview: mockResponse.message,
+      summary: [`mode:mock`, `items:${payload.length}`, `response:${path.basename(responsePath)}`],
+    };
+  }
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (process.env.STORYFLOW_PROVIDER_API_KEY) {
+    headers[process.env.STORYFLOW_PROVIDER_AUTH_HEADER || 'Authorization'] = `Bearer ${process.env.STORYFLOW_PROVIDER_API_KEY}`;
+  }
+
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      projectId: project.id,
+      projectTitle: project.title,
+      provider,
+      items: payload,
+    }),
+    cache: 'no-store',
+  });
+
+  const rawText = await response.text();
+  const responseBody = safeJsonParse(rawText) || rawText;
+  await writeFile(responsePath, typeof responseBody === 'string' ? responseBody : JSON.stringify(responseBody, null, 2), 'utf8');
+
+  if (!response.ok) {
+    throw new Error(`${provider} provider failed: ${response.status} ${rawText.slice(0, 240)}`);
+  }
+
+  return {
+    mode: 'remote' as const,
+    endpoint,
+    requestPath,
+    responsePath,
+    preview: rawText.slice(0, 180),
+    summary: [`mode:remote`, `items:${payload.length}`, `endpoint:${endpoint}`, `response:${path.basename(responsePath)}`],
+  };
+}
+
+async function executeRenderJob(projectId: string, jobId: string) {
+  const project = await getRenderProjectById(projectId);
+  if (!project) throw new Error('项目不存在');
+
+  const job = project.renderJobs.find((item) => item.id === jobId);
+  if (!job) throw new Error('渲染任务不存在');
+  if (!job.provider) throw new Error('渲染任务缺少 provider');
+
+  const provider = job.provider as ProviderKind;
+  const existingMeta = parseRenderJobOutput(job.outputUrl);
+  const providerPayloads = await exportProviderPayloads(projectId);
+  const payload = getProviderPayloadByKind(providerPayloads.providers, provider);
+
+  await prisma.renderJob.update({
+    where: { id: jobId },
+    data: {
+      status: 'running',
+      outputUrl: serializeRenderJobOutput({
+        ...existingMeta,
+        payloadCount: payload.length,
+        summary: [...existingMeta.summary, 'status:running'],
+      }),
+    },
+  });
+
+  try {
+    const result = await executeProvider(provider, { id: project.id, title: project.title }, payload);
+    const summary = provider === 'video-assembly'
+      ? [...result.summary, 'final-cut:preview-ready']
+      : provider === 'voice-synthesis'
+        ? [...result.summary, 'voice-track:generated']
+        : [...result.summary, 'frames:generated'];
+
+    await prisma.renderJob.update({
+      where: { id: jobId },
+      data: {
+        status: 'done',
+        outputUrl: serializeRenderJobOutput({
+          ...existingMeta,
+          mode: result.mode,
+          endpoint: result.endpoint || undefined,
+          requestPath: result.requestPath,
+          responsePath: result.responsePath,
+          payloadCount: payload.length,
+          retryCount: existingMeta.retryCount,
+          preview: result.preview,
+          executedAt: new Date().toISOString(),
+          lastError: undefined,
+          summary,
+        }),
+      },
+    });
+  } catch (error) {
+    await prisma.renderJob.update({
+      where: { id: jobId },
+      data: {
+        status: 'failed',
+        outputUrl: serializeRenderJobOutput({
+          ...existingMeta,
+          payloadCount: payload.length,
+          retryCount: existingMeta.retryCount + 1,
+          executedAt: new Date().toISOString(),
+          lastError: error instanceof Error ? error.message : 'Unknown error',
+          summary: [...existingMeta.summary.filter((item) => item !== 'status:running'), 'status:failed'],
+        }),
+      },
+    });
+  }
+}
+
+export async function runRenderJobs(projectId: string) {
   const jobs = await prisma.renderJob.findMany({
-    where: { projectId },
+    where: { projectId, status: { in: ['queued', 'failed'] } },
     orderBy: { createdAt: 'asc' },
   });
 
-  if (jobs.length === 0) throw new Error('还没有渲染任务');
+  if (jobs.length === 0) throw new Error('当前没有可执行的渲染任务');
 
   for (const job of jobs) {
-    let nextStatus = job.status;
-    let nextOutput = job.outputUrl;
-
-    if (job.status === 'queued') nextStatus = 'running';
-    else if (job.status === 'running') nextStatus = 'done';
-
-    if (nextStatus === 'done') {
-      if (job.provider === 'image-sequence') nextOutput = `${job.outputUrl}|frames:generated`;
-      if (job.provider === 'voice-synthesis') nextOutput = `${job.outputUrl}|voice-track:generated`;
-      if (job.provider === 'video-assembly') nextOutput = `${job.outputUrl}|final-cut:preview-ready`;
-    }
-
-    await prisma.renderJob.update({
-      where: { id: job.id },
-      data: { status: nextStatus, outputUrl: nextOutput },
-    });
+    await executeRenderJob(projectId, job.id);
   }
 
-  return getRenderProject();
+  return getRenderProjectById(projectId);
+}
+
+export async function retryFailedRenderJobs(projectId: string) {
+  const jobs = await prisma.renderJob.findMany({
+    where: { projectId, status: 'failed' },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  if (jobs.length === 0) throw new Error('当前没有失败任务可重试');
+
+  for (const job of jobs) {
+    await executeRenderJob(projectId, job.id);
+  }
+
+  return getRenderProjectById(projectId);
+}
+
+export async function advanceRenderJobs(projectId: string) {
+  return runRenderJobs(projectId);
 }

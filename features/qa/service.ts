@@ -3,6 +3,8 @@ import { getShotKindFromTitle, ALLOWED_SHOT_TITLES } from '@/lib/shot-taxonomy';
 import { parseCharacterDrafts } from '@/features/characters/service';
 import { parseVisualBibleDraft } from '@/features/visual/service';
 import { exportProductionBundle, exportProviderPayloads, exportRenderPresets } from '@/features/render/service';
+import { getSyncStatus } from '@/features/sync/service';
+import { getLatestOutlineByTitle } from '@/lib/outline-store';
 
 const TARGET_SCENE_COUNT = 5;
 const TARGET_SHOT_COUNT = 20;
@@ -13,6 +15,9 @@ export type QaCheck = {
   label: string;
   passed: boolean;
   detail: string;
+  group: 'structure' | 'content' | 'sync' | 'render' | 'export';
+  severity: 'blocker' | 'warning' | 'info';
+  blocksDelivery: boolean;
 };
 
 export async function getQaProject() {
@@ -33,14 +38,21 @@ function isCleanCharacterName(name: string) {
   return true;
 }
 
+function getMaturityLevel(input: { blockers: number; failed: number }) {
+  if (input.blockers === 0 && input.failed === 0) return '可交付';
+  if (input.blockers === 0) return '内测可用';
+  return '草稿可用';
+}
+
 export async function getQaReport() {
   const project = await getQaProject();
   if (!project) return null;
 
-  const visualOutline = project.outlines.find((item) => item.title === 'Visual Bible');
-  const characterOutline = project.outlines.find((item) => item.title === 'Character Drafts');
+  const visualOutline = getLatestOutlineByTitle(project.outlines, 'Visual Bible');
+  const characterOutline = getLatestOutlineByTitle(project.outlines, 'Character Drafts');
   const visualBible = visualOutline ? parseVisualBibleDraft(visualOutline.summary) : null;
   const characters = characterOutline ? parseCharacterDrafts(characterOutline.summary) : [];
+  const syncStatus = await getSyncStatus(project.id).catch(() => null);
 
   const shotKinds = project.shots.map((shot) => getShotKindFromTitle(shot.title));
   const invalidShotKinds = shotKinds.filter((kind) => !ALLOWED_SHOT_TITLES.includes(kind));
@@ -62,6 +74,8 @@ export async function getQaReport() {
   ]);
 
   const [presetExport, providerExport, bundleExport] = exportChecks;
+  const failedRenderJobs = project.renderJobs.filter((job) => job.status === 'failed');
+  const staleLabels = syncStatus?.staleChecks || [];
 
   const checks: QaCheck[] = [
     {
@@ -69,18 +83,27 @@ export async function getQaReport() {
       label: '分场数量固定为 5 场',
       passed: project.scenes.length === TARGET_SCENE_COUNT,
       detail: `当前 ${project.scenes.length} 场，目标 ${TARGET_SCENE_COUNT} 场。`,
+      group: 'structure',
+      severity: 'blocker',
+      blocksDelivery: true,
     },
     {
       key: 'shot-count',
       label: '镜头总数固定为 20 镜头',
       passed: project.shots.length === TARGET_SHOT_COUNT,
       detail: `当前 ${project.shots.length} 镜头，目标 ${TARGET_SHOT_COUNT} 镜头。`,
+      group: 'structure',
+      severity: 'blocker',
+      blocksDelivery: true,
     },
     {
       key: 'shot-count-per-scene',
       label: '每场固定为 4 镜头',
       passed: shotsByScene.every((item) => item.count === TARGET_SHOT_COUNT_PER_SCENE),
       detail: shotsByScene.map((item) => `${item.sceneTitle}:${item.count}`).join(' / ') || '暂无场次数据',
+      group: 'structure',
+      severity: 'warning',
+      blocksDelivery: false,
     },
     {
       key: 'shot-taxonomy',
@@ -89,6 +112,9 @@ export async function getQaReport() {
       detail: invalidShotKinds.length === 0
         ? `当前类型：${Array.from(new Set(shotKinds)).join(' / ') || '暂无镜头类型'}`
         : `存在异常类型：${invalidShotKinds.join(' / ')}`,
+      group: 'content',
+      severity: 'warning',
+      blocksDelivery: false,
     },
     {
       key: 'characters',
@@ -97,6 +123,9 @@ export async function getQaReport() {
       detail: characters.length > 0
         ? characters.map((item) => item.name).join(' / ')
         : '暂无角色草案',
+      group: 'content',
+      severity: 'warning',
+      blocksDelivery: false,
     },
     {
       key: 'visual-bible',
@@ -105,14 +134,29 @@ export async function getQaReport() {
       detail: visualBible
         ? `${visualBible.styleName} / ${visualBible.palette} / ${visualBible.motionLanguage}`
         : '暂无视觉圣经',
+      group: 'content',
+      severity: 'warning',
+      blocksDelivery: false,
+    },
+    {
+      key: 'sync-stale',
+      label: '上下游链路没有过期',
+      passed: staleLabels.length === 0,
+      detail: staleLabels.join(' / ') || '当前没有发现明显链路过期。',
+      group: 'sync',
+      severity: staleLabels.length > 0 ? 'blocker' : 'info',
+      blocksDelivery: staleLabels.length > 0,
     },
     {
       key: 'render-jobs',
-      label: '渲染任务链已存在',
-      passed: project.renderJobs.length > 0,
+      label: '渲染任务链已存在且无失败任务',
+      passed: project.renderJobs.length > 0 && failedRenderJobs.length === 0,
       detail: project.renderJobs.length > 0
         ? project.renderJobs.map((job) => `${job.provider}:${job.status}`).join(' / ')
         : '还没有渲染任务',
+      group: 'render',
+      severity: project.renderJobs.length === 0 ? 'blocker' : 'warning',
+      blocksDelivery: project.renderJobs.length === 0,
     },
     {
       key: 'export-presets',
@@ -121,6 +165,9 @@ export async function getQaReport() {
       detail: presetExport.ok
         ? `sceneTitles:${presetExport.data.sceneTitles.length} / presets:${presetExport.data.presets.length}`
         : presetExport.error,
+      group: 'export',
+      severity: 'warning',
+      blocksDelivery: false,
     },
     {
       key: 'export-provider-payloads',
@@ -129,6 +176,9 @@ export async function getQaReport() {
       detail: providerExport.ok
         ? `image:${providerExport.data.providers.imageSequence.length} / voice:${providerExport.data.providers.voiceSynthesis.length} / video:${providerExport.data.providers.videoAssembly.length}`
         : providerExport.error,
+      group: 'export',
+      severity: 'warning',
+      blocksDelivery: false,
     },
     {
       key: 'export-production-bundle',
@@ -137,19 +187,38 @@ export async function getQaReport() {
       detail: bundleExport.ok
         ? `${bundleExport.data.bundleDir} / ${bundleExport.data.zipPath}`
         : bundleExport.error,
+      group: 'export',
+      severity: 'blocker',
+      blocksDelivery: !bundleExport.ok,
     },
   ];
+
+  const failedChecks = checks.filter((item) => !item.passed);
+  const blockers = failedChecks.filter((item) => item.blocksDelivery || item.severity === 'blocker');
+  const warnings = failedChecks.filter((item) => !item.blocksDelivery && item.severity !== 'blocker');
+  const groupedChecks = {
+    structure: checks.filter((item) => item.group === 'structure'),
+    content: checks.filter((item) => item.group === 'content'),
+    sync: checks.filter((item) => item.group === 'sync'),
+    render: checks.filter((item) => item.group === 'render'),
+    export: checks.filter((item) => item.group === 'export'),
+  };
 
   return {
     projectId: project.id,
     projectTitle: project.title,
     checks,
+    groupedChecks,
     summary: {
       passed: checks.filter((item) => item.passed).length,
       total: checks.length,
-      failed: checks.filter((item) => !item.passed).length,
-      readyToDeliver: checks.every((item) => item.passed),
-      failedLabels: checks.filter((item) => !item.passed).map((item) => item.label),
+      failed: failedChecks.length,
+      blockerCount: blockers.length,
+      warningCount: warnings.length,
+      readyToDeliver: blockers.length === 0 && failedChecks.length === 0,
+      maturity: getMaturityLevel({ blockers: blockers.length, failed: failedChecks.length }),
+      failedLabels: failedChecks.map((item) => item.label),
+      blockerLabels: blockers.map((item) => item.label),
       bundleDir: bundleExport.ok ? bundleExport.data.bundleDir : null,
       zipPath: bundleExport.ok ? bundleExport.data.zipPath : null,
     },

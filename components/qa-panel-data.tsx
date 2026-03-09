@@ -1,5 +1,13 @@
 import { getQaReport } from '@/features/qa/service';
 
+const GROUP_LABELS = {
+  structure: '结构检查',
+  content: '内容检查',
+  sync: '同步检查',
+  render: '渲染检查',
+  export: '交付检查',
+} as const;
+
 export async function QaPanelData() {
   const report = await getQaReport().catch(() => null);
 
@@ -18,29 +26,29 @@ export async function QaPanelData() {
       <div className="snapshot-card">
         <p className="eyebrow">QA Overview</p>
         <h3>{report.projectTitle}</h3>
-        <p>这里会对当前主链进行轻量质检，优先检查结构稳定性、镜头分类、角色命名、视觉总控和导出交付是否接通。</p>
+        <p>这里会对当前主链做发布前检查，除了结构和导出是否通，还会判断链路是否过期，并给出成熟度等级和阻断交付项。</p>
         <div className="meta-list">
           <span>通过：{report.summary.passed}</span>
           <span>失败：{report.summary.failed}</span>
-          <span>总项：{report.summary.total}</span>
-          <span>项目 ID：{report.projectId}</span>
+          <span>阻断项：{report.summary.blockerCount}</span>
+          <span>等级：{report.summary.maturity}</span>
         </div>
       </div>
 
       <div className="asset-grid three-up">
         <div className="asset-tile">
           <span className="label">release status</span>
-          <h4>{report.summary.readyToDeliver ? '可交付' : '暂不可交付'}</h4>
+          <h4>{report.summary.readyToDeliver ? '可交付' : report.summary.maturity}</h4>
           <p>
             {report.summary.readyToDeliver
               ? '当前所有 QA 检查均已通过，可以把这条主链视为可交付状态。'
-              : `还有 ${report.summary.failed} 项未通过，建议先修完再继续往外发包。`}
+              : `当前还有 ${report.summary.failed} 项未通过，其中 ${report.summary.blockerCount} 项会阻断交付。`}
           </p>
         </div>
         <div className="asset-tile">
-          <span className="label">failed items</span>
-          <h4>未通过项汇总</h4>
-          <p>{report.summary.failedLabels.join(' / ') || '当前没有失败项。'}</p>
+          <span className="label">blockers</span>
+          <h4>阻断交付项</h4>
+          <p>{report.summary.blockerLabels.join(' / ') || '当前没有阻断项。'}</p>
         </div>
         <div className="asset-tile">
           <span className="label">latest bundle</span>
@@ -50,15 +58,24 @@ export async function QaPanelData() {
         </div>
       </div>
 
-      <div className="asset-grid three-up">
-        {report.checks.map((check) => (
-          <div key={check.key} className="asset-tile">
-            <span className="label">{check.passed ? 'pass' : 'check'}</span>
-            <h4>{check.label}</h4>
-            <p>{check.detail}</p>
+      {Object.entries(report.groupedChecks).map(([group, checks]) => (
+        <div key={group} className="page-stack">
+          <div className="snapshot-card">
+            <p className="eyebrow">{GROUP_LABELS[group as keyof typeof GROUP_LABELS]}</p>
+            <h3>{GROUP_LABELS[group as keyof typeof GROUP_LABELS]}</h3>
+            <p>该分组下共 {checks.length} 项检查，帮助更快定位当前主链还差哪一段没有闭环。</p>
           </div>
-        ))}
-      </div>
+          <div className="asset-grid three-up">
+            {checks.map((check) => (
+              <div key={check.key} className="asset-tile">
+                <span className="label">{check.passed ? 'pass' : check.blocksDelivery ? 'blocker' : 'warning'}</span>
+                <h4>{check.label}</h4>
+                <p>{check.detail}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

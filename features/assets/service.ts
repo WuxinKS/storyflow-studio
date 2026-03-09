@@ -88,7 +88,7 @@ export async function getLatestAssetProject() {
   });
 }
 
-export function getManualAssetEntries(project: Awaited<ReturnType<typeof getLatestAssetProject>>) {
+export function getManualAssetEntries(project: { outlines: Array<{ title: string; summary: string }> } | null) {
   if (!project) return [] as AssetEntry[];
   const outline = getLatestOutlineByTitle(project.outlines, 'Asset Library');
   return parseAssetLibrary(outline?.summary || '');
