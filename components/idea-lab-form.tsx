@@ -58,9 +58,9 @@ export function IdeaLabForm() {
         <label>
           <span>目标输出</span>
           <select name="output" defaultValue={current.output}>
-            <option value="novel">novel</option>
-            <option value="screenplay">screenplay</option>
-            <option value="video">video</option>
+            <option value="novel">小说</option>
+            <option value="screenplay">剧本</option>
+            <option value="video">视频</option>
           </select>
         </label>
         <label className="full-width">

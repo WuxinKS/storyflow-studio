@@ -25,8 +25,8 @@ StoryFlow Studio 是一个面向内容创作者的 **AI 导演级创作工作台
 
 当前版本已不是单纯骨架，已经具备一条可工作的主链：
 - Story Engine 分层生成与重生
-- Character Studio 锁定字段 + 局部重生
-- Visual Bible 锁定字段 + 局部重生
+- 角色工作台：锁定字段 + 局部重生
+- 视觉圣经：锁定字段 + 局部重生
 - Adaptation 生成 5 scenes / 20 shots
 - Timeline v1：情绪曲线、节奏提示、手动修时
 - Assets v1：手动录入资产并关联角色 / 场景 / 镜头
@@ -50,20 +50,20 @@ app/                  # App Router 页面
 components/           # 共享 UI 组件
 lib/                  # 元数据、样例数据、公共逻辑
 prisma/               # 数据模型
-features/             # 预留业务模块目录（后续补）
+features/             # 业务领域模块（Story / Adaptation / Render 等）
 docs/                 # 架构与路线图文档
 PROJECT_PLAN.md       # 完整项目计划
 ```
 
 ## 已创建页面
 
-- Dashboard
-- Idea Lab
-- Story Setup
-- Chapter Studio
+- 总览
+- 创意工坊
+- 故事设定
+- 章节工作台
 - Adaptation Lab
-- Storyboard
-- Render Studio
+- 分镜板
+- 生成工作台
 - Reference Lab
 - Assets
 - Settings
@@ -74,7 +74,7 @@ PROJECT_PLAN.md       # 完整项目计划
 2. 固定数据主链：Idea → Chapter → Scene → Shot → Render
 3. 接入 Story Engine
 4. 接入 Reference Vision Engine
-5. 接入 Storyboard / Render 链路
+5. 接入分镜板 / 生成链路
 
 ## 本地运行
 
@@ -88,6 +88,24 @@ npm run dev
 ```text
 http://localhost:3000
 ```
+
+## 环境变量补充
+
+```bash
+STORYFLOW_LLM_BASE_URL=""
+STORYFLOW_LLM_API_KEY=""
+STORYFLOW_LLM_MODEL="gpt-5.4"
+STORYFLOW_IMAGE_PROVIDER_URL=""
+STORYFLOW_VOICE_PROVIDER_URL=""
+STORYFLOW_VIDEO_PROVIDER_URL=""
+STORYFLOW_PROVIDER_API_KEY=""
+STORYFLOW_PROVIDER_AUTH_HEADER="Authorization"
+```
+
+说明：
+- 未配置 `STORYFLOW_LLM_*` 时，故事 / 角色 / 视觉链路会优先走内置 fallback 模板
+- 未配置 `STORYFLOW_*_PROVIDER_URL` 时，Render 执行链会自动回退为 mock，并继续生成请求 / 响应工件与交付包
+- `STORYFLOW_PROVIDER_AUTH_HEADER` 默认为 `Authorization`，可按 provider 要求改成自定义 header
 
 ## 后续优先级
 

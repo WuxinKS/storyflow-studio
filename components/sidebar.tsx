@@ -7,7 +7,7 @@ export function Sidebar() {
       <div className="brand">
         <div className="brand-badge">SF</div>
         <div>
-          <p className="eyebrow">AI Director Workspace</p>
+          <p className="eyebrow">AI 导演工作台</p>
           <h1>StoryFlow Studio</h1>
         </div>
       </div>

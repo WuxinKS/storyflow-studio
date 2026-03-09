@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { getShotKindFromTitle } from '@/lib/shot-taxonomy';
 import { createOutlineVersion, getLatestOutlineByTitle } from '@/lib/outline-store';
+import { getTimelineBeatTypeLabel } from '@/lib/display';
 
 const SHOT_DURATION_MAP: Record<string, number> = {
   空间建立: 6,
@@ -163,7 +164,7 @@ export async function getTimelineBundle(projectId?: string) {
     const startAt = shots[0]?.startAt ?? accumulated;
     const endAt = shots[shots.length - 1]?.endAt ?? accumulated;
     const emotionScore = shots.length > 0 ? Math.round((shots.reduce((sum, shot) => sum + shot.emotion, 0) / shots.length) * 10) / 10 : 0;
-    const beatMarkers = shots.filter((shot) => shot.beatType).map((shot) => `${shot.title}（${shot.beatType}）`);
+    const beatMarkers = shots.filter((shot) => shot.beatType).map((shot) => `${shot.title}（${getTimelineBeatTypeLabel(shot.beatType)}）`);
 
     if (duration < 12) {
       warnings.push({ level: 'warning', label: `场次过短：${scene.title}`, detail: `当前仅 ${formatSeconds(duration)}，建议补一条缓冲镜头或情绪停顿。` });

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { TimelineEditor } from '@/components/timeline-editor';
+import { getTimelineBeatTypeLabel } from '@/lib/display';
 import { getTimelineBundle } from '@/features/timeline/service';
 
 function formatSeconds(seconds: number) {
@@ -14,7 +15,7 @@ export async function TimelineData() {
   if (!timeline) {
     return (
       <div className="asset-tile">
-        <span className="label">empty</span>
+        <span className="label">空状态</span>
         <h4>暂无时间线数据</h4>
         <p>请先生成改编与分镜结果，再回来查看节奏结构。</p>
       </div>
@@ -62,14 +63,14 @@ export async function TimelineData() {
       <div className="asset-grid">
         {timeline.warnings.length === 0 ? (
           <div className="asset-tile">
-            <span className="label">pace status</span>
+            <span className="label">节奏状态</span>
             <h4>节奏状态稳定</h4>
             <p>当前没有发现明显时长异常或峰值缺口，可以继续进入渲染与交付检查。</p>
           </div>
         ) : (
           timeline.warnings.map((warning, index) => (
             <div key={`${warning.label}-${index}`} className="asset-tile">
-              <span className="label">{warning.level === 'warning' ? 'warning' : 'info'}</span>
+              <span className="label">{warning.level === 'warning' ? '警告' : '提示'}</span>
               <h4>{warning.label}</h4>
               <p>{warning.detail}</p>
             </div>
@@ -81,7 +82,7 @@ export async function TimelineData() {
         {timeline.scenes.map((scene) => (
           <section key={scene.id} className="storyboard-column">
             <div className="storyboard-column-head">
-              <span className="label">scene</span>
+              <span className="label">场次</span>
               <h4>{scene.title}</h4>
               <p>{scene.summary || '暂无场景摘要'}</p>
               <div className="meta-list">
@@ -103,7 +104,7 @@ export async function TimelineData() {
                       <span>时间：{formatSeconds(shot.startAt)} → {formatSeconds(shot.endAt)}</span>
                       <span>情绪：{shot.emotion} / {shot.emotionLabel}</span>
                     </div>
-                    <p>{shot.beatType ? `节奏标记：${shot.beatType}` : '尚未手动标记节奏节点。'}</p>
+                    <p>{shot.beatType ? `节奏标记：${getTimelineBeatTypeLabel(shot.beatType)}` : '尚未手动标记节奏节点。'}</p>
                     {shot.note ? <p>备注：{shot.note}</p> : null}
                   </div>
                 </article>

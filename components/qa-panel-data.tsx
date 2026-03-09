@@ -1,3 +1,4 @@
+import { getQaCheckToneLabel } from '@/lib/display';
 import { getQaReport } from '@/features/qa/service';
 
 const GROUP_LABELS = {
@@ -14,8 +15,8 @@ export async function QaPanelData() {
   if (!report) {
     return (
       <div className="asset-tile">
-        <span className="label">empty</span>
-        <h4>暂无 QA 数据</h4>
+        <span className="label">空状态</span>
+        <h4>暂无质量检查数据</h4>
         <p>请先生成故事、改编与渲染数据，再回来查看质量检查结果。</p>
       </div>
     );
@@ -24,7 +25,7 @@ export async function QaPanelData() {
   return (
     <div className="page-stack">
       <div className="snapshot-card">
-        <p className="eyebrow">QA Overview</p>
+        <p className="eyebrow">质量总览</p>
         <h3>{report.projectTitle}</h3>
         <p>这里会对当前主链做发布前检查，除了结构和导出是否通，还会判断链路是否过期，并给出成熟度等级和阻断交付项。</p>
         <div className="meta-list">
@@ -37,24 +38,24 @@ export async function QaPanelData() {
 
       <div className="asset-grid three-up">
         <div className="asset-tile">
-          <span className="label">release status</span>
+          <span className="label">交付状态</span>
           <h4>{report.summary.readyToDeliver ? '可交付' : report.summary.maturity}</h4>
           <p>
             {report.summary.readyToDeliver
-              ? '当前所有 QA 检查均已通过，可以把这条主链视为可交付状态。'
+              ? '当前所有质量检查均已通过，可以把这条主链视为可交付状态。'
               : `当前还有 ${report.summary.failed} 项未通过，其中 ${report.summary.blockerCount} 项会阻断交付。`}
           </p>
         </div>
         <div className="asset-tile">
-          <span className="label">blockers</span>
+          <span className="label">阻断项</span>
           <h4>阻断交付项</h4>
           <p>{report.summary.blockerLabels.join(' / ') || '当前没有阻断项。'}</p>
         </div>
         <div className="asset-tile">
-          <span className="label">latest bundle</span>
+          <span className="label">最新交付包</span>
           <h4>最新交付包</h4>
-          <p>{report.summary.bundleDir || '当前还没有成功写盘的 bundle。'}</p>
-          <p>{report.summary.zipPath || '当前还没有 zip。'}</p>
+          <p>{report.summary.bundleDir || '当前还没有成功写盘的交付包目录。'}</p>
+          <p>{report.summary.zipPath || '当前还没有 zip 文件。'}</p>
         </div>
       </div>
 
@@ -68,7 +69,7 @@ export async function QaPanelData() {
           <div className="asset-grid three-up">
             {checks.map((check) => (
               <div key={check.key} className="asset-tile">
-                <span className="label">{check.passed ? 'pass' : check.blocksDelivery ? 'blocker' : 'warning'}</span>
+                <span className="label">{getQaCheckToneLabel(check.passed ? 'pass' : check.blocksDelivery ? 'blocker' : 'warning')}</span>
                 <h4>{check.label}</h4>
                 <p>{check.detail}</p>
               </div>

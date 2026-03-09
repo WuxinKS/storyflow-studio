@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useProjectDraft } from '@/features/project/use-project-draft';
+import { getOutputTypeLabel } from '@/lib/display';
 
 export function ProjectSnapshot() {
   const { draft, ready, reset } = useProjectDraft();
@@ -10,10 +11,10 @@ export function ProjectSnapshot() {
     <div className="snapshot-card">
       <div className="snapshot-header">
         <div>
-          <p className="eyebrow">Current Draft</p>
+          <p className="eyebrow">当前草稿</p>
           <h3>{ready ? draft.title : '加载中...'}</h3>
         </div>
-        <span className="status-pill status-pill-subtle">{ready ? draft.output : 'draft'}</span>
+        <span className="status-pill status-pill-subtle">{ready ? getOutputTypeLabel(draft.output) : '草稿'}</span>
       </div>
       <div className="snapshot-grid">
         <div>

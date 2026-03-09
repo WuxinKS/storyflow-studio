@@ -4,6 +4,7 @@ import { CharacterEditor } from '@/components/character-editor';
 import { SyncNoticeCard } from '@/components/sync-notice-card';
 import { getCharacterDraftBundle, getLatestCharacterProject } from '@/features/characters/service';
 import { getSyncStatus } from '@/features/sync/service';
+import { getProjectStageLabel } from '@/lib/display';
 
 function roleLabel(role: string) {
   if (role === 'protagonist') return '主角';
@@ -27,7 +28,7 @@ export async function CharacterStudioData() {
   if (!project) {
     return (
       <div className="asset-tile">
-        <span className="label">empty</span>
+        <span className="label">空状态</span>
         <h4>暂无项目</h4>
         <p>先去创意页创建项目，再来生成角色草案。</p>
       </div>
@@ -45,7 +46,7 @@ export async function CharacterStudioData() {
         <p>{project.premise || '暂无故事前提'}</p>
         <div className="meta-list">
           <span>角色草案数：{characters.length}</span>
-          <span>当前阶段：{project.stage}</span>
+          <span>当前阶段：{getProjectStageLabel(project.stage)}</span>
         </div>
         <CharacterGenerateButton projectId={project.id} />
         <div className="action-row">
@@ -81,7 +82,7 @@ export async function CharacterStudioData() {
       <div className="asset-grid">
         {characters.length === 0 ? (
           <div className="asset-tile">
-            <span className="label">empty</span>
+            <span className="label">空状态</span>
             <h4>还没有角色草案</h4>
             <p>点击上方按钮，基于当前故事草案自动生成角色卡初稿。</p>
           </div>

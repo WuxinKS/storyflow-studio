@@ -9,7 +9,7 @@ export default function ReferenceLabPage() {
       bullets={[
         '录入参考镜头的景别、情绪、动作和补充说明',
         '把参考素材转成可复用的风格卡与镜头语言标签',
-        '为后续 Adaptation / Storyboard 提供迁移依据',
+        '为后续改编实验室 / 分镜板提供迁移依据',
       ]}
     >
       <ReferenceLabData />

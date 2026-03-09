@@ -8,7 +8,7 @@ export default function HomePage() {
   return (
     <div className="page-stack">
       <SectionCard
-        title="Dashboard"
+        title="总览"
         description="把想法、设定、分镜、参考素材和视频生产统一在一个工作台中。"
       >
         <div className="hero-grid">
@@ -31,8 +31,8 @@ export default function HomePage() {
       <ProjectList />
 
       <SectionCard
-        title="Production Pipeline"
-        description="当前阶段重点是搭建产品骨架，并先跑通想法驱动主链入口。"
+        title="制作流水线"
+        description="当前阶段重点是继续补齐从一句话到交付包的主链控制力，并把环境配置、执行链与质检闭环收紧。"
       >
         <Pipeline stages={pipelineStages} />
       </SectionCard>

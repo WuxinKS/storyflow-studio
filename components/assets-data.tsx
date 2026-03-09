@@ -16,7 +16,7 @@ export async function AssetsData() {
   if (!project) {
     return (
       <div className="asset-tile">
-        <span className="label">empty</span>
+        <span className="label">空状态</span>
         <h4>暂无项目</h4>
         <p>先创建项目，再来整理角色、风格、场景和参考资产。</p>
       </div>
@@ -76,7 +76,7 @@ export async function AssetsData() {
       <div className="asset-grid">
         {assets.length === 0 ? (
           <div className="asset-tile">
-            <span className="label">empty</span>
+            <span className="label">空状态</span>
             <h4>还没有可用资产</h4>
             <p>先生成角色、视觉圣经或参考分析，或直接手动录入第一批资产。</p>
           </div>

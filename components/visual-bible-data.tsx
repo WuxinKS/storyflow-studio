@@ -4,6 +4,7 @@ import { VisualBibleEditor } from '@/components/visual-bible-editor';
 import { SyncNoticeCard } from '@/components/sync-notice-card';
 import { getSyncStatus } from '@/features/sync/service';
 import { getLatestVisualProject, getVisualBibleBundle } from '@/features/visual/service';
+import { getProjectStageLabel } from '@/lib/display';
 
 function getLockedFieldLabels(visualBible: NonNullable<ReturnType<typeof getVisualBibleBundle>>) {
   const labels: string[] = [];
@@ -20,7 +21,7 @@ export async function VisualBibleData() {
   if (!project) {
     return (
       <div className="asset-tile">
-        <span className="label">empty</span>
+        <span className="label">空状态</span>
         <h4>暂无项目</h4>
         <p>先创建项目，再来生成视觉圣经。</p>
       </div>
@@ -39,7 +40,7 @@ export async function VisualBibleData() {
         <p>{project.premise || '暂无故事前提'}</p>
         <div className="meta-list">
           <span>参考条目：{project.references.length}</span>
-          <span>当前阶段：{project.stage}</span>
+          <span>当前阶段：{getProjectStageLabel(project.stage)}</span>
         </div>
         <VisualGenerateButton projectId={project.id} />
         <div className="action-row">
@@ -74,7 +75,7 @@ export async function VisualBibleData() {
 
       {!visualBible ? (
         <div className="asset-tile">
-          <span className="label">empty</span>
+          <span className="label">空状态</span>
           <h4>还没有视觉圣经</h4>
           <p>点击上方按钮，基于当前故事、角色与参考条目生成第一版视觉总控。</p>
         </div>

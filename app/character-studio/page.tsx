@@ -4,7 +4,7 @@ import { CharacterStudioData } from '@/components/character-studio-data';
 export default function CharacterStudioPage() {
   return (
     <ModulePage
-      title="Character Studio"
+      title="角色工作台"
       lead="统一查看主角、对手与关键配角的角色草案，让故事、改编与后续生成共用一套角色认知。"
       bullets={[
         '从故事梗概、剧情节拍和分场种子自动抽取角色草案',

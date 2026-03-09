@@ -47,8 +47,8 @@ export function ReferenceAnalysisForm({ projectId }: { projectId: string }) {
         <label>
           <span>来源类型</span>
           <select name="sourceType" defaultValue="image">
-            <option value="image">image</option>
-            <option value="video">video</option>
+            <option value="image">图片</option>
+            <option value="video">视频</option>
           </select>
         </label>
         <label>

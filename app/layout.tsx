@@ -17,10 +17,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <main className="content-shell">
             <header className="topbar">
               <div>
-                <p className="eyebrow">Creative Operating System</p>
+                <p className="eyebrow">创作操作系统</p>
                 <h2>{appMeta.tagline}</h2>
               </div>
-              <div className="status-pill">Planning MVP</div>
+              <div className="status-pill">主链已打通</div>
             </header>
             {children}
           </main>

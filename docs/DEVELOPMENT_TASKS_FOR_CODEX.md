@@ -1,9 +1,11 @@
 # StoryFlow Studio — 开发任务总表（给 Codex 直接接手）
 
-更新时间：2026-03-10 00:23（Asia/Shanghai）
+更新时间：2026-03-10 10:40（Asia/Shanghai）
 项目路径：`/Users/hema/.openclaw/workspace/storyflow-studio`
 
 ---
+
+> 2026-03-10 追加状态：P0-1 / P1-1 / P1-2 / P1-3 / P2-1 / P2-2 / P2-3 / P3-1 主体功能已落地；当前重点转为前端中文化、设置页运行时可视化、工程复验与 GitHub 发布闭环。
 
 ## 0. 项目目标
 

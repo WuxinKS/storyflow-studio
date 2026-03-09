@@ -5,7 +5,7 @@ export default function ChapterStudioPage() {
   return (
     <div className="page-stack">
       <SectionCard
-        title="Chapter Studio"
+        title="章节工作台"
         description="承接长文本创作能力，先打通真实项目与章节草稿的读写链路。"
       >
         <ChapterStudioData />
