@@ -638,29 +638,177 @@ async function executeProvider(provider: ProviderKind, project: { id: string; ti
 type RenderPayloadRecord = Record<string, unknown>;
 type ProviderResponseRecord = Record<string, unknown>;
 
+const PROVIDER_RESPONSE_COLLECTION_KEYS: Record<ProviderKind, string[]> = {
+  'image-sequence': ['images', 'image', 'frames', 'items', 'outputs', 'results', 'assets', 'files', 'data', 'output', 'result', 'artifact', 'artifacts', 'file', 'media'],
+  'voice-synthesis': ['audios', 'audio', 'items', 'outputs', 'results', 'assets', 'files', 'data', 'output', 'result', 'artifact', 'artifacts', 'file', 'media'],
+  'video-assembly': ['videos', 'video', 'clips', 'items', 'outputs', 'results', 'assets', 'files', 'data', 'output', 'result', 'artifact', 'artifacts', 'file', 'media'],
+};
+
+const RESPONSE_WRAPPER_KEYS = Array.from(new Set([
+  'data',
+  'output',
+  'outputs',
+  'result',
+  'results',
+  'response',
+  'body',
+  'payload',
+  'artifact',
+  'artifacts',
+  'file',
+  'files',
+  'media',
+  'items',
+  'assets',
+  'images',
+  'image',
+  'videos',
+  'video',
+  'audios',
+  'audio',
+  'clips',
+  'frames',
+]));
+
+const RESPONSE_SUMMARY_KEYS = ['summary', 'message', 'description', 'caption', 'text', 'detail', 'statusText'];
+const RESPONSE_SOURCE_URL_KEYS = ['url', 'outputUrl', 'sourceUrl', 'imageUrl', 'videoUrl', 'audioUrl', 'downloadUrl', 'uri', 'src', 'href'];
+const RESPONSE_LOCAL_PATH_KEYS = ['localPath', 'path', 'filePath', 'outputPath', 'destination', 'savePath', 'targetPath'];
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function looksLikeUrl(value: string) {
+  const normalized = value.trim();
+  return /^(https?:\/\/|data:|blob:|\/\/)/i.test(normalized);
+}
+
+function looksLikeLocalPath(value: string) {
+  const normalized = value.trim();
+  return /^([A-Za-z]:[\/]|\/|\.{1,2}[\/])/.test(normalized)
+    || /\\/.test(normalized)
+    || /\.(png|jpe?g|webp|gif|bmp|svg|mp4|mov|webm|mkv|mp3|wav|m4a|flac|aac|ogg|json)$/i.test(normalized);
+}
+
 function toRecord(value: unknown) {
-  return value && typeof value === 'object' ? value as ProviderResponseRecord : {} as ProviderResponseRecord;
+  if (value && typeof value === 'object' && !Array.isArray(value)) return value as ProviderResponseRecord;
+  if (isNonEmptyString(value)) {
+    const normalized = value.trim();
+    if (looksLikeUrl(normalized)) return { value: normalized, url: normalized } satisfies ProviderResponseRecord;
+    if (looksLikeLocalPath(normalized)) return { value: normalized, path: normalized } satisfies ProviderResponseRecord;
+    return { value: normalized } satisfies ProviderResponseRecord;
+  }
+  return {} as ProviderResponseRecord;
 }
 
 function pickText(record: ProviderResponseRecord, keys: string[]) {
   for (const key of keys) {
     const value = record[key];
-    if (typeof value === 'string' && value.trim()) return value.trim();
+    if (isNonEmptyString(value)) return value.trim();
   }
   return null;
 }
 
-function getResponseItems(responseBody: unknown) {
-  if (Array.isArray(responseBody)) return responseBody.map((item) => toRecord(item));
+function pickTextDeep(value: unknown, keys: string[], depth = 0): string | null {
+  if (depth > 5 || value == null) return null;
 
-  const record = toRecord(responseBody);
-  const candidates = ['items', 'data', 'outputs', 'results'];
-  for (const key of candidates) {
-    const value = record[key];
-    if (Array.isArray(value)) return value.map((item) => toRecord(item));
+  if (isNonEmptyString(value)) {
+    return keys.includes('value') ? value.trim() : null;
   }
 
-  return [] as ProviderResponseRecord[];
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const nested = pickTextDeep(item, keys, depth + 1);
+      if (nested) return nested;
+    }
+    return null;
+  }
+
+  const record = toRecord(value);
+  const direct = pickText(record, keys);
+  if (direct) return direct;
+
+  for (const key of RESPONSE_WRAPPER_KEYS) {
+    if (!(key in record)) continue;
+    const nested = pickTextDeep(record[key], keys, depth + 1);
+    if (nested) return nested;
+  }
+
+  return null;
+}
+
+function resolveSourceUrl(record: ProviderResponseRecord) {
+  const direct = pickTextDeep(record, RESPONSE_SOURCE_URL_KEYS);
+  if (direct) return direct;
+  const fallback = pickTextDeep(record, ['value']);
+  return fallback && looksLikeUrl(fallback) ? fallback : null;
+}
+
+function resolveLocalPath(record: ProviderResponseRecord) {
+  const direct = pickTextDeep(record, RESPONSE_LOCAL_PATH_KEYS);
+  if (direct && !looksLikeUrl(direct)) return direct;
+  const fallback = pickTextDeep(record, ['value']);
+  return fallback && looksLikeLocalPath(fallback) && !looksLikeUrl(fallback) ? fallback : null;
+}
+
+function collectResponseRecords(
+  value: unknown,
+  collectionKeys: string[],
+  depth = 0,
+  seen = new Set<string>(),
+): ProviderResponseRecord[] {
+  if (depth > 5 || value == null) return [];
+
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => collectResponseRecords(item, collectionKeys, depth + 1, seen));
+  }
+
+  if (isNonEmptyString(value)) {
+    const normalized = toRecord(value);
+    if (Object.keys(normalized).length === 0) return [];
+    const signature = JSON.stringify(normalized);
+    if (seen.has(signature)) return [];
+    seen.add(signature);
+    return [normalized];
+  }
+
+  const record = toRecord(value);
+  for (const key of collectionKeys) {
+    if (!(key in record)) continue;
+    const nested = collectResponseRecords(record[key], collectionKeys, depth + 1, seen);
+    if (nested.length > 0) return nested;
+  }
+
+  const hasSummary = Boolean(pickTextDeep(record, RESPONSE_SUMMARY_KEYS));
+  const sourceUrl = resolveSourceUrl(record);
+  const localPath = resolveLocalPath(record);
+  const fallbackValue = pickText(record, ['value']);
+  const shouldKeep = hasSummary || Boolean(sourceUrl) || Boolean(localPath) || Boolean(fallbackValue) || (depth === 0 && Object.keys(record).length > 0);
+  if (!shouldKeep) return [];
+
+  const signature = JSON.stringify({
+    summary: hasSummary ? pickTextDeep(record, RESPONSE_SUMMARY_KEYS) : null,
+    sourceUrl,
+    localPath,
+    fallbackValue,
+  });
+  if (seen.has(signature)) return [];
+  seen.add(signature);
+  return [record];
+}
+
+function getResponseItems(responseBody: unknown, provider: ProviderKind) {
+  if (Array.isArray(responseBody)) {
+    return responseBody
+      .map((item) => toRecord(item))
+      .filter((item) => Object.keys(item).length > 0);
+  }
+
+  const items = collectResponseRecords(responseBody, PROVIDER_RESPONSE_COLLECTION_KEYS[provider]);
+  if (items.length > 0) return items;
+
+  const fallback = toRecord(responseBody);
+  return Object.keys(fallback).length > 0 ? [fallback] : [];
 }
 
 function getGeneratedMediaType(provider: ProviderKind): GeneratedMediaType {
@@ -681,7 +829,7 @@ function getGeneratedMediaTitle(provider: ProviderKind, payloadRecord: RenderPay
 function getGeneratedMediaSummary(provider: ProviderKind, payloadRecord: RenderPayloadRecord, responseRecord: ProviderResponseRecord, mode: RenderExecutionMode) {
   const sceneTitle = typeof payloadRecord.sceneTitle === 'string' ? payloadRecord.sceneTitle : '未分场';
   const shotTitle = typeof payloadRecord.shotTitle === 'string' ? payloadRecord.shotTitle : '未命名镜头';
-  const directSummary = pickText(responseRecord, ['summary', 'message', 'description']);
+  const directSummary = pickTextDeep(responseRecord, RESPONSE_SUMMARY_KEYS);
   if (directSummary) return directSummary;
   if (provider === 'voice-synthesis') return `${sceneTitle} 的语音结果已生成并写入媒体索引（${mode === 'remote' ? '真实' : '模拟'}模式）。`;
   if (provider === 'video-assembly') return `${sceneTitle} / ${shotTitle} 的视频片段已生成并写入媒体索引（${mode === 'remote' ? '真实' : '模拟'}模式）。`;
@@ -711,14 +859,19 @@ async function syncGeneratedMediaArtifacts(input: {
   const outputDir = path.join(input.runDir, 'generated-media');
   await mkdir(outputDir, { recursive: true });
 
-  const responseItems = getResponseItems(input.responseBody);
+  const responseItems = getResponseItems(input.responseBody, input.provider);
+  const fallbackResponseRecord = responseItems.length === 1 ? responseItems[0] : toRecord(input.responseBody);
   const createdAt = new Date().toISOString();
   const entries: GeneratedMediaEntry[] = [];
+  const reuseSinglePayload = input.payload.length === 1 && responseItems.length > 1;
+  const loopCount = reuseSinglePayload ? responseItems.length : input.payload.length;
 
-  for (const [index, payloadItem] of input.payload.entries()) {
+  for (let index = 0; index < loopCount; index += 1) {
+    const payloadItem = input.payload[reuseSinglePayload ? 0 : index] ?? input.payload[0] ?? {};
     const payloadRecord = toRecord(payloadItem) as RenderPayloadRecord;
-    const responseRecord = responseItems[index] || {};
-    const title = getGeneratedMediaTitle(input.provider, payloadRecord, index);
+    const responseRecord = responseItems[index] || fallbackResponseRecord;
+    const baseTitle = getGeneratedMediaTitle(input.provider, payloadRecord, reuseSinglePayload ? 0 : index);
+    const title = reuseSinglePayload && index > 0 ? `${baseTitle}（变体 ${index + 1}）` : baseTitle;
     const artifactName = `${String(index + 1).padStart(2, '0')}-${slugifyProjectTitle(title)}.json`;
     const artifactPath = path.join(outputDir, artifactName);
     await writeFile(artifactPath, JSON.stringify({
@@ -733,11 +886,11 @@ async function syncGeneratedMediaArtifacts(input: {
 
     const shotId = typeof payloadRecord.shotId === 'string' ? payloadRecord.shotId : undefined;
     const sceneId = typeof payloadRecord.sceneId === 'string' ? payloadRecord.sceneId : undefined;
-    const sourceUrl = pickText(responseRecord, ['url', 'outputUrl', 'sourceUrl', 'imageUrl', 'videoUrl', 'audioUrl', 'downloadUrl']);
-    const localPath = pickText(responseRecord, ['localPath', 'path', 'filePath', 'outputPath']) || artifactPath;
+    const sourceUrl = resolveSourceUrl(responseRecord);
+    const localPath = resolveLocalPath(responseRecord) || artifactPath;
 
     entries.push({
-      id: `media-${input.provider}-${shotId || sceneId || index + 1}`,
+      id: `media-${input.provider}-${shotId || sceneId || 'item'}-${index + 1}`,
       provider: input.provider,
       type: getGeneratedMediaType(input.provider),
       title,
