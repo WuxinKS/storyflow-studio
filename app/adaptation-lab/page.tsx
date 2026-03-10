@@ -1,8 +1,15 @@
 import Link from 'next/link';
 import { AdaptationData } from '@/components/adaptation-data';
 import { ModulePage } from '@/components/module-page';
+import { buildProjectHref, normalizeProjectId } from '@/lib/project-links';
 
-export default async function AdaptationLabPage() {
+export default async function AdaptationLabPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ projectId?: string | string[] }>;
+}) {
+  const projectId = normalizeProjectId((await searchParams)?.projectId);
+
   return (
     <ModulePage
       title="改编实验室"
@@ -12,11 +19,13 @@ export default async function AdaptationLabPage() {
         '让输出可直接流向分镜板和视频生成主链',
         '当前已支持参考素材注入 + 动态镜头类型生成',
       ]}
+      currentPath="/adaptation-lab"
+      projectId={projectId}
     >
-      <AdaptationData />
+      <AdaptationData projectId={projectId} />
       <div className="action-row">
-        <Link href="/chapter-studio" className="button-ghost">返回章节工作台</Link>
-        <Link href="/storyboard" className="button-secondary">前往分镜板</Link>
+        <Link href={buildProjectHref('/chapter-studio', projectId)} className="button-ghost">返回章节工作台</Link>
+        <Link href={buildProjectHref('/storyboard', projectId)} className="button-secondary">前往分镜板</Link>
       </div>
     </ModulePage>
   );

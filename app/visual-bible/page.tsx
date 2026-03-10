@@ -1,7 +1,14 @@
 import { ModulePage } from '@/components/module-page';
 import { VisualBibleData } from '@/components/visual-bible-data';
+import { normalizeProjectId } from '@/lib/project-links';
 
-export default function VisualBiblePage() {
+export default async function VisualBiblePage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ projectId?: string | string[] }>;
+}) {
+  const projectId = normalizeProjectId((await searchParams)?.projectId);
+
   return (
     <ModulePage
       title="视觉圣经"
@@ -11,8 +18,10 @@ export default function VisualBiblePage() {
         '抽取镜头语言、运动规则与材质关键词',
         '为后续改编实验室、分镜板与生成工作台提供统一视觉约束',
       ]}
+      currentPath="/visual-bible"
+      projectId={projectId}
     >
-      <VisualBibleData />
+      <VisualBibleData projectId={projectId} />
     </ModulePage>
   );
 }

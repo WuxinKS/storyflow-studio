@@ -1,5 +1,6 @@
 import './globals.css';
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 import { Sidebar } from '@/components/sidebar';
 import { appMeta } from '@/lib/app-meta';
 
@@ -8,12 +9,28 @@ export const metadata: Metadata = {
   description: appMeta.description,
 };
 
+function SidebarFallback() {
+  return (
+    <aside className="sidebar">
+      <div className="brand">
+        <div className="brand-badge">SF</div>
+        <div>
+          <p className="eyebrow">AI 导演工作台</p>
+          <h1>StoryFlow Studio</h1>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="zh-CN">
       <body>
         <div className="app-shell">
-          <Sidebar />
+          <Suspense fallback={<SidebarFallback />}>
+            <Sidebar />
+          </Suspense>
           <main className="content-shell">
             <header className="topbar">
               <div>

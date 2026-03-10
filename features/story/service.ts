@@ -374,15 +374,22 @@ async function upsertGeneratedNovelOutline(projectId: string, chapters: Generate
   return createOutlineVersion(projectId, 'AI Novel Chapter Index', summary);
 }
 
-export async function getLatestProject() {
-  return prisma.project.findFirst({
-    orderBy: { updatedAt: 'desc' },
-    include: {
-      ideaSeeds: { orderBy: { createdAt: 'desc' }, take: 1 },
-      outlines: { orderBy: { createdAt: 'desc' } },
-      chapters: { orderBy: { orderIndex: 'asc' } },
-    },
-  });
+export async function getLatestProject(projectId?: string) {
+  const include = {
+    ideaSeeds: { orderBy: { createdAt: 'desc' }, take: 1 },
+    outlines: { orderBy: { createdAt: 'desc' } },
+    chapters: { orderBy: { orderIndex: 'asc' } },
+  } as const;
+
+  return projectId
+    ? prisma.project.findUnique({
+        where: { id: projectId },
+        include,
+      })
+    : prisma.project.findFirst({
+        orderBy: { updatedAt: 'desc' },
+        include,
+      });
 }
 
 export async function createChapter(input: {

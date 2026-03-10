@@ -1,7 +1,14 @@
 import { ModulePage } from '@/components/module-page';
 import { CharacterStudioData } from '@/components/character-studio-data';
+import { normalizeProjectId } from '@/lib/project-links';
 
-export default function CharacterStudioPage() {
+export default async function CharacterStudioPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ projectId?: string | string[] }>;
+}) {
+  const projectId = normalizeProjectId((await searchParams)?.projectId);
+
   return (
     <ModulePage
       title="角色工作台"
@@ -11,8 +18,10 @@ export default function CharacterStudioPage() {
         '先形成主角 / 对手 / 关键配角的基础角色卡',
         '后续继续补强声线、外形稳定锚点与关系网络',
       ]}
+      currentPath="/character-studio"
+      projectId={projectId}
     >
-      <CharacterStudioData />
+      <CharacterStudioData projectId={projectId} />
     </ModulePage>
   );
 }

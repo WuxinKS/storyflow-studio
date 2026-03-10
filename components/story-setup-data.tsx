@@ -9,9 +9,10 @@ import { getSyncStatus } from '@/features/sync/service';
 import { StoryGenerateButton } from '@/components/story-generate-button';
 import { SyncNoticeCard } from '@/components/sync-notice-card';
 import { getProjectStageLabel } from '@/lib/display';
+import { buildProjectHref } from '@/lib/project-links';
 
-export async function StorySetupData() {
-  const project = await getLatestProject().catch(() => null);
+export async function StorySetupData({ projectId }: { projectId?: string }) {
+  const project = await getLatestProject(projectId).catch(() => null);
 
   if (!project) {
     return (
@@ -36,7 +37,7 @@ export async function StorySetupData() {
     <div className="page-stack">
       <div className="story-setup-grid">
         <div className="snapshot-card">
-          <p className="eyebrow">最新项目</p>
+          <p className="eyebrow">当前项目</p>
           <h3>{project.title}</h3>
           <p>{project.premise || '暂无故事前提'}</p>
           <div className="meta-list">
@@ -47,9 +48,9 @@ export async function StorySetupData() {
           </div>
           <StoryGenerateButton projectId={project.id} />
           <div className="action-row wrap-row">
-            <Link href="/idea-lab" className="button-ghost">修改创意</Link>
-            <Link href="/chapter-studio" className="button-secondary">查看小说章节</Link>
-            <Link href="/adaptation-lab" className="button-secondary">进入改编工作台</Link>
+            <Link href={buildProjectHref('/idea-lab', project.id)} className="button-ghost">修改创意</Link>
+            <Link href={buildProjectHref('/chapter-studio', project.id)} className="button-secondary">查看小说章节</Link>
+            <Link href={buildProjectHref('/adaptation-lab', project.id)} className="button-secondary">进入改编工作台</Link>
           </div>
         </div>
       </div>

@@ -320,17 +320,19 @@ async function getRenderProjectById(projectId: string) {
   });
 }
 
-export async function getRenderProject() {
-  return prisma.project.findFirst({
-    orderBy: { updatedAt: 'desc' },
-    include: {
-      scenes: { orderBy: { orderIndex: 'asc' } },
-      shots: { orderBy: [{ sceneId: 'asc' }, { orderIndex: 'asc' }] },
-      renderJobs: { orderBy: { createdAt: 'desc' } },
-      references: { orderBy: { createdAt: 'desc' } },
-      outlines: { orderBy: { createdAt: 'desc' } },
-    },
-  });
+export async function getRenderProject(projectId?: string) {
+  return projectId
+    ? getRenderProjectById(projectId)
+    : prisma.project.findFirst({
+        orderBy: { updatedAt: 'desc' },
+        include: {
+          scenes: { orderBy: { orderIndex: 'asc' } },
+          shots: { orderBy: [{ sceneId: 'asc' }, { orderIndex: 'asc' }] },
+          renderJobs: { orderBy: { createdAt: 'desc' } },
+          references: { orderBy: { createdAt: 'desc' } },
+          outlines: { orderBy: { createdAt: 'desc' } },
+        },
+      });
 }
 
 export async function exportRenderPresets(projectId: string) {

@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { TimelineEditor } from '@/components/timeline-editor';
 import { getTimelineBeatTypeLabel } from '@/lib/display';
 import { getTimelineBundle } from '@/features/timeline/service';
+import { buildProjectHref } from '@/lib/project-links';
 
 function formatSeconds(seconds: number) {
   const minutes = Math.floor(seconds / 60);
@@ -9,8 +10,8 @@ function formatSeconds(seconds: number) {
   return `${minutes}分 ${remain}秒`;
 }
 
-export async function TimelineData() {
-  const timeline = await getTimelineBundle().catch(() => null);
+export async function TimelineData({ projectId }: { projectId?: string }) {
+  const timeline = await getTimelineBundle(projectId).catch(() => null);
 
   if (!timeline) {
     return (
@@ -36,8 +37,8 @@ export async function TimelineData() {
           <span>异常提示：{timeline.warnings.filter((item) => item.level === 'warning').length}</span>
         </div>
         <div className="action-row">
-          <Link href="/storyboard" className="button-ghost">返回分镜板</Link>
-          <Link href="/render-studio" className="button-secondary">继续进入生成</Link>
+          <Link href={buildProjectHref('/storyboard', timeline.projectId)} className="button-ghost">返回分镜板</Link>
+          <Link href={buildProjectHref('/render-studio', timeline.projectId)} className="button-secondary">继续进入生成</Link>
         </div>
       </div>
 

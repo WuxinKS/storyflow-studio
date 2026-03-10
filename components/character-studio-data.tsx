@@ -5,6 +5,7 @@ import { SyncNoticeCard } from '@/components/sync-notice-card';
 import { getCharacterDraftBundle, getLatestCharacterProject } from '@/features/characters/service';
 import { getSyncStatus } from '@/features/sync/service';
 import { getProjectStageLabel } from '@/lib/display';
+import { buildProjectHref } from '@/lib/project-links';
 
 function roleLabel(role: string) {
   if (role === 'protagonist') return '主角';
@@ -22,8 +23,8 @@ function getLockedFieldLabels(character: ReturnType<typeof getCharacterDraftBund
   return labels;
 }
 
-export async function CharacterStudioData() {
-  const project = await getLatestCharacterProject().catch(() => null);
+export async function CharacterStudioData({ projectId }: { projectId?: string }) {
+  const project = await getLatestCharacterProject(projectId).catch(() => null);
 
   if (!project) {
     return (
@@ -50,8 +51,8 @@ export async function CharacterStudioData() {
         </div>
         <CharacterGenerateButton projectId={project.id} />
         <div className="action-row">
-          <Link href="/story-setup" className="button-ghost">返回故事设定</Link>
-          <Link href="/adaptation-lab" className="button-secondary">继续进入改编</Link>
+          <Link href={buildProjectHref('/story-setup', project.id)} className="button-ghost">返回故事设定</Link>
+          <Link href={buildProjectHref('/adaptation-lab', project.id)} className="button-secondary">继续进入改编</Link>
         </div>
       </div>
 

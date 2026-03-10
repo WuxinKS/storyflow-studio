@@ -308,15 +308,22 @@ async function upsertCharacterOutline(projectId: string, summary: string) {
   return createOutlineVersion(projectId, 'Character Drafts', summary);
 }
 
-export async function getLatestCharacterProject() {
-  return prisma.project.findFirst({
-    orderBy: { updatedAt: 'desc' },
-    include: {
-      ideaSeeds: { orderBy: { createdAt: 'desc' }, take: 1 },
-      outlines: { orderBy: { createdAt: 'desc' } },
-      chapters: { orderBy: { orderIndex: 'asc' } },
-    },
-  });
+export async function getLatestCharacterProject(projectId?: string) {
+  const include = {
+    ideaSeeds: { orderBy: { createdAt: 'desc' }, take: 1 },
+    outlines: { orderBy: { createdAt: 'desc' } },
+    chapters: { orderBy: { orderIndex: 'asc' } },
+  } as const;
+
+  return projectId
+    ? prisma.project.findUnique({
+        where: { id: projectId },
+        include,
+      })
+    : prisma.project.findFirst({
+        orderBy: { updatedAt: 'desc' },
+        include,
+      });
 }
 
 export async function generateCharacterDrafts(projectId: string, options?: { targetRole?: string }) {

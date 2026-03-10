@@ -6,8 +6,8 @@ import {
 } from '@/features/reference/service';
 import { getProjectStageLabel, getReferenceSourceTypeLabel } from '@/lib/display';
 
-export async function ReferenceLabData() {
-  const project = await getReferenceProject().catch(() => null);
+export async function ReferenceLabData({ projectId }: { projectId?: string }) {
+  const project = await getReferenceProject(projectId).catch(() => null);
 
   if (!project) {
     return (

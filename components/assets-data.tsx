@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { AssetEditor } from '@/components/asset-editor';
 import { getAssetBundle, getAssetEditorOptions, getLatestAssetProject } from '@/features/assets/service';
+import { buildProjectHref } from '@/lib/project-links';
 
 function typeLabel(type: string) {
   if (type === 'character') return '角色资产';
@@ -13,8 +14,8 @@ function typeLabel(type: string) {
   return '参考资产';
 }
 
-export async function AssetsData() {
-  const project = await getLatestAssetProject().catch(() => null);
+export async function AssetsData({ projectId }: { projectId?: string }) {
+  const project = await getLatestAssetProject(projectId).catch(() => null);
 
   if (!project) {
     return (
@@ -55,9 +56,9 @@ export async function AssetsData() {
           <span>生成产物：{generatedTotal}</span>
         </div>
         <div className="action-row">
-          <Link href="/character-studio" className="button-ghost">查看角色工作台</Link>
-          <Link href="/visual-bible" className="button-secondary">查看视觉圣经</Link>
-          <Link href="/render-studio" className="button-secondary">查看生成工作台</Link>
+          <Link href={buildProjectHref('/character-studio', project.id)} className="button-ghost">查看角色工作台</Link>
+          <Link href={buildProjectHref('/visual-bible', project.id)} className="button-secondary">查看视觉圣经</Link>
+          <Link href={buildProjectHref('/render-studio', project.id)} className="button-secondary">查看生成工作台</Link>
         </div>
       </div>
 

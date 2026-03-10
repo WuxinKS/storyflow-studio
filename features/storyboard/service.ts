@@ -7,15 +7,24 @@ import {
   summarizeGeneratedMediaCounts,
 } from '@/features/media/service';
 
-export async function getStoryboardProject() {
-  const project = await prisma.project.findFirst({
-    orderBy: { updatedAt: 'desc' },
-    include: {
-      scenes: { orderBy: { orderIndex: 'asc' } },
-      shots: { orderBy: [{ sceneId: 'asc' }, { orderIndex: 'asc' }] },
-      outlines: { orderBy: { createdAt: 'desc' } },
-    },
-  });
+export async function getStoryboardProject(projectId?: string) {
+  const project = await (projectId
+    ? prisma.project.findUnique({
+        where: { id: projectId },
+        include: {
+          scenes: { orderBy: { orderIndex: 'asc' } },
+          shots: { orderBy: [{ sceneId: 'asc' }, { orderIndex: 'asc' }] },
+          outlines: { orderBy: { createdAt: 'desc' } },
+        },
+      })
+    : prisma.project.findFirst({
+        orderBy: { updatedAt: 'desc' },
+        include: {
+          scenes: { orderBy: { orderIndex: 'asc' } },
+          shots: { orderBy: [{ sceneId: 'asc' }, { orderIndex: 'asc' }] },
+          outlines: { orderBy: { createdAt: 'desc' } },
+        },
+      }));
 
   if (!project) return null;
 

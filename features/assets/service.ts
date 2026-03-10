@@ -93,16 +93,26 @@ function createEntryId() {
   return `asset-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export async function getLatestAssetProject() {
-  return prisma.project.findFirst({
-    orderBy: { updatedAt: 'desc' },
-    include: {
-      outlines: { orderBy: { createdAt: 'desc' } },
-      references: { orderBy: { createdAt: 'desc' } },
-      scenes: { orderBy: { orderIndex: 'asc' } },
-      shots: { orderBy: [{ sceneId: 'asc' }, { orderIndex: 'asc' }] },
-    },
-  });
+export async function getLatestAssetProject(projectId?: string) {
+  return projectId
+    ? prisma.project.findUnique({
+        where: { id: projectId },
+        include: {
+          outlines: { orderBy: { createdAt: 'desc' } },
+          references: { orderBy: { createdAt: 'desc' } },
+          scenes: { orderBy: { orderIndex: 'asc' } },
+          shots: { orderBy: [{ sceneId: 'asc' }, { orderIndex: 'asc' }] },
+        },
+      })
+    : prisma.project.findFirst({
+        orderBy: { updatedAt: 'desc' },
+        include: {
+          outlines: { orderBy: { createdAt: 'desc' } },
+          references: { orderBy: { createdAt: 'desc' } },
+          scenes: { orderBy: { orderIndex: 'asc' } },
+          shots: { orderBy: [{ sceneId: 'asc' }, { orderIndex: 'asc' }] },
+        },
+      });
 }
 
 export function getManualAssetEntries(project: { outlines: Array<{ title: string; summary: string }> } | null) {

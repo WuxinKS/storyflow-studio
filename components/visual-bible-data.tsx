@@ -5,6 +5,7 @@ import { SyncNoticeCard } from '@/components/sync-notice-card';
 import { getSyncStatus } from '@/features/sync/service';
 import { getLatestVisualProject, getVisualBibleBundle } from '@/features/visual/service';
 import { getProjectStageLabel } from '@/lib/display';
+import { buildProjectHref } from '@/lib/project-links';
 
 function getLockedFieldLabels(visualBible: NonNullable<ReturnType<typeof getVisualBibleBundle>>) {
   const labels: string[] = [];
@@ -15,8 +16,8 @@ function getLockedFieldLabels(visualBible: NonNullable<ReturnType<typeof getVisu
   return labels;
 }
 
-export async function VisualBibleData() {
-  const project = await getLatestVisualProject().catch(() => null);
+export async function VisualBibleData({ projectId }: { projectId?: string }) {
+  const project = await getLatestVisualProject(projectId).catch(() => null);
 
   if (!project) {
     return (
@@ -44,8 +45,8 @@ export async function VisualBibleData() {
         </div>
         <VisualGenerateButton projectId={project.id} />
         <div className="action-row">
-          <Link href="/story-setup" className="button-ghost">返回故事设定</Link>
-          <Link href="/adaptation-lab" className="button-secondary">继续进入改编</Link>
+          <Link href={buildProjectHref('/story-setup', project.id)} className="button-ghost">返回故事设定</Link>
+          <Link href={buildProjectHref('/adaptation-lab', project.id)} className="button-secondary">继续进入改编</Link>
         </div>
       </div>
 

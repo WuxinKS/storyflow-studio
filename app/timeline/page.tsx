@@ -1,7 +1,14 @@
 import { ModulePage } from '@/components/module-page';
 import { TimelineData } from '@/components/timeline-data';
+import { normalizeProjectId } from '@/lib/project-links';
 
-export default function TimelinePage() {
+export default async function TimelinePage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ projectId?: string | string[] }>;
+}) {
+  const projectId = normalizeProjectId((await searchParams)?.projectId);
+
   return (
     <ModulePage
       title="时间线"
@@ -11,8 +18,10 @@ export default function TimelinePage() {
         '查看每场起止时间、镜头数量、情绪强度与峰值分布',
         '自动提示节奏异常，辅助继续进入生成与交付检查',
       ]}
+      currentPath="/timeline"
+      projectId={projectId}
     >
-      <TimelineData />
+      <TimelineData projectId={projectId} />
     </ModulePage>
   );
 }

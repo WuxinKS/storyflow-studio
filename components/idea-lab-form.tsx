@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { FormEvent, useState } from 'react';
 import { defaultProjectDraft, ProjectDraft } from '@/features/project/draft';
 import { useProjectDraft } from '@/features/project/use-project-draft';
+import { buildProjectHref } from '@/lib/project-links';
 
 type SubmitMode = 'create' | 'pipeline-full';
 
@@ -55,7 +56,7 @@ export function IdeaLabForm() {
           ? data.run.steps.filter((step: { status: string }) => step.status === 'completed').length
           : 0;
         setMessage(`已创建项目并跑完整主链：${data.project.title}（完成 ${completedSteps} 个步骤）`);
-        router.push('/render-studio');
+        router.push(buildProjectHref('/render-studio', data.project.id));
         router.refresh();
         return;
       }

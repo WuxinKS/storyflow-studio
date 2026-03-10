@@ -13,6 +13,7 @@ import { buildReferenceProfile } from '@/features/reference/service';
 import { getSyncStatus } from '@/features/sync/service';
 import { getVisualBibleBundle } from '@/features/visual/service';
 import { getShotKindFromTitle } from '@/lib/shot-taxonomy';
+import { buildProjectHref } from '@/lib/project-links';
 
 function summarizeStatus(statuses: string[]) {
   const done = statuses.filter((s) => s === 'done').length;
@@ -85,8 +86,8 @@ function getGeneratedMediaTypeLabel(type: string) {
   return '生成产物';
 }
 
-export async function RenderStudioData() {
-  const project = await getRenderProject().catch(() => null);
+export async function RenderStudioData({ projectId }: { projectId?: string }) {
+  const project = await getRenderProject(projectId).catch(() => null);
 
   if (!project) {
     return (
@@ -137,9 +138,9 @@ export async function RenderStudioData() {
         </div>
         <RenderGenerateButton projectId={project.id} />
         <div className="action-row">
-          <Link href="/storyboard" className="button-ghost">返回分镜板</Link>
-          <Link href="/visual-bible" className="button-secondary">查看视觉圣经</Link>
-          <Link href="/assets" className="button-secondary">查看资产中心</Link>
+          <Link href={buildProjectHref('/storyboard', project.id)} className="button-ghost">返回分镜板</Link>
+          <Link href={buildProjectHref('/visual-bible', project.id)} className="button-secondary">查看视觉圣经</Link>
+          <Link href={buildProjectHref('/assets', project.id)} className="button-secondary">查看资产中心</Link>
         </div>
       </div>
 

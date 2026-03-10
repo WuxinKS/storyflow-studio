@@ -1,7 +1,14 @@
 import { ModulePage } from '@/components/module-page';
 import { QaPanelData } from '@/components/qa-panel-data';
+import { normalizeProjectId } from '@/lib/project-links';
 
-export default function QaPanelPage() {
+export default async function QaPanelPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ projectId?: string | string[] }>;
+}) {
+  const projectId = normalizeProjectId((await searchParams)?.projectId);
+
   return (
     <ModulePage
       title="质量检查"
@@ -11,8 +18,10 @@ export default function QaPanelPage() {
         '检查上下游链路是否过期，并标出阻断交付项',
         '检查角色命名、视觉圣经、渲染任务与导出链是否接通',
       ]}
+      currentPath="/qa-panel"
+      projectId={projectId}
     >
-      <QaPanelData />
+      <QaPanelData projectId={projectId} />
     </ModulePage>
   );
 }

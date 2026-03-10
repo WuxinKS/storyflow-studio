@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { getProjectStageLabel } from '@/lib/display';
 import { getLlmConfig } from '@/lib/llm';
 import { getGeneratedMediaEntries, summarizeGeneratedMediaCounts } from '@/features/media/service';
+import { buildProjectHref } from '@/lib/project-links';
 
 function maskUrl(url: string) {
   try {
@@ -19,7 +20,7 @@ function pickConfiguredValue(preferred?: string, fallback?: string) {
   return '';
 }
 
-export async function SettingsData() {
+export async function SettingsData({ projectId }: { projectId?: string }) {
   const llm = getLlmConfig();
   const sharedAuthHeader = process.env.STORYFLOW_PROVIDER_AUTH_HEADER || 'Authorization';
   const sharedAuthScheme = process.env.STORYFLOW_PROVIDER_AUTH_SCHEME || 'Bearer';
@@ -52,17 +53,29 @@ export async function SettingsData() {
   ];
   const enabledProviders = providers.filter((item) => item.url).length;
   const providerSpecificKeyCount = providers.filter((item) => item.apiKeySource === '独立 Key').length;
-  const latestProject = await prisma.project.findFirst({
-    orderBy: { updatedAt: 'desc' },
-    include: {
-      chapters: true,
-      scenes: true,
-      shots: true,
-      references: true,
-      outlines: { orderBy: { createdAt: 'desc' } },
-      renderJobs: { orderBy: { createdAt: 'desc' } },
-    },
-  }).catch(() => null);
+  const latestProject = await (projectId
+    ? prisma.project.findUnique({
+        where: { id: projectId },
+        include: {
+          chapters: true,
+          scenes: true,
+          shots: true,
+          references: true,
+          outlines: { orderBy: { createdAt: 'desc' } },
+          renderJobs: { orderBy: { createdAt: 'desc' } },
+        },
+      })
+    : prisma.project.findFirst({
+        orderBy: { updatedAt: 'desc' },
+        include: {
+          chapters: true,
+          scenes: true,
+          shots: true,
+          references: true,
+          outlines: { orderBy: { createdAt: 'desc' } },
+          renderJobs: { orderBy: { createdAt: 'desc' } },
+        },
+      })).catch(() => null);
   const generatedMediaCounts = summarizeGeneratedMediaCounts(getGeneratedMediaEntries(latestProject));
 
   return (
@@ -79,8 +92,8 @@ export async function SettingsData() {
           <span>共享鉴权：{sharedAuthHeader} / {sharedAuthScheme}</span>
         </div>
         <div className="action-row">
-          <Link href="/render-studio" className="button-ghost">查看生成工作台</Link>
-          <Link href="/qa-panel" className="button-secondary">查看质量检查</Link>
+          <Link href={buildProjectHref('/render-studio', latestProject?.id)} className="button-ghost">查看生成工作台</Link>
+          <Link href={buildProjectHref('/qa-panel', latestProject?.id)} className="button-secondary">查看质量检查</Link>
         </div>
       </div>
 

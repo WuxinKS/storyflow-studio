@@ -1,7 +1,14 @@
 import { ModulePage } from '@/components/module-page';
 import { ReferenceLabData } from '@/components/reference-lab-data';
+import { normalizeProjectId } from '@/lib/project-links';
 
-export default function ReferenceLabPage() {
+export default async function ReferenceLabPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ projectId?: string | string[] }>;
+}) {
+  const projectId = normalizeProjectId((await searchParams)?.projectId);
+
   return (
     <ModulePage
       title="Reference Lab"
@@ -11,8 +18,10 @@ export default function ReferenceLabPage() {
         '把参考素材转成可复用的风格卡与镜头语言标签',
         '为后续改编实验室 / 分镜板提供迁移依据',
       ]}
+      currentPath="/reference-lab"
+      projectId={projectId}
     >
-      <ReferenceLabData />
+      <ReferenceLabData projectId={projectId} />
     </ModulePage>
   );
 }

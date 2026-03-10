@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { getStoryboardProject } from '@/features/storyboard/service';
 import { getShotKindFromTitle } from '@/lib/shot-taxonomy';
+import { buildProjectHref } from '@/lib/project-links';
 
 function hasReferenceFlavor(text: string | null) {
   if (!text) return false;
@@ -12,8 +13,8 @@ function hasDirectorLanguage(text: string | null) {
   return text.includes('导演处理上强调') || text.includes('镜头重点放在');
 }
 
-export async function StoryboardData() {
-  const project = await getStoryboardProject().catch(() => null);
+export async function StoryboardData({ projectId }: { projectId?: string }) {
+  const project = await getStoryboardProject(projectId).catch(() => null);
 
   if (!project) {
     return (
@@ -43,8 +44,8 @@ export async function StoryboardData() {
           <span>已沉淀产物：{project.mediaCounts.total}</span>
         </div>
         <div className="action-row">
-          <Link href="/adaptation-lab" className="button-ghost">返回改编工作台</Link>
-          <Link href="/render-studio" className="button-secondary">继续到生成工作台</Link>
+          <Link href={buildProjectHref('/adaptation-lab', project.projectId)} className="button-ghost">返回改编工作台</Link>
+          <Link href={buildProjectHref('/render-studio', project.projectId)} className="button-secondary">继续到生成工作台</Link>
         </div>
       </div>
 

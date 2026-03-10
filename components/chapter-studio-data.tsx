@@ -7,9 +7,10 @@ import {
 import { ChapterCreateForm } from '@/components/chapter-create-form';
 import { NovelGenerateButton } from '@/components/novel-generate-button';
 import { getProjectStageLabel } from '@/lib/display';
+import { buildProjectHref } from '@/lib/project-links';
 
-export async function ChapterStudioData() {
-  const project = await getLatestProject().catch(() => null);
+export async function ChapterStudioData({ projectId }: { projectId?: string }) {
+  const project = await getLatestProject(projectId).catch(() => null);
 
   if (!project) {
     return (
@@ -40,8 +41,8 @@ export async function ChapterStudioData() {
         </div>
         <NovelGenerateButton projectId={project.id} />
         <div className="action-row">
-          <Link href="/story-setup" className="button-ghost">返回设定中心</Link>
-          <Link href="/adaptation-lab" className="button-secondary">进入改编工作台</Link>
+          <Link href={buildProjectHref('/story-setup', project.id)} className="button-ghost">返回设定中心</Link>
+          <Link href={buildProjectHref('/adaptation-lab', project.id)} className="button-secondary">进入改编工作台</Link>
         </div>
       </div>
 
@@ -95,7 +96,7 @@ export async function ChapterStudioData() {
                 <h4>{chapter.title}</h4>
                 <p>{chapter.content.slice(0, 160) || '暂无内容'}</p>
                 <div className="action-row compact-row">
-                  <Link href="/adaptation-lab" className="button-secondary">送去自动分镜</Link>
+                  <Link href={buildProjectHref('/adaptation-lab', project.id)} className="button-secondary">送去自动分镜</Link>
                 </div>
               </div>
             ))
@@ -123,7 +124,7 @@ export async function ChapterStudioData() {
                 <h4>{chapter.title}</h4>
                 <p>{chapter.content.slice(0, 160) || '暂无内容'}</p>
                 <div className="action-row compact-row">
-                  <Link href="/adaptation-lab" className="button-secondary">用于改编</Link>
+                  <Link href={buildProjectHref('/adaptation-lab', project.id)} className="button-secondary">用于改编</Link>
                 </div>
               </div>
             ))

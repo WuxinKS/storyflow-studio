@@ -164,13 +164,20 @@ export function buildReferenceProfile(
   return buildReferenceProfileFromInsights(getReferenceInsights(references));
 }
 
-export async function getReferenceProject() {
-  return prisma.project.findFirst({
-    orderBy: { updatedAt: 'desc' },
-    include: {
-      references: { orderBy: { createdAt: 'desc' } },
-    },
-  });
+export async function getReferenceProject(projectId?: string) {
+  const include = {
+    references: { orderBy: { createdAt: 'desc' } },
+  } as const;
+
+  return projectId
+    ? prisma.project.findUnique({
+        where: { id: projectId },
+        include,
+      })
+    : prisma.project.findFirst({
+        orderBy: { updatedAt: 'desc' },
+        include,
+      });
 }
 
 export async function createReferenceAnalysis(input: {
@@ -200,5 +207,5 @@ export async function createReferenceAnalysis(input: {
     },
   });
 
-  return getReferenceProject();
+  return getReferenceProject(input.projectId);
 }

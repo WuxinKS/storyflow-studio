@@ -1,7 +1,14 @@
 import { ModulePage } from '@/components/module-page';
 import { AssetsData } from '@/components/assets-data';
+import { normalizeProjectId } from '@/lib/project-links';
 
-export default function AssetsPage() {
+export default async function AssetsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ projectId?: string | string[] }>;
+}) {
+  const projectId = normalizeProjectId((await searchParams)?.projectId);
+
   return (
     <ModulePage
       title="资产中心"
@@ -11,8 +18,10 @@ export default function AssetsPage() {
         '支持手动录入资产并关联角色 / 场景 / 镜头',
         '把渲染后的图片 / 音频 / 视频继续沉淀回资产层',
       ]}
+      currentPath="/assets"
+      projectId={projectId}
     >
-      <AssetsData />
+      <AssetsData projectId={projectId} />
     </ModulePage>
   );
 }

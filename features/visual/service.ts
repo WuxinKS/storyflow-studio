@@ -195,16 +195,23 @@ async function upsertVisualBibleOutline(projectId: string, summary: string) {
   return createOutlineVersion(projectId, 'Visual Bible', summary);
 }
 
-export async function getLatestVisualProject() {
-  return prisma.project.findFirst({
-    orderBy: { updatedAt: 'desc' },
-    include: {
-      ideaSeeds: { orderBy: { createdAt: 'desc' }, take: 1 },
-      outlines: { orderBy: { createdAt: 'desc' } },
-      chapters: { orderBy: { orderIndex: 'asc' } },
-      references: { orderBy: { createdAt: 'desc' } },
-    },
-  });
+export async function getLatestVisualProject(projectId?: string) {
+  const include = {
+    ideaSeeds: { orderBy: { createdAt: 'desc' }, take: 1 },
+    outlines: { orderBy: { createdAt: 'desc' } },
+    chapters: { orderBy: { orderIndex: 'asc' } },
+    references: { orderBy: { createdAt: 'desc' } },
+  } as const;
+
+  return projectId
+    ? prisma.project.findUnique({
+        where: { id: projectId },
+        include,
+      })
+    : prisma.project.findFirst({
+        orderBy: { updatedAt: 'desc' },
+        include,
+      });
 }
 
 export async function generateVisualBible(projectId: string, options?: { focus?: VisualLockField | 'all' }) {

@@ -22,17 +22,24 @@ type ShotSeed = {
 const TARGET_SCENE_COUNT = 5;
 const TARGET_SHOT_COUNT_PER_SCENE = 4;
 
-export async function getLatestProjectWithChapters() {
-  return prisma.project.findFirst({
-    orderBy: { updatedAt: 'desc' },
-    include: {
-      chapters: { orderBy: { orderIndex: 'asc' } },
-      scenes: { orderBy: { orderIndex: 'asc' } },
-      shots: { orderBy: { orderIndex: 'asc' } },
-      references: { orderBy: { createdAt: 'desc' } },
-      outlines: { orderBy: { createdAt: 'desc' } },
-    },
-  });
+export async function getLatestProjectWithChapters(projectId?: string) {
+  const include = {
+    chapters: { orderBy: { orderIndex: 'asc' } },
+    scenes: { orderBy: { orderIndex: 'asc' } },
+    shots: { orderBy: { orderIndex: 'asc' } },
+    references: { orderBy: { createdAt: 'desc' } },
+    outlines: { orderBy: { createdAt: 'desc' } },
+  } as const;
+
+  return projectId
+    ? prisma.project.findUnique({
+        where: { id: projectId },
+        include,
+      })
+    : prisma.project.findFirst({
+        orderBy: { updatedAt: 'desc' },
+        include,
+      });
 }
 
 function getCharacterDrafts(project: { outlines?: Array<{ title: string; summary: string }> }): CharacterDraft[] {

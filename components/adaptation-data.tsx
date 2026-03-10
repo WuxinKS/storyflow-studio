@@ -49,8 +49,8 @@ function resolveAdaptationSource(chapters: Array<{ title: string }>) {
   };
 }
 
-export async function AdaptationData() {
-  const project = await getLatestProjectWithChapters().catch(() => null);
+export async function AdaptationData({ projectId }: { projectId?: string }) {
+  const project = await getLatestProjectWithChapters(projectId).catch(() => null);
 
   if (!project) {
     return (

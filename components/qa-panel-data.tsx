@@ -9,8 +9,8 @@ const GROUP_LABELS = {
   export: '交付检查',
 } as const;
 
-export async function QaPanelData() {
-  const report = await getQaReport().catch(() => null);
+export async function QaPanelData({ projectId }: { projectId?: string }) {
+  const report = await getQaReport(projectId).catch(() => null);
 
   if (!report) {
     return (

@@ -1,5 +1,7 @@
+import Link from 'next/link';
 import { listProjects } from '@/features/project/service';
 import { getProjectStageLabel } from '@/lib/display';
+import { buildProjectHref } from '@/lib/project-links';
 
 export async function ProjectList() {
   const projects = await listProjects().catch(() => []);
@@ -11,7 +13,7 @@ export async function ProjectList() {
           <p className="eyebrow">数据库快照</p>
           <h2>项目列表</h2>
         </div>
-        <p>这里展示已经写入 Prisma 数据层的项目。若数据库未初始化，会优雅回退为空列表。</p>
+        <p>这里展示已经写入 Prisma 数据层的项目。现在可以直接点进任意项目，保持整条工作流都锁定在同一个 project 上。</p>
       </div>
 
       <div className="asset-grid">
@@ -27,6 +29,11 @@ export async function ProjectList() {
               <span className="label">{getProjectStageLabel(project.stage)}</span>
               <h4>{project.title}</h4>
               <p>{project.premise || project.description || '暂无摘要'}</p>
+              <div className="action-row wrap-row">
+                <Link href={buildProjectHref('/story-setup', project.id)} className="button-ghost">进入设定</Link>
+                <Link href={buildProjectHref('/render-studio', project.id)} className="button-secondary">查看生成</Link>
+                <Link href={buildProjectHref('/qa-panel', project.id)} className="button-secondary">查看 QA</Link>
+              </div>
             </div>
           ))
         )}
