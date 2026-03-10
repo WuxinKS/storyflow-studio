@@ -49,6 +49,30 @@ const PROVIDER_ENV_MAP: Record<ProviderKind, string | undefined> = {
   'video-assembly': process.env.STORYFLOW_VIDEO_PROVIDER_URL,
 };
 
+const PROVIDER_API_KEY_ENV_MAP: Record<ProviderKind, string | undefined> = {
+  'image-sequence': process.env.STORYFLOW_IMAGE_PROVIDER_API_KEY,
+  'voice-synthesis': process.env.STORYFLOW_VOICE_PROVIDER_API_KEY,
+  'video-assembly': process.env.STORYFLOW_VIDEO_PROVIDER_API_KEY,
+};
+
+const PROVIDER_AUTH_HEADER_ENV_MAP: Record<ProviderKind, string | undefined> = {
+  'image-sequence': process.env.STORYFLOW_IMAGE_PROVIDER_AUTH_HEADER,
+  'voice-synthesis': process.env.STORYFLOW_VOICE_PROVIDER_AUTH_HEADER,
+  'video-assembly': process.env.STORYFLOW_VIDEO_PROVIDER_AUTH_HEADER,
+};
+
+const PROVIDER_AUTH_SCHEME_ENV_MAP: Record<ProviderKind, string | undefined> = {
+  'image-sequence': process.env.STORYFLOW_IMAGE_PROVIDER_AUTH_SCHEME,
+  'voice-synthesis': process.env.STORYFLOW_VOICE_PROVIDER_AUTH_SCHEME,
+  'video-assembly': process.env.STORYFLOW_VIDEO_PROVIDER_AUTH_SCHEME,
+};
+
+function pickConfiguredValue(preferred?: string, fallback?: string) {
+  if (typeof preferred === 'string' && preferred.trim()) return preferred.trim();
+  if (typeof fallback === 'string' && fallback.trim()) return fallback.trim();
+  return null;
+}
+
 function hasReferenceFlavor(text: string | null) {
   if (!text) return false;
   return text.includes('参考构图') || text.includes('情绪参考') || text.includes('动作节奏参考');
@@ -254,6 +278,31 @@ function serializeRenderJobOutput(meta: Partial<RenderJobMeta>) {
 
 function getProviderEndpoint(provider: ProviderKind) {
   return PROVIDER_ENV_MAP[provider] || null;
+}
+
+function getProviderApiKey(provider: ProviderKind) {
+  return pickConfiguredValue(PROVIDER_API_KEY_ENV_MAP[provider], process.env.STORYFLOW_PROVIDER_API_KEY);
+}
+
+function getProviderAuthHeader(provider: ProviderKind) {
+  return pickConfiguredValue(PROVIDER_AUTH_HEADER_ENV_MAP[provider], process.env.STORYFLOW_PROVIDER_AUTH_HEADER) || 'Authorization';
+}
+
+function getProviderAuthScheme(provider: ProviderKind) {
+  return pickConfiguredValue(PROVIDER_AUTH_SCHEME_ENV_MAP[provider], process.env.STORYFLOW_PROVIDER_AUTH_SCHEME) || 'Bearer';
+}
+
+function buildProviderHeaders(provider: ProviderKind) {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  const apiKey = getProviderApiKey(provider);
+  if (!apiKey) return headers;
+
+  const authHeader = getProviderAuthHeader(provider);
+  const authScheme = getProviderAuthScheme(provider);
+  headers[authHeader] = /^(raw|none)$/i.test(authScheme) ? apiKey : `${authScheme} ${apiKey}`.trim();
+  return headers;
 }
 
 async function getRenderProjectById(projectId: string) {
@@ -596,12 +645,7 @@ async function executeProvider(provider: ProviderKind, project: { id: string; ti
     };
   }
 
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-  if (process.env.STORYFLOW_PROVIDER_API_KEY) {
-    headers[process.env.STORYFLOW_PROVIDER_AUTH_HEADER || 'Authorization'] = `Bearer ${process.env.STORYFLOW_PROVIDER_API_KEY}`;
-  }
+  const headers = buildProviderHeaders(provider);
 
   const response = await fetch(endpoint, {
     method: 'POST',

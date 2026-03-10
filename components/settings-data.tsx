@@ -13,14 +13,45 @@ function maskUrl(url: string) {
   }
 }
 
+function pickConfiguredValue(preferred?: string, fallback?: string) {
+  if (typeof preferred === 'string' && preferred.trim()) return preferred.trim();
+  if (typeof fallback === 'string' && fallback.trim()) return fallback.trim();
+  return '';
+}
+
 export async function SettingsData() {
   const llm = getLlmConfig();
+  const sharedAuthHeader = process.env.STORYFLOW_PROVIDER_AUTH_HEADER || 'Authorization';
+  const sharedAuthScheme = process.env.STORYFLOW_PROVIDER_AUTH_SCHEME || 'Bearer';
+  const sharedApiKeyConfigured = Boolean(process.env.STORYFLOW_PROVIDER_API_KEY);
   const providers = [
-    { key: 'image', title: '图像 Provider', url: process.env.STORYFLOW_IMAGE_PROVIDER_URL || '' },
-    { key: 'voice', title: '语音 Provider', url: process.env.STORYFLOW_VOICE_PROVIDER_URL || '' },
-    { key: 'video', title: '视频 Provider', url: process.env.STORYFLOW_VIDEO_PROVIDER_URL || '' },
+    {
+      key: 'image',
+      title: '图像 Provider',
+      url: process.env.STORYFLOW_IMAGE_PROVIDER_URL || '',
+      authHeader: pickConfiguredValue(process.env.STORYFLOW_IMAGE_PROVIDER_AUTH_HEADER, sharedAuthHeader),
+      authScheme: pickConfiguredValue(process.env.STORYFLOW_IMAGE_PROVIDER_AUTH_SCHEME, sharedAuthScheme),
+      apiKeySource: process.env.STORYFLOW_IMAGE_PROVIDER_API_KEY ? '独立 Key' : sharedApiKeyConfigured ? '共享 Key' : '未配置 Key',
+    },
+    {
+      key: 'voice',
+      title: '语音 Provider',
+      url: process.env.STORYFLOW_VOICE_PROVIDER_URL || '',
+      authHeader: pickConfiguredValue(process.env.STORYFLOW_VOICE_PROVIDER_AUTH_HEADER, sharedAuthHeader),
+      authScheme: pickConfiguredValue(process.env.STORYFLOW_VOICE_PROVIDER_AUTH_SCHEME, sharedAuthScheme),
+      apiKeySource: process.env.STORYFLOW_VOICE_PROVIDER_API_KEY ? '独立 Key' : sharedApiKeyConfigured ? '共享 Key' : '未配置 Key',
+    },
+    {
+      key: 'video',
+      title: '视频 Provider',
+      url: process.env.STORYFLOW_VIDEO_PROVIDER_URL || '',
+      authHeader: pickConfiguredValue(process.env.STORYFLOW_VIDEO_PROVIDER_AUTH_HEADER, sharedAuthHeader),
+      authScheme: pickConfiguredValue(process.env.STORYFLOW_VIDEO_PROVIDER_AUTH_SCHEME, sharedAuthScheme),
+      apiKeySource: process.env.STORYFLOW_VIDEO_PROVIDER_API_KEY ? '独立 Key' : sharedApiKeyConfigured ? '共享 Key' : '未配置 Key',
+    },
   ];
   const enabledProviders = providers.filter((item) => item.url).length;
+  const providerSpecificKeyCount = providers.filter((item) => item.apiKeySource === '独立 Key').length;
   const latestProject = await prisma.project.findFirst({
     orderBy: { updatedAt: 'desc' },
     include: {
@@ -39,12 +70,13 @@ export async function SettingsData() {
       <div className="snapshot-card">
         <p className="eyebrow">运行时设置</p>
         <h3>模型与 Provider 状态</h3>
-        <p>这里集中展示默认模型、真实 Provider、模拟回退与导出目录，方便判断当前环境更适合演示、联调还是正式执行。</p>
+        <p>这里集中展示默认模型、真实 Provider、鉴权策略、模拟回退与导出目录，方便判断当前环境更适合演示、联调还是正式执行。</p>
         <div className="meta-list">
           <span>默认模型：{llm.model}</span>
           <span>LLM：{llm.enabled ? '已接通' : '未接通，回退模板输出'}</span>
           <span>真实 Provider：{enabledProviders} / {providers.length}</span>
-          <span>鉴权头：{process.env.STORYFLOW_PROVIDER_AUTH_HEADER || 'Authorization'}</span>
+          <span>独立鉴权：{providerSpecificKeyCount} / {providers.length}</span>
+          <span>共享鉴权：{sharedAuthHeader} / {sharedAuthScheme}</span>
         </div>
         <div className="action-row">
           <Link href="/render-studio" className="button-ghost">查看生成工作台</Link>
@@ -67,6 +99,11 @@ export async function SettingsData() {
             <span className="label">{provider.title}</span>
             <h4>{provider.url ? '已配置真实 endpoint' : '当前走 mock fallback'}</h4>
             <p>{provider.url ? maskUrl(provider.url) : '未配置真实 endpoint 时，生成工作台仍可生成请求 / 响应工件并完成质量检查 / 导出闭环。'}</p>
+            <div className="meta-list">
+              <span>鉴权头：{provider.authHeader}</span>
+              <span>鉴权方案：{provider.authScheme}</span>
+              <span>{provider.apiKeySource}</span>
+            </div>
           </div>
         ))}
       </div>
@@ -85,7 +122,7 @@ export async function SettingsData() {
         <div className="asset-tile">
           <span className="label">下一步建议</span>
           <h4>环境补齐顺序</h4>
-          <p>{llm.enabled ? '优先继续补图像 / 语音 / 视频 Provider，减少模拟执行占比。' : '先补 LLM endpoint，再补图像 / 语音 / 视频 Provider，能最快形成真实主链。'}</p>
+          <p>{llm.enabled ? '优先继续补图像 / 语音 / 视频 Provider，并按 Provider 拆分独立鉴权。' : '先补 LLM endpoint，再补图像 / 语音 / 视频 Provider，能最快形成真实主链。'}</p>
         </div>
       </div>
 
