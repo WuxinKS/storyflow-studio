@@ -358,6 +358,7 @@ export async function RenderStudioData({ projectId }: { projectId?: string }) {
               </div>
               {meta.preview ? <p>响应摘要：{meta.preview}</p> : null}
               {meta.endpoint ? <p>Endpoint：{meta.endpoint}</p> : null}
+              {meta.timeoutMs ? <p>超时：{meta.timeoutMs} ms</p> : null}
               {meta.executedAt ? <p>执行时间：{meta.executedAt}</p> : null}
               {meta.requestPath ? <p>请求工件：{meta.requestPath}</p> : null}
               {meta.responsePath ? <p>响应工件：{meta.responsePath}</p> : null}

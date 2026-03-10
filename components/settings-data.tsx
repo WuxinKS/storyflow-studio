@@ -20,6 +20,12 @@ function pickConfiguredValue(preferred?: string, fallback?: string) {
   return '';
 }
 
+function parseTimeoutMs(value: string | undefined, fallback: number) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return Math.round(parsed);
+}
+
 export async function SettingsData({ projectId }: { projectId?: string }) {
   const llm = getLlmConfig();
   const sharedAuthHeader = process.env.STORYFLOW_PROVIDER_AUTH_HEADER || 'Authorization';
@@ -32,6 +38,7 @@ export async function SettingsData({ projectId }: { projectId?: string }) {
       url: process.env.STORYFLOW_IMAGE_PROVIDER_URL || '',
       authHeader: pickConfiguredValue(process.env.STORYFLOW_IMAGE_PROVIDER_AUTH_HEADER, sharedAuthHeader),
       authScheme: pickConfiguredValue(process.env.STORYFLOW_IMAGE_PROVIDER_AUTH_SCHEME, sharedAuthScheme),
+      timeoutMs: parseTimeoutMs(pickConfiguredValue(process.env.STORYFLOW_IMAGE_PROVIDER_TIMEOUT_MS, process.env.STORYFLOW_PROVIDER_TIMEOUT_MS), 300000),
       apiKeySource: process.env.STORYFLOW_IMAGE_PROVIDER_API_KEY ? '独立 Key' : sharedApiKeyConfigured ? '共享 Key' : '未配置 Key',
     },
     {
@@ -40,6 +47,7 @@ export async function SettingsData({ projectId }: { projectId?: string }) {
       url: process.env.STORYFLOW_VOICE_PROVIDER_URL || '',
       authHeader: pickConfiguredValue(process.env.STORYFLOW_VOICE_PROVIDER_AUTH_HEADER, sharedAuthHeader),
       authScheme: pickConfiguredValue(process.env.STORYFLOW_VOICE_PROVIDER_AUTH_SCHEME, sharedAuthScheme),
+      timeoutMs: parseTimeoutMs(pickConfiguredValue(process.env.STORYFLOW_VOICE_PROVIDER_TIMEOUT_MS, process.env.STORYFLOW_PROVIDER_TIMEOUT_MS), 300000),
       apiKeySource: process.env.STORYFLOW_VOICE_PROVIDER_API_KEY ? '独立 Key' : sharedApiKeyConfigured ? '共享 Key' : '未配置 Key',
     },
     {
@@ -48,6 +56,7 @@ export async function SettingsData({ projectId }: { projectId?: string }) {
       url: process.env.STORYFLOW_VIDEO_PROVIDER_URL || '',
       authHeader: pickConfiguredValue(process.env.STORYFLOW_VIDEO_PROVIDER_AUTH_HEADER, sharedAuthHeader),
       authScheme: pickConfiguredValue(process.env.STORYFLOW_VIDEO_PROVIDER_AUTH_SCHEME, sharedAuthScheme),
+      timeoutMs: parseTimeoutMs(pickConfiguredValue(process.env.STORYFLOW_VIDEO_PROVIDER_TIMEOUT_MS, process.env.STORYFLOW_PROVIDER_TIMEOUT_MS), 300000),
       apiKeySource: process.env.STORYFLOW_VIDEO_PROVIDER_API_KEY ? '独立 Key' : sharedApiKeyConfigured ? '共享 Key' : '未配置 Key',
     },
   ];
@@ -105,6 +114,7 @@ export async function SettingsData({ projectId }: { projectId?: string }) {
           <div className="meta-list">
             <span>模型：{llm.model}</span>
             <span>API Key：{llm.apiKey ? '已配置' : '未配置'}</span>
+            <span>超时：{llm.timeoutMs} ms</span>
           </div>
         </div>
         {providers.map((provider) => (
@@ -115,6 +125,7 @@ export async function SettingsData({ projectId }: { projectId?: string }) {
             <div className="meta-list">
               <span>鉴权头：{provider.authHeader}</span>
               <span>鉴权方案：{provider.authScheme}</span>
+              <span>超时：{provider.timeoutMs} ms</span>
               <span>{provider.apiKeySource}</span>
             </div>
           </div>

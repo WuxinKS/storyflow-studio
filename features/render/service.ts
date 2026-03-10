@@ -35,6 +35,7 @@ type RenderJobMeta = {
   executedAt?: string;
   assetCount?: number;
   artifactIndexPath?: string;
+  timeoutMs?: number;
 };
 
 const DEFAULT_JOB_META: RenderJobMeta = {
@@ -69,10 +70,22 @@ const PROVIDER_AUTH_SCHEME_ENV_MAP: Record<ProviderKind, string | undefined> = {
   'video-assembly': process.env.STORYFLOW_VIDEO_PROVIDER_AUTH_SCHEME,
 };
 
+const PROVIDER_TIMEOUT_ENV_MAP: Record<ProviderKind, string | undefined> = {
+  'image-sequence': process.env.STORYFLOW_IMAGE_PROVIDER_TIMEOUT_MS,
+  'voice-synthesis': process.env.STORYFLOW_VOICE_PROVIDER_TIMEOUT_MS,
+  'video-assembly': process.env.STORYFLOW_VIDEO_PROVIDER_TIMEOUT_MS,
+};
+
 function pickConfiguredValue(preferred?: string, fallback?: string) {
   if (typeof preferred === 'string' && preferred.trim()) return preferred.trim();
   if (typeof fallback === 'string' && fallback.trim()) return fallback.trim();
   return null;
+}
+
+function parseTimeoutMs(value: string | null | undefined, fallback: number) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return Math.round(parsed);
 }
 
 function hasReferenceFlavor(text: string | null) {
@@ -292,6 +305,10 @@ function getProviderAuthHeader(provider: ProviderKind) {
 
 function getProviderAuthScheme(provider: ProviderKind) {
   return pickConfiguredValue(PROVIDER_AUTH_SCHEME_ENV_MAP[provider], process.env.STORYFLOW_PROVIDER_AUTH_SCHEME) || 'Bearer';
+}
+
+function getProviderTimeoutMs(provider: ProviderKind) {
+  return parseTimeoutMs(pickConfiguredValue(PROVIDER_TIMEOUT_ENV_MAP[provider], process.env.STORYFLOW_PROVIDER_TIMEOUT_MS), 300000);
 }
 
 function buildProviderHeaders(provider: ProviderKind) {
@@ -700,6 +717,7 @@ async function writeExecutionArtifacts(projectTitle: string, provider: ProviderK
 
 async function executeProvider(provider: ProviderKind, project: { id: string; title: string }, payload: unknown[]) {
   const endpoint = getProviderEndpoint(provider);
+  const timeoutMs = getProviderTimeoutMs(provider);
   const { runDir, requestPath } = await writeExecutionArtifacts(project.title, provider, payload);
   const responsePath = path.join(runDir, `${provider}-response.json`);
 
@@ -716,28 +734,42 @@ async function executeProvider(provider: ProviderKind, project: { id: string; ti
     return {
       mode: 'mock' as const,
       endpoint: null,
+      timeoutMs,
       runDir,
       requestPath,
       responsePath,
       responseBody: mockResponse,
       preview: mockResponse.message,
-      summary: [`mode:mock`, `items:${payload.length}`, `response:${path.basename(responsePath)}`],
+      summary: [`mode:mock`, `items:${payload.length}`, `timeout:${timeoutMs}ms`, `response:${path.basename(responsePath)}`],
     };
   }
 
   const headers = buildProviderHeaders(provider);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(`timeout:${timeoutMs}`), timeoutMs);
 
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      projectId: project.id,
-      projectTitle: project.title,
-      provider,
-      items: payload,
-    }),
-    cache: 'no-store',
-  });
+  let response: Response;
+  try {
+    response = await fetch(endpoint, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        projectId: project.id,
+        projectTitle: project.title,
+        provider,
+        items: payload,
+      }),
+      cache: 'no-store',
+      signal: controller.signal,
+    });
+  } catch (error) {
+    clearTimeout(timer);
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error(`${provider} provider timed out after ${timeoutMs}ms`);
+    }
+    throw error;
+  }
+  clearTimeout(timer);
 
   const rawText = await response.text();
   const responseBody = safeJsonParse(rawText) || rawText;
@@ -750,12 +782,13 @@ async function executeProvider(provider: ProviderKind, project: { id: string; ti
   return {
     mode: 'remote' as const,
     endpoint,
+    timeoutMs,
     runDir,
     requestPath,
     responsePath,
     responseBody,
     preview: rawText.slice(0, 180),
-    summary: [`mode:remote`, `items:${payload.length}`, `endpoint:${endpoint}`, `response:${path.basename(responsePath)}`],
+    summary: [`mode:remote`, `items:${payload.length}`, `timeout:${timeoutMs}ms`, `endpoint:${endpoint}`, `response:${path.basename(responsePath)}`],
   };
 }
 
@@ -1100,6 +1133,7 @@ async function executeRenderJob(projectId: string, jobId: string) {
           lastError: undefined,
           assetCount: mediaArtifacts.entries.length,
           artifactIndexPath: mediaArtifacts.indexPath,
+          timeoutMs: result.timeoutMs,
           summary: [...summary, `assets:${mediaArtifacts.entries.length}`],
         }),
       },
@@ -1115,6 +1149,7 @@ async function executeRenderJob(projectId: string, jobId: string) {
           retryCount: existingMeta.retryCount + 1,
           executedAt: new Date().toISOString(),
           lastError: error instanceof Error ? error.message : 'Unknown error',
+          timeoutMs: getProviderTimeoutMs(provider),
           summary: [...existingMeta.summary.filter((item) => item !== 'status:running'), 'status:failed'],
         }),
       },
