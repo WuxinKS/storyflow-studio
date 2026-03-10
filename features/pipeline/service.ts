@@ -1,10 +1,12 @@
+import path from 'node:path';
 import { prisma } from '@/lib/prisma';
 import { createOutlineVersion } from '@/lib/outline-store';
 import { generateStoryDraft, isGeneratedNovelChapterTitle } from '@/features/story/service';
 import { generateCharacterDrafts } from '@/features/characters/service';
 import { generateVisualBible } from '@/features/visual/service';
 import { generateAdaptationFromLatestChapter } from '@/features/adaptation/service';
-import { createRenderJobsForLatestProject, runRenderJobs } from '@/features/render/service';
+import { getQaReport } from '@/features/qa/service';
+import { createRenderJobsForLatestProject, exportProductionBundle, runRenderJobs } from '@/features/render/service';
 
 export const PIPELINE_RUN_LOG_TITLE = 'Pipeline Run Log';
 
@@ -160,12 +162,34 @@ export async function runProjectPipeline(projectId: string, options?: { mode?: P
       if (renderProject?.renderJobs.some((job) => job.status === 'failed')) {
         throw new Error('部分渲染任务执行失败，请到生成工作台查看错误详情。');
       }
+
+      const bundle = await runStep('production-bundle', '导出交付包', () => exportProductionBundle(projectId), (result) => {
+        return `已生成交付包 ${path.basename(result.zipPath)}，目录 ${result.bundleDir}。`;
+      });
+
+      await runStep('qa-summary', '质量结论', () => getQaReport(projectId, { bundleExport: bundle }), (report) => {
+        if (!report) return '当前还没有可用 QA 数据。';
+        const blockerText = report.summary.blockerLabels.join(' / ') || '无阻断项';
+        return `成熟度：${report.summary.maturity}｜通过 ${report.summary.passed}/${report.summary.total}｜阻断项：${report.summary.blockerCount}（${blockerText}）。`;
+      });
     } else {
       steps.push(createStep({
         key: 'render-execution',
         label: '执行生成',
         status: 'skipped',
         detail: '当前模式只准备到渲染任务，不自动执行。',
+      }));
+      steps.push(createStep({
+        key: 'production-bundle',
+        label: '导出交付包',
+        status: 'skipped',
+        detail: '当前模式只准备到渲染任务，不自动导出交付包。',
+      }));
+      steps.push(createStep({
+        key: 'qa-summary',
+        label: '质量结论',
+        status: 'skipped',
+        detail: '当前模式只准备到渲染任务，不自动生成 QA 结论。',
       }));
     }
 

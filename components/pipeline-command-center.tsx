@@ -34,13 +34,15 @@ export async function PipelineCommandCenter() {
   const aiChapterCount = visibleChapters.filter((chapter) => isGeneratedNovelChapterTitle(chapter.title)).length;
   const latestRunOutline = project.outlines.find((outline) => outline.title === PIPELINE_RUN_LOG_TITLE) || null;
   const latestRun = parsePipelineRunLog(latestRunOutline?.summary);
+  const completedSteps = latestRun?.steps.filter((step) => step.status === 'completed').length || 0;
+  const failedSteps = latestRun?.steps.filter((step) => step.status === 'failed').length || 0;
 
   return (
     <div className="page-stack">
       <div className="snapshot-card">
         <p className="eyebrow">主链控制台</p>
         <h3>{project.title}</h3>
-        <p>从一句话出发，自动串起故事骨架、小说章节、角色、视觉、自动分镜和渲染任务。若已配置真实 Provider，还可以继续直接执行整条生成链。</p>
+        <p>从一句话出发，自动串起故事骨架、小说章节、角色、视觉、自动分镜、渲染执行、交付包导出和 QA 结论。若已配置真实 Provider，就能更接近真正的一键成片闭环。</p>
         <div className="meta-list">
           <span>当前阶段：{getProjectStageLabel(project.stage)}</span>
           <span>可用章节：{visibleChapters.length}</span>
@@ -53,20 +55,37 @@ export async function PipelineCommandCenter() {
       </div>
 
       {latestRun ? (
-        <div className="asset-grid three-up">
-          <div className="asset-tile">
-            <span className="label">最近一次运行</span>
-            <h4>{latestRun.status === 'completed' ? '已完成' : '执行失败'}</h4>
-            <p>模式：{latestRun.mode === 'full' ? '完整主链' : '准备到渲染任务'}，结束时间：{latestRun.finishedAt || '未知'}。</p>
-          </div>
-          {latestRun.steps.slice(0, 6).map((step) => (
-            <div key={step.key} className="asset-tile">
-              <span className="label">{step.status === 'completed' ? '已完成' : step.status === 'skipped' ? '已跳过' : '失败'}</span>
-              <h4>{step.label}</h4>
-              <p>{step.detail}</p>
+        <>
+          <div className="asset-grid three-up">
+            <div className="asset-tile">
+              <span className="label">最近一次运行</span>
+              <h4>{latestRun.status === 'completed' ? '已完成' : '执行失败'}</h4>
+              <p>模式：{latestRun.mode === 'full' ? '完整主链' : '准备到渲染任务'}，结束时间：{latestRun.finishedAt || '未知'}。</p>
+              <div className="meta-list">
+                <span>完成步骤：{completedSteps}</span>
+                <span>失败步骤：{failedSteps}</span>
+                <span>总步骤：{latestRun.steps.length}</span>
+              </div>
             </div>
-          ))}
-        </div>
+            {latestRun.error ? (
+              <div className="asset-tile">
+                <span className="label">失败原因</span>
+                <h4>需要处理</h4>
+                <p>{latestRun.error}</p>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="asset-grid three-up">
+            {latestRun.steps.map((step) => (
+              <div key={step.key} className="asset-tile">
+                <span className="label">{step.status === 'completed' ? '已完成' : step.status === 'skipped' ? '已跳过' : '失败'}</span>
+                <h4>{step.label}</h4>
+                <p>{step.detail}</p>
+              </div>
+            ))}
+          </div>
+        </>
       ) : null}
     </div>
   );

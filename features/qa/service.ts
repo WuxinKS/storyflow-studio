@@ -21,16 +21,26 @@ export type QaCheck = {
   blocksDelivery: boolean;
 };
 
-export async function getQaProject() {
-  return prisma.project.findFirst({
-    orderBy: { updatedAt: 'desc' },
-    include: {
-      scenes: { orderBy: { orderIndex: 'asc' } },
-      shots: { orderBy: [{ sceneId: 'asc' }, { orderIndex: 'asc' }] },
-      outlines: { orderBy: { createdAt: 'desc' } },
-      renderJobs: { orderBy: { createdAt: 'desc' } },
-    },
-  });
+export async function getQaProject(projectId?: string) {
+  return projectId
+    ? prisma.project.findUnique({
+        where: { id: projectId },
+        include: {
+          scenes: { orderBy: { orderIndex: 'asc' } },
+          shots: { orderBy: [{ sceneId: 'asc' }, { orderIndex: 'asc' }] },
+          outlines: { orderBy: { createdAt: 'desc' } },
+          renderJobs: { orderBy: { createdAt: 'desc' } },
+        },
+      })
+    : prisma.project.findFirst({
+        orderBy: { updatedAt: 'desc' },
+        include: {
+          scenes: { orderBy: { orderIndex: 'asc' } },
+          shots: { orderBy: [{ sceneId: 'asc' }, { orderIndex: 'asc' }] },
+          outlines: { orderBy: { createdAt: 'desc' } },
+          renderJobs: { orderBy: { createdAt: 'desc' } },
+        },
+      });
 }
 
 function isCleanCharacterName(name: string) {
@@ -45,8 +55,8 @@ function getMaturityLevel(input: { blockers: number; failed: number }) {
   return '草稿可用';
 }
 
-export async function getQaReport() {
-  const project = await getQaProject();
+export async function getQaReport(projectId?: string, options?: { bundleExport?: Awaited<ReturnType<typeof exportProductionBundle>> | null }) {
+  const project = await getQaProject(projectId);
   if (!project) return null;
 
   const visualOutline = getLatestOutlineByTitle(project.outlines, 'Visual Bible');
@@ -71,9 +81,11 @@ export async function getQaReport() {
     exportProviderPayloads(project.id)
       .then((data) => ({ ok: true as const, data }))
       .catch((error) => ({ ok: false as const, error: error instanceof Error ? error.message : 'Unknown error' })),
-    exportProductionBundle(project.id)
-      .then((data) => ({ ok: true as const, data }))
-      .catch((error) => ({ ok: false as const, error: error instanceof Error ? error.message : 'Unknown error' })),
+    (options?.bundleExport
+      ? Promise.resolve({ ok: true as const, data: options.bundleExport })
+      : exportProductionBundle(project.id)
+          .then((data) => ({ ok: true as const, data }))
+          .catch((error) => ({ ok: false as const, error: error instanceof Error ? error.message : 'Unknown error' }))),
   ]);
 
   const [presetExport, providerExport, bundleExport] = exportChecks;
