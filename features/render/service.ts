@@ -5,6 +5,7 @@ import { promisify } from 'node:util';
 import { prisma } from '@/lib/prisma';
 import { parseVisualBibleDraft, type VisualBibleDraft } from '@/features/visual/service';
 import { parseCharacterDrafts, type CharacterDraft } from '@/features/characters/service';
+import { buildReferenceProfile, getReferenceInsights } from '@/features/reference/service';
 import { getShotKindFromTitle } from '@/lib/shot-taxonomy';
 import { getLatestOutlineByTitle } from '@/lib/outline-store';
 import {
@@ -312,6 +313,7 @@ async function getRenderProjectById(projectId: string) {
       scenes: { orderBy: { orderIndex: 'asc' } },
       shots: { orderBy: [{ sceneId: 'asc' }, { orderIndex: 'asc' }] },
       renderJobs: { orderBy: { createdAt: 'desc' } },
+      references: { orderBy: { createdAt: 'desc' } },
       outlines: { orderBy: { createdAt: 'desc' } },
     },
   });
@@ -324,6 +326,7 @@ export async function getRenderProject() {
       scenes: { orderBy: { orderIndex: 'asc' } },
       shots: { orderBy: [{ sceneId: 'asc' }, { orderIndex: 'asc' }] },
       renderJobs: { orderBy: { createdAt: 'desc' } },
+      references: { orderBy: { createdAt: 'desc' } },
       outlines: { orderBy: { createdAt: 'desc' } },
     },
   });
@@ -335,6 +338,7 @@ export async function exportRenderPresets(projectId: string) {
     include: {
       scenes: { orderBy: { orderIndex: 'asc' } },
       shots: { orderBy: [{ sceneId: 'asc' }, { orderIndex: 'asc' }] },
+      references: { orderBy: { createdAt: 'desc' } },
       outlines: { orderBy: { createdAt: 'desc' } },
     },
   });
@@ -343,6 +347,7 @@ export async function exportRenderPresets(projectId: string) {
 
   const visualBible = getVisualBible(project);
   const characters = getCharacterDrafts(project);
+  const referenceProfile = buildReferenceProfile(project.references);
   const presets = project.shots.map((shot) => getRenderPresetForShot(shot, visualBible, characters));
 
   return {
@@ -351,6 +356,7 @@ export async function exportRenderPresets(projectId: string) {
     sceneTitles: project.scenes.map((scene) => scene.title),
     visualBible,
     characters,
+    referenceProfile,
     presets,
   };
 }
@@ -361,6 +367,7 @@ export async function exportProviderPayloads(projectId: string) {
     include: {
       scenes: { orderBy: { orderIndex: 'asc' } },
       shots: { orderBy: [{ sceneId: 'asc' }, { orderIndex: 'asc' }] },
+      references: { orderBy: { createdAt: 'desc' } },
       outlines: { orderBy: { createdAt: 'desc' } },
     },
   });
@@ -370,6 +377,8 @@ export async function exportProviderPayloads(projectId: string) {
   const visualBible = getVisualBible(project);
   const characters = getCharacterDrafts(project);
   const characterSummary = summarizeCharacters(characters);
+  const referenceProfile = buildReferenceProfile(project.references);
+  const referenceInsights = getReferenceInsights(project.references);
   const sceneTitleMap = new Map(project.scenes.map((scene) => [scene.id, scene.title]));
   const presets = project.shots.map((shot) => ({
     shot,
@@ -391,6 +400,12 @@ export async function exportProviderPayloads(projectId: string) {
     lighting: preset.lighting,
     textureKeywords: preset.textureKeywords,
     characterSummary,
+    referenceTitles: referenceProfile.titles,
+    referenceFraming: referenceProfile.framing,
+    referenceEmotion: referenceProfile.emotion,
+    referenceMovement: referenceProfile.movement,
+    referenceNotes: referenceProfile.noteSummary,
+    referenceHighlights: referenceProfile.highlights,
   }));
 
   const voicePayload = project.scenes.map((scene) => ({
@@ -401,6 +416,10 @@ export async function exportProviderPayloads(projectId: string) {
     audioPlan: 'dialogue+ambience',
     styleName: visualBible?.styleName || null,
     characterSummary,
+    referenceTitles: referenceProfile.titles,
+    referenceEmotion: referenceProfile.emotion,
+    referenceMovement: referenceProfile.movement,
+    referenceNotes: referenceProfile.noteSummary,
   }));
 
   const videoPayload = presets.map(({ shot, preset }) => ({
@@ -417,6 +436,11 @@ export async function exportProviderPayloads(projectId: string) {
     motionLanguage: preset.motionLanguage,
     styleName: preset.visualBibleStyle,
     characterSummary,
+    referenceTitles: referenceProfile.titles,
+    referenceFraming: referenceProfile.framing,
+    referenceEmotion: referenceProfile.emotion,
+    referenceMovement: referenceProfile.movement,
+    referenceHighlights: referenceProfile.highlights,
   }));
 
   return {
@@ -424,6 +448,8 @@ export async function exportProviderPayloads(projectId: string) {
     projectTitle: project.title,
     visualBible,
     characters,
+    referenceProfile,
+    referenceInsights,
     providers: {
       imageSequence: imagePayload,
       voiceSynthesis: voicePayload,
@@ -439,6 +465,7 @@ export async function exportProductionBundle(projectId: string) {
       scenes: { orderBy: { orderIndex: 'asc' } },
       shots: { orderBy: [{ sceneId: 'asc' }, { orderIndex: 'asc' }] },
       renderJobs: { orderBy: { createdAt: 'desc' } },
+      references: { orderBy: { createdAt: 'desc' } },
       outlines: { orderBy: { createdAt: 'desc' } },
     },
   });
@@ -448,12 +475,15 @@ export async function exportProductionBundle(projectId: string) {
   const presetsData = await exportRenderPresets(projectId);
   const providerData = await exportProviderPayloads(projectId);
   const generatedMedia = getGeneratedMediaEntries(project);
+  const referenceInsights = getReferenceInsights(project.references);
   const bundle = {
     projectId: project.id,
     projectTitle: project.title,
     exportedAt: new Date().toISOString(),
     visualBible: presetsData.visualBible,
     characters: presetsData.characters,
+    referenceProfile: providerData.referenceProfile,
+    referenceInsights,
     scenes: project.scenes.map((scene) => ({
       id: scene.id,
       title: scene.title,
@@ -548,6 +578,7 @@ export async function createRenderJobsForLatestProject(projectId: string) {
     include: {
       scenes: { orderBy: { orderIndex: 'asc' } },
       shots: { orderBy: [{ sceneId: 'asc' }, { orderIndex: 'asc' }] },
+      references: { orderBy: { createdAt: 'desc' } },
       outlines: { orderBy: { createdAt: 'desc' } },
     },
   });
@@ -560,6 +591,7 @@ export async function createRenderJobsForLatestProject(projectId: string) {
   const characters = getCharacterDrafts(project);
   const characterSummary = summarizeCharacters(characters);
   const shotKindsSummary = summarizeShotKinds(project.shots.map((shot) => shot.title));
+  const referenceProfile = buildReferenceProfile(project.references);
   const referenceReadyShots = project.shots.filter((shot) => hasReferenceFlavor(shot.prompt)).length;
   const directorReadyScenes = project.scenes.filter((scene) => (scene.summary || '').includes('导演处理上强调')).length;
   const presetPreview = project.shots.slice(0, 3).map((shot) => {
@@ -577,7 +609,7 @@ export async function createRenderJobsForLatestProject(projectId: string) {
         provider: 'image-sequence',
         outputUrl: createJobSeedMeta({
           payloadCount: payloads.providers.imageSequence.length,
-          summary: [`shots:${project.shots.length}`, `kinds:${shotKindsSummary}`, `style:${visualBible?.styleName || 'none'}`, `characters:${characterSummary}`, `presetPreview:${presetPreview}`],
+          summary: [`shots:${project.shots.length}`, `kinds:${shotKindsSummary}`, `style:${visualBible?.styleName || 'none'}`, `references:${referenceProfile.total}`, `characters:${characterSummary}`, `presetPreview:${presetPreview}`],
         }),
       },
       {
@@ -586,7 +618,7 @@ export async function createRenderJobsForLatestProject(projectId: string) {
         provider: 'voice-synthesis',
         outputUrl: createJobSeedMeta({
           payloadCount: payloads.providers.voiceSynthesis.length,
-          summary: [`scenes:${project.scenes.length}`, `directorReady:${directorReadyScenes}`, `style:${visualBible?.styleName || 'none'}`, `characters:${characterSummary}`, 'audioPlan:dialogue+ambience'],
+          summary: [`scenes:${project.scenes.length}`, `directorReady:${directorReadyScenes}`, `style:${visualBible?.styleName || 'none'}`, `references:${referenceProfile.total}`, `characters:${characterSummary}`, 'audioPlan:dialogue+ambience'],
         }),
       },
       {
@@ -595,7 +627,7 @@ export async function createRenderJobsForLatestProject(projectId: string) {
         provider: 'video-assembly',
         outputUrl: createJobSeedMeta({
           payloadCount: payloads.providers.videoAssembly.length,
-          summary: [`referenceReady:${referenceReadyShots}`, `style:${visualBible?.styleName || 'none'}`, `characters:${characterSummary}`, 'presetLinked:true'],
+          summary: [`referenceReady:${referenceReadyShots}`, `references:${referenceProfile.total}`, `style:${visualBible?.styleName || 'none'}`, `characters:${characterSummary}`, 'presetLinked:true'],
         }),
       },
     ],

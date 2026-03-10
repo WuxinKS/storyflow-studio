@@ -8,6 +8,7 @@ import {
 } from '@/lib/display';
 import { getRenderPresetForShot, getRenderProject, parseRenderJobOutput } from '@/features/render/service';
 import { getGeneratedMediaEntries, summarizeGeneratedMediaCounts } from '@/features/media/service';
+import { buildReferenceProfile } from '@/features/reference/service';
 import { getSyncStatus } from '@/features/sync/service';
 import { getVisualBibleBundle } from '@/features/visual/service';
 import { getShotKindFromTitle } from '@/lib/shot-taxonomy';
@@ -98,6 +99,7 @@ export async function RenderStudioData() {
 
   const summary = summarizeStatus(project.renderJobs.map((job) => job.status));
   const syncStatus = await getSyncStatus(project.id).catch(() => null);
+  const referenceProfile = buildReferenceProfile(project.references || []);
   const generatedMedia = getGeneratedMediaEntries(project);
   const mediaCounts = summarizeGeneratedMediaCounts(generatedMedia);
   const jobOutputs = project.renderJobs.map((job) => ({
@@ -124,6 +126,7 @@ export async function RenderStudioData() {
           <span>分场：{project.scenes.length}</span>
           <span>镜头：{project.shots.length}</span>
           <span>参考增强：{flavoredCount}</span>
+          <span>参考卡：{referenceProfile.total}</span>
           <span>可生成镜头：{renderReadyShots}</span>
           <span>真实执行：{remoteCount}</span>
           <span>模拟执行：{mockCount}</span>
@@ -214,6 +217,24 @@ export async function RenderStudioData() {
           <span className="label">分场标题</span>
           <h4>当前分场标题</h4>
           <p>{project.scenes.map((scene) => scene.title).join(' / ') || '暂无分场标题'}</p>
+        </div>
+      </div>
+
+      <div className="asset-grid three-up">
+        <div className="asset-tile">
+          <span className="label">参考构图</span>
+          <h4>注入到图像 / 视频</h4>
+          <p>{referenceProfile.framing}</p>
+        </div>
+        <div className="asset-tile">
+          <span className="label">参考情绪</span>
+          <h4>注入到分镜 / 配音</h4>
+          <p>{referenceProfile.emotion} / {referenceProfile.movement}</p>
+        </div>
+        <div className="asset-tile">
+          <span className="label">参考锚点</span>
+          <h4>当前主参考</h4>
+          <p>{referenceProfile.titleSummary}</p>
         </div>
       </div>
 

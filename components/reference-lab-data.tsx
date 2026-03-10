@@ -1,11 +1,10 @@
 import { ReferenceAnalysisForm } from '@/components/reference-analysis-form';
-import { getReferenceProject } from '@/features/reference/service';
+import {
+  buildReferenceProfile,
+  getReferenceInsights,
+  getReferenceProject,
+} from '@/features/reference/service';
 import { getProjectStageLabel, getReferenceSourceTypeLabel } from '@/lib/display';
-
-function parseNotes(notes: string | null) {
-  if (!notes) return [];
-  return notes.split('\n').filter(Boolean);
-}
 
 export async function ReferenceLabData() {
   const project = await getReferenceProject().catch(() => null);
@@ -20,36 +19,78 @@ export async function ReferenceLabData() {
     );
   }
 
+  const insights = getReferenceInsights(project.references);
+  const profile = buildReferenceProfile(project.references);
+
   return (
     <div className="page-stack">
       <div className="snapshot-card">
         <p className="eyebrow">参考工作台</p>
         <h3>{project.title}</h3>
-        <p>把参考图、截图或样片拆成可复用的镜头语言、情绪标签和风格卡。</p>
+        <p>把参考图、截图或样片拆成可复用的镜头语言、情绪标签和风格卡，并直接为改编与渲染链提供参考约束。</p>
         <div className="meta-list">
           <span>参考条目：{project.references.length}</span>
+          <span>图片：{profile.imageCount}</span>
+          <span>视频：{profile.videoCount}</span>
           <span>项目阶段：{getProjectStageLabel(project.stage)}</span>
         </div>
       </div>
 
       <ReferenceAnalysisForm projectId={project.id} />
 
+      <div className="asset-grid three-up">
+        <div className="asset-tile">
+          <span className="label">构图画像</span>
+          <h4>当前构图偏好</h4>
+          <p>{profile.framing}</p>
+        </div>
+        <div className="asset-tile">
+          <span className="label">情绪画像</span>
+          <h4>当前情绪方向</h4>
+          <p>{profile.emotion}</p>
+        </div>
+        <div className="asset-tile">
+          <span className="label">节奏画像</span>
+          <h4>当前动作 / 节奏</h4>
+          <p>{profile.movement}</p>
+        </div>
+      </div>
+
+      <div className="asset-grid three-up">
+        <div className="asset-tile">
+          <span className="label">参考锚点</span>
+          <h4>主要参考标题</h4>
+          <p>{profile.titleSummary}</p>
+        </div>
+        <div className="asset-tile">
+          <span className="label">补充说明</span>
+          <h4>可迁移说明</h4>
+          <p>{profile.noteSummary}</p>
+        </div>
+        <div className="asset-tile">
+          <span className="label">下游注入</span>
+          <h4>当前会影响</h4>
+          <p>这些参考画像会直接注入改编实验室与生成工作台，影响 scene 摘要、shot prompt 和 provider payload。</p>
+        </div>
+      </div>
+
       <div className="asset-grid">
-        {project.references.length === 0 ? (
+        {insights.length === 0 ? (
           <div className="asset-tile">
             <span className="label">空状态</span>
             <h4>还没有参考分析</h4>
-            <p>先录入一个参考镜头，后续可以把它迁移到分镜板或改编实验室。</p>
+            <p>先录入一个参考镜头，后续会把它直接迁移到改编实验室和渲染工作台。</p>
           </div>
         ) : (
-          project.references.map((item) => (
-            <div key={item.id} className="asset-tile ref-tile">
-              <span className="label">{getReferenceSourceTypeLabel(item.type)}</span>
-              <h4>参考卡片</h4>
+          insights.map((item) => (
+            <div key={item.id} className="asset-tile ref-tile scene-tile">
+              <span className="label">{getReferenceSourceTypeLabel(item.sourceType)}</span>
+              <h4>{item.title}</h4>
+              <p>{item.notes}</p>
               <div className="tag-list">
-                {parseNotes(item.notes).map((line) => (
-                  <span key={line} className="tag-chip">{line}</span>
-                ))}
+                <span className="tag-chip">构图：{item.framing}</span>
+                <span className="tag-chip">情绪：{item.emotion}</span>
+                <span className="tag-chip">节奏：{item.movement}</span>
               </div>
             </div>
           ))

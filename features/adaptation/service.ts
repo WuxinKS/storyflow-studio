@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { generateText } from '@/lib/llm';
 import { parseCharacterDrafts, type CharacterDraft } from '@/features/characters/service';
 import { isGeneratedNovelChapterTitle, isStoryEngineChapterTitle } from '@/features/story/service';
+import { buildReferenceProfileFromNotes } from '@/features/reference/service';
 import { normalizeShotKind, type AllowedShotTitle } from '@/lib/shot-taxonomy';
 
 type StructuredSceneSeed = {
@@ -120,11 +121,14 @@ function ensureSceneSeedCount(sceneSeeds: Array<{ raw: string; meta: StructuredS
 }
 
 function extractReferenceHints(referenceNotes: string[]) {
-  const text = referenceNotes.join(' | ');
-  const framing = text.match(/景别\/构图：([^|\n]+)/)?.[1]?.trim() || '近景与特写结合，主体始终明确';
-  const emotion = text.match(/情绪：([^|\n]+)/)?.[1]?.trim() || '情绪逐步压紧，带一点悬而未决';
-  const movement = text.match(/动作\/节奏：([^|\n]+)/)?.[1]?.trim() || '动作克制，节奏渐进，保留停顿';
-  return { framing, emotion, movement };
+  const profile = buildReferenceProfileFromNotes(referenceNotes);
+  return {
+    framing: profile.framing,
+    emotion: profile.emotion,
+    movement: profile.movement,
+    titles: profile.titleSummary,
+    notes: profile.noteSummary,
+  };
 }
 
 function normalizeSeed(sceneText: string) {
@@ -199,14 +203,14 @@ function buildSceneSummaryFallback(
   if (seedMeta) {
     const core = `这一场围绕“${seedMeta.goal}”展开，核心冲突是“${seedMeta.conflict}”。场面先从“${opening}”进入，再把注意力推向“${turning}”，最终落到“${seedMeta.emotion}”这一情绪状态上。${characterNote}`;
     if (!referenceNotes.length) return core;
-    return `${core} 导演处理上强调${hints.framing}，情绪保持${hints.emotion}，整体节奏为${hints.movement}。`;
+    return `${core} 参考锚点来自${hints.titles}，导演处理上强调${hints.framing}，情绪保持${hints.emotion}，整体节奏为${hints.movement}，并补足${hints.notes}。`;
   }
 
   if (!referenceNotes.length) {
     return `这一场先建立“${opening}”的局面，再把叙事重心推向“${turning}”，镜头重点放在动作触发与情绪变化。${characterNote}`;
   }
 
-  return `这一场以“${opening}”开局，随后把注意力推向“${turning}”。${characterNote} 导演处理上强调${hints.framing}，情绪保持${hints.emotion}，整体节奏为${hints.movement}。`;
+  return `这一场以“${opening}”开局，随后把注意力推向“${turning}”。${characterNote} 参考锚点来自${hints.titles}，导演处理上强调${hints.framing}，情绪保持${hints.emotion}，整体节奏为${hints.movement}，并补足${hints.notes}。`;
 }
 
 function hasDialogueScene(sceneText: string) {
@@ -381,7 +385,7 @@ async function generateSceneSummaryWithLlm(input: {
   const hints = extractReferenceHints(input.referenceNotes);
   const result = await generateText({
     systemPrompt: '你是影视改编助手。请为单个 scene 输出一段中文导演化摘要，只输出正文，不要分点。要求包含场面推进、冲突核心、情绪落点，并自然融入镜头处理感，同时体现关键角色所承受的关系压力或人物状态。',
-    userPrompt: `项目：${input.projectTitle}\n场次标题：${input.sceneTitle}\n分场种子：${input.sceneSummarySeed}\n目标：${input.goal}\n冲突：${input.conflict}\n情绪：${input.emotion}\n角色摘要：${input.characterSummary}\n参考构图：${hints.framing}\n参考情绪：${hints.emotion}\n参考节奏：${hints.movement}`,
+    userPrompt: `项目：${input.projectTitle}\n场次标题：${input.sceneTitle}\n分场种子：${input.sceneSummarySeed}\n目标：${input.goal}\n冲突：${input.conflict}\n情绪：${input.emotion}\n角色摘要：${input.characterSummary}\n参考标题：${hints.titles}\n参考构图：${hints.framing}\n参考情绪：${hints.emotion}\n参考节奏：${hints.movement}\n参考补充：${hints.notes}`,
     temperature: 0.7,
   });
   return result?.trim() || null;
@@ -400,7 +404,7 @@ async function generateShotSeedsWithLlm(input: {
   const hints = extractReferenceHints(input.referenceNotes);
   const result = await generateText({
     systemPrompt: '你是影视分镜助手。请输出 JSON 数组，严格生成 4 个 shot seed。每项必须包含英文键名：title, prompt, cameraNotes。值全部使用中文。shot title 优先从这些类型里选择：空间建立、细节观察、感官压迫、情绪落点、关系压迫、动作触发、对白博弈。不要输出解释。每个 shot 都要体现关键角色状态、视角或关系压力，而不是只描述环境。必须恰好返回 4 项。',
-    userPrompt: `项目：${input.projectTitle}\n场次标题：${input.sceneTitle}\n分场种子：${input.sceneSummarySeed}\n目标：${input.goal}\n冲突：${input.conflict}\n情绪：${input.emotion}\n角色摘要：${input.characterSummary}\n参考构图：${hints.framing}\n参考情绪：${hints.emotion}\n参考节奏：${hints.movement}`,
+    userPrompt: `项目：${input.projectTitle}\n场次标题：${input.sceneTitle}\n分场种子：${input.sceneSummarySeed}\n目标：${input.goal}\n冲突：${input.conflict}\n情绪：${input.emotion}\n角色摘要：${input.characterSummary}\n参考标题：${hints.titles}\n参考构图：${hints.framing}\n参考情绪：${hints.emotion}\n参考节奏：${hints.movement}\n参考补充：${hints.notes}`,
     temperature: 0.7,
   });
 
