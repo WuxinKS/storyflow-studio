@@ -37,36 +37,30 @@ export function IdeaLabForm() {
     setMessage('');
 
     try {
-      const projectResponse = await fetch('/api/projects', {
+      const response = await fetch('/api/projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(next),
+        body: JSON.stringify({
+          ...next,
+          runPipelineMode: mode === 'pipeline-full' ? 'full' : undefined,
+        }),
       });
-      const projectData = await projectResponse.json();
-      if (!projectResponse.ok || !projectData.ok) {
-        throw new Error(projectData.error || '保存到数据库失败');
+      const data = await response.json();
+      if (!response.ok || !data.ok) {
+        throw new Error(data.error || '保存到数据库失败');
       }
 
       if (mode === 'pipeline-full') {
-        const pipelineResponse = await fetch('/api/pipeline', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ projectId: projectData.project.id, mode: 'full' }),
-        });
-        const pipelineData = await pipelineResponse.json();
-        if (!pipelineResponse.ok || !pipelineData.ok) {
-          throw new Error(pipelineData.error || '主链执行失败');
-        }
-        const completedSteps = Array.isArray(pipelineData.run?.steps)
-          ? pipelineData.run.steps.filter((step: { status: string }) => step.status === 'completed').length
+        const completedSteps = Array.isArray(data.run?.steps)
+          ? data.run.steps.filter((step: { status: string }) => step.status === 'completed').length
           : 0;
-        setMessage(`已创建项目并跑完整主链：${projectData.project.title}（完成 ${completedSteps} 个步骤）`);
+        setMessage(`已创建项目并跑完整主链：${data.project.title}（完成 ${completedSteps} 个步骤）`);
         router.push('/render-studio');
         router.refresh();
         return;
       }
 
-      setMessage(`已创建项目：${projectData.project.title}`);
+      setMessage(`已创建项目：${data.project.title}`);
       router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '保存失败');
