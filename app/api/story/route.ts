@@ -6,9 +6,11 @@ import {
   getLatestProject,
 } from '@/features/story/service';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const project = await getLatestProject();
+    const { searchParams } = new URL(request.url);
+    const projectId = searchParams.get('projectId') || undefined;
+    const project = await getLatestProject(projectId);
     return NextResponse.json({ ok: true, project });
   } catch (error) {
     return NextResponse.json(

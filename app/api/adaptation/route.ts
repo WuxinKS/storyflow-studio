@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
 import { generateAdaptationFromLatestChapter, getLatestProjectWithChapters } from '@/features/adaptation/service';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const project = await getLatestProjectWithChapters();
+    const { searchParams } = new URL(request.url);
+    const projectId = searchParams.get('projectId') || undefined;
+    const project = await getLatestProjectWithChapters(projectId);
     return NextResponse.json({ ok: true, project });
   } catch (error) {
     return NextResponse.json(

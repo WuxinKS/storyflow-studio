@@ -1,8 +1,10 @@
 "use client";
 
 import { FormEvent, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 export function ReferenceAnalysisForm({ projectId }: { projectId: string }) {
+  const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -30,6 +32,7 @@ export function ReferenceAnalysisForm({ projectId }: { projectId: string }) {
       if (!response.ok || !data.ok) throw new Error(data.error || '参考分析保存失败');
       setMessage(`已记录参考分析，当前总数：${data.project.references.length}`);
       event.currentTarget.reset();
+      router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '保存失败');
     } finally {

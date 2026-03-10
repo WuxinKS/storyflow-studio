@@ -14,7 +14,7 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const action = searchParams.get('action');
-    const projectId = searchParams.get('projectId');
+    const projectId = searchParams.get('projectId') || undefined;
 
     if (action === 'export-presets') {
       if (!projectId) {
@@ -40,7 +40,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ ok: true, data });
     }
 
-    const project = await getRenderProject();
+    const project = await getRenderProject(projectId);
     return NextResponse.json({ ok: true, project });
   } catch (error) {
     return NextResponse.json(

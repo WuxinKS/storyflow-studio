@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getTimelineBundle, saveTimelineOverrides } from '@/features/timeline/service';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const timeline = await getTimelineBundle();
+    const { searchParams } = new URL(request.url);
+    const projectId = searchParams.get('projectId') || undefined;
+    const timeline = await getTimelineBundle(projectId);
     return NextResponse.json({ ok: true, timeline });
   } catch (error) {
     return NextResponse.json(

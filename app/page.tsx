@@ -1,11 +1,19 @@
 import { Pipeline } from '@/components/pipeline';
 import { PipelineCommandCenter } from '@/components/pipeline-command-center';
+import { ProjectContextBar } from '@/components/project-context-bar';
 import { ProjectList } from '@/components/project-list';
 import { ProjectSnapshot } from '@/components/project-snapshot';
 import { SectionCard } from '@/components/section-card';
+import { normalizeProjectId } from '@/lib/project-links';
 import { dashboardHighlights, pipelineStages } from '@/lib/sample-data';
 
-export default function HomePage() {
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ projectId?: string | string[] }>;
+}) {
+  const projectId = normalizeProjectId((await searchParams)?.projectId);
+
   return (
     <div className="page-stack">
       <SectionCard
@@ -28,8 +36,9 @@ export default function HomePage() {
         </div>
       </SectionCard>
 
+      <ProjectContextBar currentPath="/" projectId={projectId} />
       <ProjectSnapshot />
-      <PipelineCommandCenter />
+      <PipelineCommandCenter projectId={projectId} />
       <ProjectList />
 
       <SectionCard

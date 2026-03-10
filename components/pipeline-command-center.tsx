@@ -6,19 +6,33 @@ import {
   isStoryEngineChapterTitle,
 } from '@/features/story/service';
 import { PipelineRunButton } from '@/components/pipeline-run-button';
+import { buildProjectHref } from '@/lib/project-links';
+import Link from 'next/link';
 
-export async function PipelineCommandCenter() {
-  const project = await prisma.project.findFirst({
-    orderBy: { updatedAt: 'desc' },
-    include: {
-      chapters: { orderBy: { orderIndex: 'asc' } },
-      scenes: { orderBy: { orderIndex: 'asc' } },
-      shots: { orderBy: [{ sceneId: 'asc' }, { orderIndex: 'asc' }] },
-      renderJobs: { orderBy: { createdAt: 'desc' } },
-      references: { orderBy: { createdAt: 'desc' } },
-      outlines: { orderBy: { createdAt: 'desc' } },
-    },
-  }).catch(() => null);
+export async function PipelineCommandCenter({ projectId }: { projectId?: string }) {
+  const project = await (projectId
+    ? prisma.project.findUnique({
+        where: { id: projectId },
+        include: {
+          chapters: { orderBy: { orderIndex: 'asc' } },
+          scenes: { orderBy: { orderIndex: 'asc' } },
+          shots: { orderBy: [{ sceneId: 'asc' }, { orderIndex: 'asc' }] },
+          renderJobs: { orderBy: { createdAt: 'desc' } },
+          references: { orderBy: { createdAt: 'desc' } },
+          outlines: { orderBy: { createdAt: 'desc' } },
+        },
+      })
+    : prisma.project.findFirst({
+        orderBy: { updatedAt: 'desc' },
+        include: {
+          chapters: { orderBy: { orderIndex: 'asc' } },
+          scenes: { orderBy: { orderIndex: 'asc' } },
+          shots: { orderBy: [{ sceneId: 'asc' }, { orderIndex: 'asc' }] },
+          renderJobs: { orderBy: { createdAt: 'desc' } },
+          references: { orderBy: { createdAt: 'desc' } },
+          outlines: { orderBy: { createdAt: 'desc' } },
+        },
+      })).catch(() => null);
 
   if (!project) {
     return (
@@ -52,6 +66,11 @@ export async function PipelineCommandCenter() {
           <span>渲染任务：{project.renderJobs.length}</span>
         </div>
         <PipelineRunButton projectId={project.id} />
+        <div className="action-row wrap-row">
+          <Link href={buildProjectHref('/story-setup', project.id)} className="button-ghost">查看故事设定</Link>
+          <Link href={buildProjectHref('/render-studio', project.id)} className="button-secondary">查看生成工作台</Link>
+          <Link href={buildProjectHref('/qa-panel', project.id)} className="button-secondary">查看 QA</Link>
+        </div>
       </div>
 
       {latestRun ? (

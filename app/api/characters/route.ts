@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
 import { generateCharacterDrafts, getLatestCharacterProject, saveCharacterDrafts } from '@/features/characters/service';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const project = await getLatestCharacterProject();
+    const { searchParams } = new URL(request.url);
+    const projectId = searchParams.get('projectId') || undefined;
+    const project = await getLatestCharacterProject(projectId);
     return NextResponse.json({ ok: true, project });
   } catch (error) {
     return NextResponse.json(

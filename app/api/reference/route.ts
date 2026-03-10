@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
 import { createReferenceAnalysis, getReferenceProject } from '@/features/reference/service';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const project = await getReferenceProject();
+    const { searchParams } = new URL(request.url);
+    const projectId = searchParams.get('projectId') || undefined;
+    const project = await getReferenceProject(projectId);
     return NextResponse.json({ ok: true, project });
   } catch (error) {
     return NextResponse.json(

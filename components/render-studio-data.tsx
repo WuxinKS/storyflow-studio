@@ -120,6 +120,11 @@ export async function RenderStudioData({ projectId }: { projectId?: string }) {
   const beatMarkedShots = timeline?.scenes.reduce((sum, scene) => sum + scene.shots.filter((shot) => Boolean(shot.beatType)).length, 0) || 0;
   const manualDurationShots = timeline?.scenes.reduce((sum, scene) => sum + scene.shots.filter((shot) => shot.isManualDuration).length, 0) || 0;
   const mockCount = jobOutputs.filter(({ meta }) => meta.mode === 'mock').length;
+  const exportLinks = {
+    presets: `/api/render?action=export-presets&projectId=${project.id}`,
+    providerPayloads: `/api/render?action=export-provider-payloads&projectId=${project.id}`,
+    productionBundle: `/api/render?action=export-production-bundle&projectId=${project.id}`,
+  };
 
   return (
     <div className="page-stack">
@@ -294,17 +299,17 @@ export async function RenderStudioData({ projectId }: { projectId?: string }) {
         <div className="asset-tile">
           <span className="label">接口导出</span>
           <h4>Preset JSON 导出</h4>
-          <p>可通过 <code>/api/render?action=export-presets&amp;projectId={project.id}</code> 获取结构化 preset JSON。</p>
+          <p>可直接导出镜头 preset JSON，用于联调和复验。</p><a className="button-ghost" href={exportLinks.presets} target="_blank" rel="noreferrer">打开 Preset JSON</a>
         </div>
         <div className="asset-tile">
           <span className="label">Provider 导出</span>
           <h4>Provider 可执行载荷</h4>
-          <p>可通过 <code>/api/render?action=export-provider-payloads&amp;projectId={project.id}</code> 获取按 image / voice / video 分组的可执行 payload。</p>
+          <p>可直接导出 image / voice / video 三类 Provider payload。</p><a className="button-ghost" href={exportLinks.providerPayloads} target="_blank" rel="noreferrer">打开 Provider Payload</a>
         </div>
         <div className="asset-tile">
           <span className="label">交付包导出</span>
           <h4>生产交付包</h4>
-          <p>交付包现在会同时带上媒体索引，便于把生成产物和结构数据一起归档。</p>
+          <p>交付包会带上媒体索引、结构数据和生产 bundle，方便直接归档交付。</p><a className="button-ghost" href={exportLinks.productionBundle} target="_blank" rel="noreferrer">生成并查看交付包</a>
         </div>
       </div>
 
@@ -352,7 +357,11 @@ export async function RenderStudioData({ projectId }: { projectId?: string }) {
                 <span>产物：{meta.assetCount || 0}</span>
               </div>
               {meta.preview ? <p>响应摘要：{meta.preview}</p> : null}
-              {meta.artifactIndexPath ? <p>索引：{meta.artifactIndexPath}</p> : null}
+              {meta.endpoint ? <p>Endpoint：{meta.endpoint}</p> : null}
+              {meta.executedAt ? <p>执行时间：{meta.executedAt}</p> : null}
+              {meta.requestPath ? <p>请求工件：{meta.requestPath}</p> : null}
+              {meta.responsePath ? <p>响应工件：{meta.responsePath}</p> : null}
+              {meta.artifactIndexPath ? <p>媒体索引：{meta.artifactIndexPath}</p> : null}
               {meta.lastError ? <p>错误：{meta.lastError}</p> : null}
             </div>
           ))
