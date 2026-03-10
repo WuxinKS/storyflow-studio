@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
 import { getProjectStageLabel } from '@/lib/display';
 import { getLlmConfig } from '@/lib/llm';
+import { getGeneratedMediaEntries, summarizeGeneratedMediaCounts } from '@/features/media/service';
 
 function maskUrl(url: string) {
   try {
@@ -27,9 +28,11 @@ export async function SettingsData() {
       scenes: true,
       shots: true,
       references: true,
+      outlines: { orderBy: { createdAt: 'desc' } },
       renderJobs: { orderBy: { createdAt: 'desc' } },
     },
   }).catch(() => null);
+  const generatedMediaCounts = summarizeGeneratedMediaCounts(getGeneratedMediaEntries(latestProject));
 
   return (
     <div className="page-stack">
@@ -77,7 +80,7 @@ export async function SettingsData() {
         <div className="asset-tile">
           <span className="label">导出目录</span>
           <h4>工件与交付包</h4>
-          <p><code>exports/render-runs</code> 保存执行请求 / 响应工件，<code>exports/production</code> 保存生产交付包与 zip 文件。</p>
+          <p><code>exports/render-runs</code> 保存执行请求 / 响应工件，交付包内还会带上 <code>generated-media-library.json</code> 媒体索引。</p>
         </div>
         <div className="asset-tile">
           <span className="label">下一步建议</span>
@@ -102,12 +105,12 @@ export async function SettingsData() {
           <div className="asset-tile">
             <span className="label">参考与生成</span>
             <h4>链路覆盖情况</h4>
-            <p>参考条目 {latestProject.references.length} 条，渲染任务 {latestProject.renderJobs.length} 个，可用于判断当前项目距离生成与交付还有多远。</p>
+            <p>参考条目 {latestProject.references.length} 条，渲染任务 {latestProject.renderJobs.length} 个，媒体索引 {generatedMediaCounts.total} 条。</p>
           </div>
           <div className="asset-tile">
             <span className="label">联调提示</span>
             <h4>适合继续推进</h4>
-            <p>{latestProject.renderJobs.length > 0 ? '当前项目已经有渲染任务，建议继续查看生成工作台与质量检查面板。' : '当前项目还没有渲染任务，建议先去生成工作台创建并执行第一批任务。'}</p>
+            <p>{generatedMediaCounts.total > 0 ? '当前项目已开始沉淀生成产物，建议继续查看分镜板、时间线与质量检查面板。' : latestProject.renderJobs.length > 0 ? '当前项目已经有渲染任务，建议继续执行并观察媒体索引回写。' : '当前项目还没有渲染任务，建议先去生成工作台创建并执行第一批任务。'}</p>
           </div>
         </div>
       ) : (

@@ -27,11 +27,12 @@ export async function TimelineData() {
       <div className="snapshot-card">
         <p className="eyebrow">时间线总览</p>
         <h3>{timeline.projectTitle}</h3>
-        <p>当前时间线已经支持手动修时、情绪曲线和高潮标记，不再只是静态估时，而是能直接服务于节奏调校。</p>
+        <p>当前时间线不仅支持手动修时和节奏标记，还能看到每场、每镜头当前已经沉淀了多少图片 / 音频 / 视频产物。</p>
         <div className="meta-list">
           <span>总时长：{timeline.totalDurationLabel}</span>
           <span>场次数：{timeline.scenes.length}</span>
           <span>镜头数：{timeline.scenes.reduce((sum, scene) => sum + scene.shotCount, 0)}</span>
+          <span>已沉淀产物：{timeline.mediaCounts.total}</span>
           <span>异常提示：{timeline.warnings.filter((item) => item.level === 'warning').length}</span>
         </div>
         <div className="action-row">
@@ -43,8 +44,8 @@ export async function TimelineData() {
       <div className="asset-grid three-up">
         <div className="asset-tile">
           <span className="label">当前说明</span>
-          <h4>时间线 v1</h4>
-          <p>当前版本已支持镜头时长微调、情绪强度估算、高潮点标记与节奏异常提示。</p>
+          <h4>时间线 v2</h4>
+          <p>当前版本已支持镜头时长微调、情绪强度估算、高潮点标记，并叠加生成产物覆盖情况。</p>
         </div>
         <div className="asset-tile">
           <span className="label">情绪曲线</span>
@@ -52,9 +53,9 @@ export async function TimelineData() {
           <p>{timeline.emotionCurve.map((item) => `${item.title}:${item.score}`).join(' / ')}</p>
         </div>
         <div className="asset-tile">
-          <span className="label">节奏提示</span>
-          <h4>自动发现的问题</h4>
-          <p>{timeline.warnings.map((item) => item.label).join(' / ') || '当前没有明显节奏异常。'}</p>
+          <span className="label">媒体覆盖</span>
+          <h4>产物沉淀情况</h4>
+          <p>图 {timeline.mediaCounts.images} / 音 {timeline.mediaCounts.audio} / 视 {timeline.mediaCounts.videos}</p>
         </div>
       </div>
 
@@ -90,6 +91,9 @@ export async function TimelineData() {
                 <span>起止：{formatSeconds(scene.startAt)} → {formatSeconds(scene.endAt)}</span>
                 <span>镜头数：{scene.shotCount}</span>
                 <span>情绪：{scene.emotionScore} / {scene.emotionLabel}</span>
+                <span>图：{scene.mediaCounts.images}</span>
+                <span>音：{scene.mediaCounts.audio}</span>
+                <span>视：{scene.mediaCounts.videos}</span>
               </div>
               {scene.beatMarkers.length > 0 ? <p>标记：{scene.beatMarkers.join(' / ')}</p> : null}
             </div>
@@ -103,9 +107,13 @@ export async function TimelineData() {
                       <span>时长：{formatSeconds(shot.duration)}</span>
                       <span>时间：{formatSeconds(shot.startAt)} → {formatSeconds(shot.endAt)}</span>
                       <span>情绪：{shot.emotion} / {shot.emotionLabel}</span>
+                      <span>图：{shot.mediaCounts.images}</span>
+                      <span>音：{shot.mediaCounts.audio}</span>
+                      <span>视：{shot.mediaCounts.videos}</span>
                     </div>
                     <p>{shot.beatType ? `节奏标记：${getTimelineBeatTypeLabel(shot.beatType)}` : '尚未手动标记节奏节点。'}</p>
                     {shot.note ? <p>备注：{shot.note}</p> : null}
+                    {shot.latestMedia ? <p>最新产物：{shot.latestMedia.title}</p> : <p>当前镜头还没有生成产物。</p>}
                   </div>
                 </article>
               ))}

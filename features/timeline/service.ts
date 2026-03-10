@@ -2,6 +2,13 @@ import { prisma } from '@/lib/prisma';
 import { getShotKindFromTitle } from '@/lib/shot-taxonomy';
 import { createOutlineVersion, getLatestOutlineByTitle } from '@/lib/outline-store';
 import { getTimelineBeatTypeLabel } from '@/lib/display';
+import {
+  buildGeneratedMediaLookup,
+  getGeneratedMediaEntries,
+  getGeneratedMediaForScene,
+  getGeneratedMediaForShot,
+  summarizeGeneratedMediaCounts,
+} from '@/features/media/service';
 
 const SHOT_DURATION_MAP: Record<string, number> = {
   空间建立: 6,
@@ -129,6 +136,9 @@ export async function getTimelineBundle(projectId?: string) {
 
   if (!project) return null;
 
+  const generatedMedia = getGeneratedMediaEntries(project);
+  const mediaLookup = buildGeneratedMediaLookup(generatedMedia);
+  const mediaCounts = summarizeGeneratedMediaCounts(generatedMedia);
   const overrideOutline = getLatestOutlineByTitle(project.outlines, 'Timeline Overrides');
   const overrides = parseTimelineOverrides(overrideOutline?.summary || '');
   const overrideMap = new Map(overrides.map((item) => [item.shotId, item]));
@@ -138,12 +148,15 @@ export async function getTimelineBundle(projectId?: string) {
 
   const scenes = project.scenes.map((scene) => {
     const sceneShots = project.shots.filter((shot) => shot.sceneId === scene.id);
+    const sceneMedia = getGeneratedMediaForScene(mediaLookup, scene.id);
+
     const shots = sceneShots.map((shot) => {
       const override = overrideMap.get(shot.id);
       const duration = override?.duration || estimateShotDuration(shot.title);
       const emotion = override?.emotion || estimateEmotionScore(shot.title);
       const startAt = accumulated;
       accumulated += duration;
+      const shotMedia = getGeneratedMediaForShot(mediaLookup, shot.id);
 
       return {
         id: shot.id,
@@ -157,6 +170,8 @@ export async function getTimelineBundle(projectId?: string) {
         beatType: override?.beatType || null,
         note: override?.note || '',
         isManualDuration: Boolean(override?.duration),
+        mediaCounts: summarizeGeneratedMediaCounts(shotMedia),
+        latestMedia: shotMedia[0] || null,
       };
     });
 
@@ -165,6 +180,7 @@ export async function getTimelineBundle(projectId?: string) {
     const endAt = shots[shots.length - 1]?.endAt ?? accumulated;
     const emotionScore = shots.length > 0 ? Math.round((shots.reduce((sum, shot) => sum + shot.emotion, 0) / shots.length) * 10) / 10 : 0;
     const beatMarkers = shots.filter((shot) => shot.beatType).map((shot) => `${shot.title}（${getTimelineBeatTypeLabel(shot.beatType)}）`);
+    const sceneMediaCounts = summarizeGeneratedMediaCounts(sceneMedia);
 
     if (duration < 12) {
       warnings.push({ level: 'warning', label: `场次过短：${scene.title}`, detail: `当前仅 ${formatSeconds(duration)}，建议补一条缓冲镜头或情绪停顿。` });
@@ -174,6 +190,9 @@ export async function getTimelineBundle(projectId?: string) {
     }
     if (!beatMarkers.some((item) => item.includes('climax') || item.includes('conflict-peak'))) {
       warnings.push({ level: 'info', label: `缺少峰值标记：${scene.title}`, detail: '建议至少标一个冲突峰值或高潮点，方便判断节奏起伏。' });
+    }
+    if (sceneShots.length > 0 && sceneMediaCounts.total === 0) {
+      warnings.push({ level: 'info', label: `场次未沉淀产物：${scene.title}`, detail: '当前场次还没有对应的图片 / 音频 / 视频产物，建议继续执行渲染任务。' });
     }
 
     return {
@@ -187,6 +206,7 @@ export async function getTimelineBundle(projectId?: string) {
       emotionScore,
       emotionLabel: getEmotionLabel(Math.round(emotionScore)),
       beatMarkers,
+      mediaCounts: sceneMediaCounts,
       shots,
     };
   });
@@ -206,6 +226,7 @@ export async function getTimelineBundle(projectId?: string) {
     totalDurationLabel: formatSeconds(totalSeconds),
     warnings,
     emotionCurve,
+    mediaCounts,
     overrides,
     scenes,
   };

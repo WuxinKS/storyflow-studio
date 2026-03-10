@@ -24,6 +24,20 @@ export type GeneratedMediaEntry = {
   createdAt: string;
 };
 
+export type GeneratedMediaCounts = {
+  total: number;
+  images: number;
+  audio: number;
+  videos: number;
+  remote: number;
+  mock: number;
+};
+
+export type GeneratedMediaLookup = {
+  byScene: Map<string, GeneratedMediaEntry[]>;
+  byShot: Map<string, GeneratedMediaEntry[]>;
+};
+
 function normalizeGeneratedMediaEntry(entry: Partial<GeneratedMediaEntry>) {
   const type = entry.type === 'generated-audio'
     ? 'generated-audio'
@@ -77,7 +91,7 @@ export function getGeneratedMediaEntries(project: { outlines: Array<{ title: str
   return parseGeneratedMediaLibrary(outline?.summary || '').sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
-export function summarizeGeneratedMediaCounts(entries: GeneratedMediaEntry[]) {
+export function summarizeGeneratedMediaCounts(entries: GeneratedMediaEntry[]): GeneratedMediaCounts {
   return {
     total: entries.length,
     images: entries.filter((item) => item.type === 'generated-image').length,
@@ -86,6 +100,34 @@ export function summarizeGeneratedMediaCounts(entries: GeneratedMediaEntry[]) {
     remote: entries.filter((item) => item.mode === 'remote').length,
     mock: entries.filter((item) => item.mode === 'mock').length,
   };
+}
+
+export function buildGeneratedMediaLookup(entries: GeneratedMediaEntry[]): GeneratedMediaLookup {
+  const byScene = new Map<string, GeneratedMediaEntry[]>();
+  const byShot = new Map<string, GeneratedMediaEntry[]>();
+
+  for (const entry of entries) {
+    if (entry.sceneId) {
+      const current = byScene.get(entry.sceneId) || [];
+      current.push(entry);
+      byScene.set(entry.sceneId, current);
+    }
+    if (entry.shotId) {
+      const current = byShot.get(entry.shotId) || [];
+      current.push(entry);
+      byShot.set(entry.shotId, current);
+    }
+  }
+
+  return { byScene, byShot };
+}
+
+export function getGeneratedMediaForScene(lookup: GeneratedMediaLookup, sceneId: string) {
+  return lookup.byScene.get(sceneId) || [];
+}
+
+export function getGeneratedMediaForShot(lookup: GeneratedMediaLookup, shotId: string) {
+  return lookup.byShot.get(shotId) || [];
 }
 
 export async function replaceGeneratedMediaEntriesForProvider(
