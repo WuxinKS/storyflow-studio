@@ -28,6 +28,7 @@ export async function getQaProject(projectId?: string) {
         include: {
           scenes: { orderBy: { orderIndex: 'asc' } },
           shots: { orderBy: [{ sceneId: 'asc' }, { orderIndex: 'asc' }] },
+          references: { orderBy: { createdAt: 'desc' } },
           outlines: { orderBy: { createdAt: 'desc' } },
           renderJobs: { orderBy: { createdAt: 'desc' } },
         },
@@ -37,6 +38,7 @@ export async function getQaProject(projectId?: string) {
         include: {
           scenes: { orderBy: { orderIndex: 'asc' } },
           shots: { orderBy: [{ sceneId: 'asc' }, { orderIndex: 'asc' }] },
+          references: { orderBy: { createdAt: 'desc' } },
           outlines: { orderBy: { createdAt: 'desc' } },
           renderJobs: { orderBy: { createdAt: 'desc' } },
         },
@@ -47,6 +49,11 @@ function isCleanCharacterName(name: string) {
   if (!name.trim()) return false;
   if (/叫.+的|关键对手|关系人物|角色/.test(name)) return false;
   return true;
+}
+
+function hasReferenceFlavor(text: string | null) {
+  if (!text) return false;
+  return text.includes('参考构图') || text.includes('情绪参考') || text.includes('动作节奏参考');
 }
 
 function getMaturityLevel(input: { blockers: number; failed: number }) {
@@ -92,6 +99,9 @@ export async function getQaReport(projectId?: string, options?: { bundleExport?:
   const failedRenderJobs = project.renderJobs.filter((job) => job.status === 'failed');
   const doneRenderJobs = project.renderJobs.filter((job) => job.status === 'done');
   const staleLabels = syncStatus?.staleChecks || [];
+  const referenceCount = project.references.length;
+  const flavoredShots = project.shots.filter((shot) => hasReferenceFlavor(shot.prompt)).length;
+  const exportedReferenceCount = providerExport.ok ? providerExport.data.referenceProfile.total : 0;
 
   const checks: QaCheck[] = [
     {
@@ -152,6 +162,17 @@ export async function getQaReport(projectId?: string, options?: { bundleExport?:
         : '暂无视觉圣经',
       group: 'content',
       severity: 'warning',
+      blocksDelivery: false,
+    },
+    {
+      key: 'reference-injection',
+      label: '参考素材已注入改编与生成链',
+      passed: referenceCount === 0 || (flavoredShots > 0 && exportedReferenceCount >= referenceCount),
+      detail: referenceCount === 0
+        ? '当前没有参考素材，允许跳过。'
+        : `参考 ${referenceCount} 条 / 参考增强镜头 ${flavoredShots} 条 / 载荷参考画像 ${exportedReferenceCount} 条。`,
+      group: 'content',
+      severity: referenceCount > 0 ? 'warning' : 'info',
       blocksDelivery: false,
     },
     {
