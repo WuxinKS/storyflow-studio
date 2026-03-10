@@ -7,6 +7,7 @@ import {
   getRenderProviderLabel,
 } from '@/lib/display';
 import { getRenderPresetForShot, getRenderProject, parseRenderJobOutput } from '@/features/render/service';
+import { getTimelineBundle } from '@/features/timeline/service';
 import { getGeneratedMediaEntries, summarizeGeneratedMediaCounts } from '@/features/media/service';
 import { buildReferenceProfile } from '@/features/reference/service';
 import { getSyncStatus } from '@/features/sync/service';
@@ -101,6 +102,7 @@ export async function RenderStudioData() {
   const syncStatus = await getSyncStatus(project.id).catch(() => null);
   const referenceProfile = buildReferenceProfile(project.references || []);
   const generatedMedia = getGeneratedMediaEntries(project);
+  const timeline = await getTimelineBundle(project.id).catch(() => null);
   const mediaCounts = summarizeGeneratedMediaCounts(generatedMedia);
   const jobOutputs = project.renderJobs.map((job) => ({
     job,
@@ -114,6 +116,8 @@ export async function RenderStudioData() {
   const visualBible = getVisualBibleBundle(project);
   const shotPresets = project.shots.slice(0, 6).map((shot) => getRenderPresetForShot(shot, visualBible));
   const remoteCount = jobOutputs.filter(({ meta }) => meta.mode === 'remote').length;
+  const beatMarkedShots = timeline?.scenes.reduce((sum, scene) => sum + scene.shots.filter((shot) => Boolean(shot.beatType)).length, 0) || 0;
+  const manualDurationShots = timeline?.scenes.reduce((sum, scene) => sum + scene.shots.filter((shot) => shot.isManualDuration).length, 0) || 0;
   const mockCount = jobOutputs.filter(({ meta }) => meta.mode === 'mock').length;
 
   return (
@@ -235,6 +239,23 @@ export async function RenderStudioData() {
           <span className="label">参考锚点</span>
           <h4>当前主参考</h4>
           <p>{referenceProfile.titleSummary}</p>
+        </div>
+      </div>
+      <div className="asset-grid three-up">
+        <div className="asset-tile">
+          <span className="label">时间线总长</span>
+          <h4>视频时长基线</h4>
+          <p>{timeline ? `${timeline.totalDurationLabel}（${timeline.totalSeconds} 秒）` : '当前还没有时间线数据。'}</p>
+        </div>
+        <div className="asset-tile">
+          <span className="label">节拍标记</span>
+          <h4>峰值 / 高潮覆盖</h4>
+          <p>{timeline ? `已标记 ${beatMarkedShots} 个镜头，帮助视频拼装识别重点段落。` : '当前还没有节拍标记。'}</p>
+        </div>
+        <div className="asset-tile">
+          <span className="label">手动修时</span>
+          <h4>时间线联动</h4>
+          <p>{timeline ? `已有 ${manualDurationShots} 个镜头使用人工修时，Render payload 会直接继承。` : '当前还没有手动修时信息。'}</p>
         </div>
       </div>
 

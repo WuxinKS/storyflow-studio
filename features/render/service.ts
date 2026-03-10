@@ -7,6 +7,7 @@ import { parseVisualBibleDraft, type VisualBibleDraft } from '@/features/visual/
 import { parseCharacterDrafts, type CharacterDraft } from '@/features/characters/service';
 import { buildReferenceProfile, getReferenceInsights } from '@/features/reference/service';
 import { getShotKindFromTitle } from '@/lib/shot-taxonomy';
+import { getTimelineBundle } from '@/features/timeline/service';
 import { getLatestOutlineByTitle } from '@/lib/outline-store';
 import {
   getGeneratedMediaEntries,
@@ -379,69 +380,104 @@ export async function exportProviderPayloads(projectId: string) {
   const characterSummary = summarizeCharacters(characters);
   const referenceProfile = buildReferenceProfile(project.references);
   const referenceInsights = getReferenceInsights(project.references);
+  const timeline = await getTimelineBundle(projectId).catch(() => null);
+  const timelineSceneMap = new Map((timeline?.scenes || []).map((scene) => [scene.id, scene]));
+  const timelineShotMap = new Map((timeline?.scenes || []).flatMap((scene) => scene.shots.map((shot) => [shot.id, { ...shot, sceneId: scene.id, sceneTitle: scene.title }])));
   const sceneTitleMap = new Map(project.scenes.map((scene) => [scene.id, scene.title]));
   const presets = project.shots.map((shot) => ({
     shot,
     preset: getRenderPresetForShot(shot, visualBible, characters),
   }));
 
-  const imagePayload = presets.map(({ shot, preset }) => ({
-    provider: 'image-sequence',
-    shotId: shot.id,
-    shotTitle: shot.title,
-    sceneTitle: sceneTitleMap.get(shot.sceneId || '') || '未分场',
-    prompt: shot.prompt,
-    cameraNotes: shot.cameraNotes,
-    visualStyle: preset.visualStyle,
-    cameraMotion: preset.cameraMotion,
-    pacing: preset.pacing,
-    emphasis: preset.emphasis,
-    palette: preset.palette,
-    lighting: preset.lighting,
-    textureKeywords: preset.textureKeywords,
-    characterSummary,
-    referenceTitles: referenceProfile.titles,
-    referenceFraming: referenceProfile.framing,
-    referenceEmotion: referenceProfile.emotion,
-    referenceMovement: referenceProfile.movement,
-    referenceNotes: referenceProfile.noteSummary,
-    referenceHighlights: referenceProfile.highlights,
-  }));
+  const imagePayload = presets.map(({ shot, preset }) => {
+    const timelineShot = timelineShotMap.get(shot.id);
+    return {
+      provider: 'image-sequence',
+      shotId: shot.id,
+      shotTitle: shot.title,
+      sceneTitle: sceneTitleMap.get(shot.sceneId || '') || '未分场',
+      prompt: shot.prompt,
+      cameraNotes: shot.cameraNotes,
+      visualStyle: preset.visualStyle,
+      cameraMotion: preset.cameraMotion,
+      pacing: preset.pacing,
+      emphasis: preset.emphasis,
+      palette: preset.palette,
+      lighting: preset.lighting,
+      textureKeywords: preset.textureKeywords,
+      characterSummary,
+      referenceTitles: referenceProfile.titles,
+      referenceFraming: referenceProfile.framing,
+      referenceEmotion: referenceProfile.emotion,
+      referenceMovement: referenceProfile.movement,
+      referenceNotes: referenceProfile.noteSummary,
+      referenceHighlights: referenceProfile.highlights,
+      plannedDuration: timelineShot?.duration || null,
+      timelineStartAt: timelineShot?.startAt || null,
+      timelineEndAt: timelineShot?.endAt || null,
+      emotionScore: timelineShot?.emotion || null,
+      emotionLabel: timelineShot?.emotionLabel || null,
+      beatType: timelineShot?.beatType || null,
+      beatNote: timelineShot?.note || '',
+    };
+  });
 
-  const voicePayload = project.scenes.map((scene) => ({
-    provider: 'voice-synthesis',
-    sceneId: scene.id,
-    sceneTitle: scene.title,
-    summary: scene.summary,
-    audioPlan: 'dialogue+ambience',
-    styleName: visualBible?.styleName || null,
-    characterSummary,
-    referenceTitles: referenceProfile.titles,
-    referenceEmotion: referenceProfile.emotion,
-    referenceMovement: referenceProfile.movement,
-    referenceNotes: referenceProfile.noteSummary,
-  }));
+  const voicePayload = project.scenes.map((scene) => {
+    const timelineScene = timelineSceneMap.get(scene.id);
+    return {
+      provider: 'voice-synthesis',
+      sceneId: scene.id,
+      sceneTitle: scene.title,
+      summary: scene.summary,
+      audioPlan: 'dialogue+ambience',
+      styleName: visualBible?.styleName || null,
+      characterSummary,
+      referenceTitles: referenceProfile.titles,
+      referenceEmotion: referenceProfile.emotion,
+      referenceMovement: referenceProfile.movement,
+      referenceNotes: referenceProfile.noteSummary,
+      targetDuration: timelineScene?.duration || null,
+      emotionScore: timelineScene?.emotionScore || null,
+      emotionLabel: timelineScene?.emotionLabel || null,
+      beatMarkers: timelineScene?.beatMarkers || [],
+    };
+  });
 
-  const videoPayload = presets.map(({ shot, preset }) => ({
-    provider: 'video-assembly',
-    shotId: shot.id,
-    shotTitle: shot.title,
-    sceneTitle: sceneTitleMap.get(shot.sceneId || '') || '未分场',
-    visualStyle: preset.visualStyle,
-    cameraMotion: preset.cameraMotion,
-    pacing: preset.pacing,
-    audioFocus: preset.audioFocus,
-    referenceReady: hasReferenceFlavor(shot.prompt),
-    lensLanguage: preset.lensLanguage,
-    motionLanguage: preset.motionLanguage,
-    styleName: preset.visualBibleStyle,
-    characterSummary,
-    referenceTitles: referenceProfile.titles,
-    referenceFraming: referenceProfile.framing,
-    referenceEmotion: referenceProfile.emotion,
-    referenceMovement: referenceProfile.movement,
-    referenceHighlights: referenceProfile.highlights,
-  }));
+  const videoPayload = presets.map(({ shot, preset }) => {
+    const timelineShot = timelineShotMap.get(shot.id);
+    const timelineScene = timelineSceneMap.get(shot.sceneId || '');
+    return {
+      provider: 'video-assembly',
+      shotId: shot.id,
+      shotTitle: shot.title,
+      sceneTitle: sceneTitleMap.get(shot.sceneId || '') || '未分场',
+      visualStyle: preset.visualStyle,
+      cameraMotion: preset.cameraMotion,
+      pacing: preset.pacing,
+      audioFocus: preset.audioFocus,
+      referenceReady: hasReferenceFlavor(shot.prompt),
+      lensLanguage: preset.lensLanguage,
+      motionLanguage: preset.motionLanguage,
+      styleName: preset.visualBibleStyle,
+      characterSummary,
+      referenceTitles: referenceProfile.titles,
+      referenceFraming: referenceProfile.framing,
+      referenceEmotion: referenceProfile.emotion,
+      referenceMovement: referenceProfile.movement,
+      referenceHighlights: referenceProfile.highlights,
+      plannedDuration: timelineShot?.duration || null,
+      timelineStartAt: timelineShot?.startAt || null,
+      timelineEndAt: timelineShot?.endAt || null,
+      emotionScore: timelineShot?.emotion || null,
+      emotionLabel: timelineShot?.emotionLabel || null,
+      beatType: timelineShot?.beatType || null,
+      beatNote: timelineShot?.note || '',
+      sceneDuration: timelineScene?.duration || null,
+      sceneEmotionLabel: timelineScene?.emotionLabel || null,
+      projectTotalDuration: timeline?.totalSeconds || null,
+      projectTotalDurationLabel: timeline?.totalDurationLabel || null,
+    };
+  });
 
   return {
     projectId: project.id,
@@ -450,6 +486,16 @@ export async function exportProviderPayloads(projectId: string) {
     characters,
     referenceProfile,
     referenceInsights,
+    timelineSummary: timeline
+      ? {
+          totalSeconds: timeline.totalSeconds,
+          totalDurationLabel: timeline.totalDurationLabel,
+          warningCount: timeline.warnings.length,
+          sceneCount: timeline.scenes.length,
+          shotCount: timeline.scenes.reduce((sum, scene) => sum + scene.shots.length, 0),
+          beatMarkerCount: timeline.scenes.reduce((sum, scene) => sum + scene.shots.filter((shot) => Boolean(shot.beatType)).length, 0),
+        }
+      : null,
     providers: {
       imageSequence: imagePayload,
       voiceSynthesis: voicePayload,
