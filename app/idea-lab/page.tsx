@@ -6,7 +6,7 @@ export default function IdeaLabPage() {
     <div className="page-stack">
       <SectionCard
         title="创意工坊"
-        description="输入一句创意、关键词、题材和输出目标，初始化一个可持续迭代的故事项目。"
+        description="输入一句创意、关键词、题材和输出目标；既可以只创建项目，也可以直接一键跑完整主链。"
       >
         <IdeaLabForm />
       </SectionCard>
