@@ -502,6 +502,38 @@ textarea {
   font-weight: 700;
 }
 
+.media-preview-shell {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  background: rgba(11, 20, 36, 0.88);
+  display: grid;
+  place-items: center;
+}
+
+.media-preview-empty {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.media-preview-visual {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  background: #040b16;
+}
+
+.media-preview-audio {
+  padding: 16px;
+}
+
+.media-preview-audio-control {
+  width: 100%;
+}
+
 .frame-body {
   display: grid;
   gap: 8px;

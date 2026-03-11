@@ -36,6 +36,9 @@ export type AssetCard = {
   source: string;
   links: string[];
   mode: 'auto' | 'manual';
+  previewKind?: 'image' | 'audio' | 'video';
+  sourceUrl?: string;
+  localPath?: string;
 };
 
 function parseReferenceNotes(notes: string | null) {
@@ -142,6 +145,9 @@ export function getAssetBundle(project: Awaited<ReturnType<typeof getLatestAsset
     source: 'Character Drafts',
     links: buildAssetLinks({ characterName: item.name }),
     mode: 'auto',
+    previewKind: undefined,
+    sourceUrl: undefined,
+    localPath: undefined,
   }));
 
   const styleAssets: AssetCard[] = visualBible
@@ -155,6 +161,9 @@ export function getAssetBundle(project: Awaited<ReturnType<typeof getLatestAsset
           source: 'Visual Bible',
           links: [],
           mode: 'auto',
+          previewKind: undefined,
+          sourceUrl: undefined,
+          localPath: undefined,
         },
       ]
     : [];
@@ -168,6 +177,9 @@ export function getAssetBundle(project: Awaited<ReturnType<typeof getLatestAsset
     source: 'Scenes',
     links: buildAssetLinks({ sceneTitle: scene.title }),
     mode: 'auto',
+    previewKind: undefined,
+    sourceUrl: undefined,
+    localPath: undefined,
   }));
 
   const referenceAssets: AssetCard[] = project.references.map((item, index) => {
@@ -179,8 +191,11 @@ export function getAssetBundle(project: Awaited<ReturnType<typeof getLatestAsset
       summary: lines.slice(1, 3).join('｜') || '暂无参考摘要',
       tags: [item.type, ...lines.slice(1, 5).map((line) => line.replace(/^[^：]+：/, '').trim())].filter(Boolean),
       source: 'Reference Analysis',
-      links: [],
+      links: buildAssetLinks({ localPath: item.localPath || undefined, sourceUrl: item.sourceUrl || undefined }),
       mode: 'auto',
+      previewKind: item.type === 'video' ? 'video' : 'image',
+      sourceUrl: item.sourceUrl || undefined,
+      localPath: item.localPath || undefined,
     } satisfies AssetCard;
   });
 
@@ -198,6 +213,9 @@ export function getAssetBundle(project: Awaited<ReturnType<typeof getLatestAsset
       sourceUrl: item.sourceUrl || undefined,
     }),
     mode: 'auto',
+    previewKind: item.type === 'generated-video' ? 'video' : item.type === 'generated-audio' ? 'audio' : 'image',
+    sourceUrl: item.sourceUrl || undefined,
+    localPath: item.localPath || item.artifactPath || undefined,
   }));
 
   const manualCards: AssetCard[] = manualAssets.map((item) => ({
@@ -213,6 +231,9 @@ export function getAssetBundle(project: Awaited<ReturnType<typeof getLatestAsset
       characterName: item.characterName,
     }),
     mode: 'manual',
+    previewKind: undefined,
+    sourceUrl: undefined,
+    localPath: undefined,
   }));
 
   return [...manualCards, ...generatedMediaCards, ...characterAssets, ...styleAssets, ...sceneAssets, ...referenceAssets];

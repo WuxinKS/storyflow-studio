@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { getStoryboardProject } from '@/features/storyboard/service';
+import { MediaPreview } from '@/components/media-preview';
 import { getShotKindFromTitle } from '@/lib/shot-taxonomy';
+import { getPreviewKindFromGeneratedType } from '@/lib/media-preview';
 import { buildProjectHref } from '@/lib/project-links';
 
 function hasReferenceFlavor(text: string | null) {
@@ -92,9 +94,19 @@ export async function StoryboardData({ projectId }: { projectId?: string }) {
               <div className="storyboard-cards">
                 {scene.shots.map((shot, index) => (
                   <article key={shot.id} className="frame-card">
-                    <div className="frame-preview">
-                      <span>镜头 {index + 1}</span>
-                    </div>
+                    {shot.latestMedia ? (
+                      <MediaPreview
+                        kind={getPreviewKindFromGeneratedType(shot.latestMedia.type)}
+                        title={shot.latestMedia.title}
+                        sourceUrl={shot.latestMedia.sourceUrl}
+                        localPath={shot.latestMedia.localPath}
+                        fallbackLabel={`镜头 ${index + 1}`}
+                      />
+                    ) : (
+                      <div className="frame-preview">
+                        <span>镜头 {index + 1}</span>
+                      </div>
+                    )}
                     <div className="frame-body">
                       <strong>{shot.title}</strong>
                       <p>{shot.prompt || '暂无镜头提示词'}</p>

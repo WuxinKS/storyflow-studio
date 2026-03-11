@@ -14,6 +14,8 @@ import { buildReferenceProfile } from '@/features/reference/service';
 import { getSyncStatus } from '@/features/sync/service';
 import { getVisualBibleBundle } from '@/features/visual/service';
 import { getShotKindFromTitle } from '@/lib/shot-taxonomy';
+import { getPreviewKindFromGeneratedType, resolvePreviewSource } from '@/lib/media-preview';
+import { MediaPreview } from '@/components/media-preview';
 import { buildProjectHref } from '@/lib/project-links';
 
 function summarizeStatus(statuses: string[]) {
@@ -322,19 +324,32 @@ export async function RenderStudioData({ projectId }: { projectId?: string }) {
             <p>执行渲染任务后，这里会展示最新沉淀的图片、音频和视频产物。</p>
           </div>
         ) : (
-          generatedMedia.slice(0, 6).map((item) => (
-            <div key={item.id} className="asset-tile scene-tile">
-              <span className="label">{getGeneratedMediaTypeLabel(item.type)}</span>
-              <h4>{item.title}</h4>
-              <p>{item.summary}</p>
-              <div className="meta-list">
-                <span>模式：{getRenderExecutionModeLabel(item.mode)}</span>
-                <span>Provider：{getRenderProviderLabel(item.provider)}</span>
+          generatedMedia.slice(0, 6).map((item) => {
+            const previewKind = getPreviewKindFromGeneratedType(item.type);
+            const previewHref = previewKind ? resolvePreviewSource({ kind: previewKind, sourceUrl: item.sourceUrl, localPath: item.localPath }) : null;
+
+            return (
+              <div key={item.id} className="asset-tile scene-tile">
+                <MediaPreview
+                  kind={previewKind}
+                  title={item.title}
+                  sourceUrl={item.sourceUrl}
+                  localPath={item.localPath}
+                  fallbackLabel={item.type === 'generated-video' ? '视频预览' : item.type === 'generated-audio' ? '音频预览' : '图片预览'}
+                />
+                <span className="label">{getGeneratedMediaTypeLabel(item.type)}</span>
+                <h4>{item.title}</h4>
+                <p>{item.summary}</p>
+                <div className="meta-list">
+                  <span>模式：{getRenderExecutionModeLabel(item.mode)}</span>
+                  <span>Provider：{getRenderProviderLabel(item.provider)}</span>
+                </div>
+                {item.localPath ? <p>文件：{item.localPath}</p> : null}
+                {item.sourceUrl ? <p>链接：{item.sourceUrl}</p> : null}
+                {previewHref ? <a className="button-ghost" href={previewHref} target="_blank" rel="noreferrer">打开预览</a> : null}
               </div>
-              {item.localPath ? <p>文件：{item.localPath}</p> : null}
-              {item.sourceUrl ? <p>链接：{item.sourceUrl}</p> : null}
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 

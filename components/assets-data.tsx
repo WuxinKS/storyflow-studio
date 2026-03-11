@@ -1,5 +1,7 @@
 import Link from 'next/link';
 import { AssetEditor } from '@/components/asset-editor';
+import { MediaPreview } from '@/components/media-preview';
+import { resolvePreviewSource } from '@/lib/media-preview';
 import { getAssetBundle, getAssetEditorOptions, getLatestAssetProject } from '@/features/assets/service';
 import { buildProjectHref } from '@/lib/project-links';
 
@@ -108,25 +110,39 @@ export async function AssetsData({ projectId }: { projectId?: string }) {
             <p>先生成角色、视觉圣经或参考分析，或直接手动录入第一批资产。</p>
           </div>
         ) : (
-          assets.map((asset) => (
-            <div key={asset.id} className="asset-tile scene-tile">
-              <span className="label">{typeLabel(asset.type)}</span>
-              <h4>{asset.title}</h4>
-              <p>{asset.summary}</p>
-              <div className="tag-list">
-                <span className="tag-chip">{asset.mode === 'manual' ? '手动录入' : '自动聚合'}</span>
-                {asset.tags.map((tag) => (
-                  <span key={`${asset.id}-${tag}`} className="tag-chip">{tag}</span>
-                ))}
+          assets.map((asset) => {
+            const previewHref = asset.previewKind ? resolvePreviewSource({ kind: asset.previewKind, sourceUrl: asset.sourceUrl, localPath: asset.localPath }) : null;
+
+            return (
+              <div key={asset.id} className="asset-tile scene-tile">
+                {asset.previewKind ? (
+                  <MediaPreview
+                    kind={asset.previewKind}
+                    title={asset.title}
+                    sourceUrl={asset.sourceUrl}
+                    localPath={asset.localPath}
+                    fallbackLabel={asset.previewKind === 'video' ? '视频资产' : asset.previewKind === 'audio' ? '音频资产' : '图片资产'}
+                  />
+                ) : null}
+                <span className="label">{typeLabel(asset.type)}</span>
+                <h4>{asset.title}</h4>
+                <p>{asset.summary}</p>
+                <div className="tag-list">
+                  <span className="tag-chip">{asset.mode === 'manual' ? '手动录入' : '自动聚合'}</span>
+                  {asset.tags.map((tag) => (
+                    <span key={`${asset.id}-${tag}`} className="tag-chip">{tag}</span>
+                  ))}
+                </div>
+                <div className="meta-list">
+                  <span>来源：{asset.source}</span>
+                  {asset.links.map((link) => (
+                    <span key={`${asset.id}-${link}`}>{link}</span>
+                  ))}
+                </div>
+                {previewHref ? <a className="button-ghost" href={previewHref} target="_blank" rel="noreferrer">打开预览</a> : null}
               </div>
-              <div className="meta-list">
-                <span>来源：{asset.source}</span>
-                {asset.links.map((link) => (
-                  <span key={`${asset.id}-${link}`}>{link}</span>
-                ))}
-              </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>
