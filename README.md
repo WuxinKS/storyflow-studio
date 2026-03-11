@@ -148,6 +148,36 @@ STORYFLOW_VIDEO_PROVIDER_TIMEOUT_MS=""
 说明：
 - 未配置 `STORYFLOW_LLM_*` 时，故事 / 角色 / 视觉链路会优先走内置 fallback 模板
 - 未配置 `STORYFLOW_*_PROVIDER_URL` 时，Render 执行链会自动回退为 mock，并继续生成请求 / 响应工件与交付包
+
+### 推荐 Provider 预设
+
+```bash
+# 图像：Gemini
+STORYFLOW_IMAGE_PROVIDER_URL="https://generativelanguage.googleapis.com/v1beta/models"
+STORYFLOW_IMAGE_PROVIDER_NAME="Gemini"
+STORYFLOW_IMAGE_PROVIDER_MODEL="gemini-2.0-flash-preview-image-generation"
+STORYFLOW_IMAGE_PROVIDER_ADAPTER="gemini-image"
+STORYFLOW_IMAGE_PROVIDER_EXTRA_BODY_JSON='{"aspectRatio":"16:9"}'
+
+# 图像：即梦 / Seedream（将 URL 替换为你的真实网关）
+STORYFLOW_IMAGE_PROVIDER_URL="https://your-jimeng-endpoint.example.com/v1/images/generations"
+STORYFLOW_IMAGE_PROVIDER_NAME="即梦"
+STORYFLOW_IMAGE_PROVIDER_MODEL="seedream-4.0"
+STORYFLOW_IMAGE_PROVIDER_ADAPTER="jimeng-image"
+STORYFLOW_IMAGE_PROVIDER_EXTRA_BODY_JSON='{"response_format":"url","size":"1536x864"}'
+
+# 视频：Seedance（将 URL 替换为你的真实网关）
+STORYFLOW_VIDEO_PROVIDER_URL="https://your-seedance-endpoint.example.com/v1/video/generations"
+STORYFLOW_VIDEO_PROVIDER_NAME="Seedance"
+STORYFLOW_VIDEO_PROVIDER_MODEL="seedance-1.0-pro"
+STORYFLOW_VIDEO_PROVIDER_ADAPTER="seedance-video"
+STORYFLOW_VIDEO_PROVIDER_EXTRA_BODY_JSON='{"duration":5,"aspect_ratio":"16:9"}'
+```
+
+说明：
+- `gemini-image` 会自动把基础 URL 组装为 `.../models/<model>:generateContent`，并兼容 Gemini 返回的 `inlineData` 图片结果。
+- `jimeng-image` 当前按单条任务逐个调用，适合接常见的图片生成网关；如你的服务字段不同，可通过 `*_EXTRA_BODY_JSON` 和 `*_REQUEST_PATH` 继续覆写。
+- `seedance-video` 当前先接入为单任务视频生成适配层，适合先打通生成链路与工件沉淀；如供应商是异步任务制，可后续继续补轮询与回查。
 - 建议同时配置 `STORYFLOW_*_PROVIDER_NAME` 与 `STORYFLOW_*_PROVIDER_MODEL`，设置页、QA、生成工作台和运行诊断会直接显示供应商与模型
 - 若供应商接口不是通用批量 JSON，可继续配置 `STORYFLOW_*_PROVIDER_ADAPTER`、`*_REQUEST_PATH`、`*_RESPONSE_ITEMS_KEY`、`*_EXTRA_BODY_JSON` 与 `*_EXTRA_HEADERS_JSON` 进入适配模式
 - 目前内置适配模式包括 `generic-batch`、`single-item`、`openai-image`、`openai-speech`、`elevenlabs-tts`、`runway-video`、`minimax-video`、`kling-video`

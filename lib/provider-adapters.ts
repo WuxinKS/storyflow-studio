@@ -10,11 +10,14 @@ export type ProviderAdapterMode =
   | 'generic-batch'
   | 'single-item'
   | 'openai-image'
+  | 'gemini-image'
+  | 'jimeng-image'
   | 'openai-speech'
   | 'elevenlabs-tts'
   | 'runway-video'
   | 'minimax-video'
-  | 'kling-video';
+  | 'kling-video'
+  | 'seedance-video';
 
 export type ProviderAdapterConfig = {
   mode: ProviderAdapterMode;
@@ -81,15 +84,29 @@ function joinUrl(baseUrl: string, requestPath: string) {
   return `${trimSlash(baseUrl)}/${trimLeadingSlash(requestPath)}`;
 }
 
+function buildGeminiEndpoint(baseUrl: string, requestPath: string, providerModel: string) {
+  if (requestPath) return joinUrl(baseUrl, requestPath);
+  if (!baseUrl) return '';
+
+  const normalizedBase = trimSlash(baseUrl);
+  if (/:(generateContent|streamGenerateContent)$/i.test(normalizedBase)) return normalizedBase;
+  if (/\/models\/[^/]+$/i.test(normalizedBase)) return `${normalizedBase}:generateContent`;
+  if (/\/models$/i.test(normalizedBase)) return `${normalizedBase}/${providerModel || 'gemini-2.0-flash-preview-image-generation'}:generateContent`;
+  return `${normalizedBase}/v1beta/models/${providerModel || 'gemini-2.0-flash-preview-image-generation'}:generateContent`;
+}
+
 function inferAdapterMode(provider: ProviderRuntimeConfig): ProviderAdapterMode {
   const providerName = provider.providerName.toLowerCase();
 
+  if (provider.channel === 'image' && providerName.includes('gemini')) return 'gemini-image';
+  if (provider.channel === 'image' && (providerName.includes('即梦') || providerName.includes('jimeng') || providerName.includes('seedream'))) return 'jimeng-image';
   if (provider.channel === 'image' && providerName.includes('openai')) return 'openai-image';
   if (provider.channel === 'voice' && providerName.includes('elevenlabs')) return 'elevenlabs-tts';
   if (provider.channel === 'voice' && providerName.includes('openai')) return 'openai-speech';
   if (provider.channel === 'video' && providerName.includes('runway')) return 'runway-video';
   if (provider.channel === 'video' && providerName.includes('minimax')) return 'minimax-video';
   if (provider.channel === 'video' && providerName.includes('kling')) return 'kling-video';
+  if (provider.channel === 'video' && providerName.includes('seedance')) return 'seedance-video';
   return 'generic-batch';
 }
 
@@ -124,18 +141,24 @@ export function getProviderAdapterConfig(provider: ProviderKind): ProviderAdapte
   const mode = pickConfiguredValue(process.env[`${prefix}_ADAPTER`], inferAdapterMode(runtime)) as ProviderAdapterMode;
   const defaultRequestPath = mode === 'openai-image'
     ? '/images/generations'
-    : mode === 'openai-speech'
-      ? '/audio/speech'
-      : '';
+    : mode === 'gemini-image'
+      ? ''
+      : mode === 'openai-speech'
+        ? '/audio/speech'
+        : '';
   const defaultResponseItemsKey = mode === 'openai-image'
     ? 'data'
-    : mode === 'openai-speech'
-      ? 'data'
-      : mode === 'elevenlabs-tts'
-        ? 'audio'
-        : mode === 'runway-video' || mode === 'minimax-video' || mode === 'kling-video'
+    : mode === 'gemini-image'
+      ? 'candidates'
+      : mode === 'jimeng-image'
+        ? 'data'
+        : mode === 'openai-speech'
           ? 'data'
-          : 'items';
+          : mode === 'elevenlabs-tts'
+            ? 'audio'
+            : mode === 'runway-video' || mode === 'minimax-video' || mode === 'kling-video' || mode === 'seedance-video'
+              ? 'data'
+              : 'items';
 
   return {
     mode,
@@ -183,6 +206,39 @@ function buildOpenAiImageBody(item: JsonRecord, profile: ProviderRuntimeConfig, 
   } satisfies JsonRecord;
 }
 
+function buildGeminiImageBody(item: JsonRecord, profile: ProviderRuntimeConfig, adapter: ProviderAdapterConfig) {
+  const extraBody = adapter.extraBody;
+  const imageConfig = {
+    aspectRatio: typeof extraBody.aspectRatio === 'string' ? extraBody.aspectRatio : '16:9',
+    ...(typeof extraBody.imageSize === 'string' ? { imageSize: extraBody.imageSize } : {}),
+    ...((extraBody.imageConfig && typeof extraBody.imageConfig === 'object' && !Array.isArray(extraBody.imageConfig))
+      ? extraBody.imageConfig as JsonRecord
+      : {}),
+  } satisfies JsonRecord;
+
+  return {
+    model: profile.providerModel || 'gemini-2.0-flash-preview-image-generation',
+    contents: [{
+      role: 'user',
+      parts: [{ text: buildPromptFromItem(item, '生成一张电影感分镜图像') }],
+    }],
+    generationConfig: {
+      responseModalities: ['Image'],
+      imageConfig,
+      ...extraBody,
+    },
+  } satisfies JsonRecord;
+}
+
+function buildJimengImageBody(item: JsonRecord, profile: ProviderRuntimeConfig, adapter: ProviderAdapterConfig) {
+  return {
+    model: profile.providerModel || 'seedream-4.0',
+    prompt: buildPromptFromItem(item, '生成一张电影感分镜图像'),
+    response_format: typeof adapter.extraBody.response_format === 'string' ? adapter.extraBody.response_format : 'url',
+    ...adapter.extraBody,
+  } satisfies JsonRecord;
+}
+
 function buildOpenAiSpeechBody(item: JsonRecord, profile: ProviderRuntimeConfig, adapter: ProviderAdapterConfig) {
   return {
     model: profile.providerModel || 'gpt-4o-mini-tts',
@@ -222,7 +278,9 @@ export function buildProviderAdapterRequest(input: {
   const providerProfile = getProviderRuntimeConfig(input.provider);
   const adapter = getProviderAdapterConfig(input.provider);
   const items = input.payload.map((item) => toJsonRecord(item));
-  const endpoint = joinUrl(providerProfile.url, adapter.requestPath);
+  const endpoint = adapter.mode === 'gemini-image'
+    ? buildGeminiEndpoint(providerProfile.url, adapter.requestPath, providerProfile.providerModel)
+    : joinUrl(providerProfile.url, adapter.requestPath);
   const headers = mergeRequestHeaders(input.headers, adapter.extraHeaders);
 
   if (adapter.mode === 'single-item') {
@@ -249,6 +307,26 @@ export function buildProviderAdapterRequest(input: {
     } satisfies ProviderAdapterRequest;
   }
 
+  if (adapter.mode === 'gemini-image') {
+    return {
+      endpoint,
+      requestBody: items.map((item) => buildGeminiImageBody(item, providerProfile, adapter)),
+      requestHeaders: headers,
+      responseItemsKey: adapter.responseItemsKey,
+      batchMode: 'single',
+    } satisfies ProviderAdapterRequest;
+  }
+
+  if (adapter.mode === 'jimeng-image') {
+    return {
+      endpoint,
+      requestBody: items.map((item) => buildJimengImageBody(item, providerProfile, adapter)),
+      requestHeaders: headers,
+      responseItemsKey: adapter.responseItemsKey,
+      batchMode: 'single',
+    } satisfies ProviderAdapterRequest;
+  }
+
   if (adapter.mode === 'openai-speech') {
     return {
       endpoint,
@@ -269,7 +347,7 @@ export function buildProviderAdapterRequest(input: {
     } satisfies ProviderAdapterRequest;
   }
 
-  if (adapter.mode === 'runway-video' || adapter.mode === 'minimax-video' || adapter.mode === 'kling-video') {
+  if (adapter.mode === 'runway-video' || adapter.mode === 'minimax-video' || adapter.mode === 'kling-video' || adapter.mode === 'seedance-video') {
     return {
       endpoint,
       requestBody: items.map((item) => buildVideoPromptBody(item, providerProfile, adapter, adapter.mode)),

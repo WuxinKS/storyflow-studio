@@ -985,6 +985,7 @@ const RESPONSE_WRAPPER_KEYS = Array.from(new Set([
 
 const RESPONSE_SUMMARY_KEYS = ['summary', 'message', 'description', 'caption', 'text', 'detail', 'statusText'];
 const RESPONSE_SOURCE_URL_KEYS = ['url', 'outputUrl', 'sourceUrl', 'imageUrl', 'videoUrl', 'audioUrl', 'downloadUrl', 'uri', 'src', 'href'];
+const RESPONSE_INLINE_DATA_KEYS = ['inlineData', 'inline_data'];
 const RESPONSE_LOCAL_PATH_KEYS = ['localPath', 'path', 'filePath', 'outputPath', 'destination', 'savePath', 'targetPath'];
 
 function isNonEmptyString(value: unknown): value is string {
@@ -1050,9 +1051,35 @@ function pickTextDeep(value: unknown, keys: string[], depth = 0): string | null 
   return null;
 }
 
+function resolveInlineDataDataUrl(value: unknown, depth = 0): string | null {
+  if (depth > 6 || value == null) return null;
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const nested = resolveInlineDataDataUrl(item, depth + 1);
+      if (nested) return nested;
+    }
+    return null;
+  }
+  const record = toRecord(value);
+  for (const key of RESPONSE_INLINE_DATA_KEYS) {
+    const node = toRecord(record[key]);
+    const mimeType = typeof node.mime_type === 'string' ? node.mime_type : typeof node.mimeType === 'string' ? node.mimeType : '';
+    const data = typeof node.data === 'string' ? node.data.trim() : '';
+    if (data) return `data:${mimeType || 'application/octet-stream'};base64,${data}`;
+  }
+  for (const key of RESPONSE_WRAPPER_KEYS.concat(['candidates', 'content', 'parts'])) {
+    if (!(key in record)) continue;
+    const nested = resolveInlineDataDataUrl(record[key], depth + 1);
+    if (nested) return nested;
+  }
+  return null;
+}
+
 function resolveSourceUrl(record: ProviderResponseRecord) {
   const direct = pickTextDeep(record, RESPONSE_SOURCE_URL_KEYS);
   if (direct) return direct;
+  const inlineDataUrl = resolveInlineDataDataUrl(record);
+  if (inlineDataUrl) return inlineDataUrl;
   const fallback = pickTextDeep(record, ['value']);
   return fallback && looksLikeUrl(fallback) ? fallback : null;
 }
