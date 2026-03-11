@@ -37,16 +37,20 @@ export async function StoryboardData({ projectId }: { projectId?: string }) {
       <div className="snapshot-card">
         <p className="eyebrow">分镜总览</p>
         <h3>{project.projectTitle}</h3>
-        <p>当前镜头板已开始直接关联生成产物，可同时查看镜头结构和当前图片 / 音频 / 视频沉淀情况。</p>
+        <p>当前镜头板已开始同时关联生成产物和镜头级定向参考，可在看结构的同时追踪每个镜头究竟继承了哪些参考素材。</p>
         <div className="meta-list">
           <span>分场：{project.scenes.length}</span>
           <span>镜头：{project.scenes.reduce((sum, scene) => sum + scene.shots.length, 0)}</span>
           <span>参考增强：{flavoredCount}</span>
+          <span>定向分场：{project.bindingSummary.sceneBoundCount}</span>
+          <span>定向镜头：{project.bindingSummary.shotBoundCount}</span>
+          <span>生效镜头参考：{project.bindingSummary.effectiveShotBoundCount}</span>
           <span>导演语言分场：{directorReadyCount}</span>
           <span>已沉淀产物：{project.mediaCounts.total}</span>
         </div>
         <div className="action-row">
           <Link href={buildProjectHref('/adaptation-lab', project.projectId)} className="button-ghost">返回改编工作台</Link>
+          <Link href={buildProjectHref('/reference-lab', project.projectId)} className="button-ghost">管理参考绑定</Link>
           <Link href={buildProjectHref('/render-studio', project.projectId)} className="button-secondary">继续到生成工作台</Link>
         </div>
       </div>
@@ -89,7 +93,19 @@ export async function StoryboardData({ projectId }: { projectId?: string }) {
                   <span>图：{scene.mediaCounts.images}</span>
                   <span>音：{scene.mediaCounts.audio}</span>
                   <span>视：{scene.mediaCounts.videos}</span>
+                  {scene.referenceTitles.length > 0 ? <span className="tag-chip">分场定向参考 {scene.referenceTitles.length}</span> : null}
                 </div>
+                {scene.referenceTitles.length > 0 ? (
+                  <>
+                    <div className="tag-list">
+                      {scene.referenceTitles.map((title) => (
+                        <span key={`${scene.id}-${title}`} className="tag-chip">{title}</span>
+                      ))}
+                    </div>
+                    <p>{scene.referencePromptLine}</p>
+                    {scene.referenceNote ? <p><strong>绑定说明：</strong>{scene.referenceNote}</p> : null}
+                  </>
+                ) : null}
               </div>
               <div className="storyboard-cards">
                 {scene.shots.map((shot, index) => (
@@ -117,7 +133,20 @@ export async function StoryboardData({ projectId }: { projectId?: string }) {
                         <span>音：{shot.mediaCounts.audio}</span>
                         <span>视：{shot.mediaCounts.videos}</span>
                         {hasReferenceFlavor(shot.prompt) ? <span className="tag-chip">已注入参考</span> : null}
+                        {shot.referenceTitles.length > 0 ? <span className="tag-chip">定向参考 {shot.referenceTitles.length}</span> : null}
+                        {shot.hasDirectReferenceBinding ? <span className="tag-chip">镜头直绑</span> : null}
                       </div>
+                      {shot.referenceTitles.length > 0 ? (
+                        <>
+                          <div className="tag-list">
+                            {shot.referenceTitles.map((title) => (
+                              <span key={`${shot.id}-${title}`} className="tag-chip">{title}</span>
+                            ))}
+                          </div>
+                          <p>{shot.referencePromptLine}</p>
+                          {shot.referenceNote ? <p><strong>绑定说明：</strong>{shot.referenceNote}</p> : null}
+                        </>
+                      ) : null}
                       {shot.latestMedia ? (
                         <p>最新产物：{shot.latestMedia.title}｜{shot.latestMedia.localPath || shot.latestMedia.sourceUrl || '仅索引已记录'}</p>
                       ) : (

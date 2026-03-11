@@ -5,7 +5,7 @@ import { promisify } from 'node:util';
 import { prisma } from '@/lib/prisma';
 import { parseVisualBibleDraft, type VisualBibleDraft } from '@/features/visual/service';
 import { parseCharacterDrafts, type CharacterDraft } from '@/features/characters/service';
-import { buildReferenceProfile, getReferenceInsights } from '@/features/reference/service';
+import { buildReferenceBindingSnapshot, buildReferenceProfile, getReferenceInsights } from '@/features/reference/service';
 import { getShotKindFromTitle } from '@/lib/shot-taxonomy';
 import { getTimelineBundle } from '@/features/timeline/service';
 import { getLatestOutlineByTitle } from '@/lib/outline-store';
@@ -172,15 +172,29 @@ export type ShotRenderPreset = {
   lensLanguage?: string;
   motionLanguage?: string;
   textureKeywords?: string;
+  referenceTitles?: string[];
+  referencePromptLine?: string;
+  referenceBindingNote?: string;
 };
 
 export function getRenderPresetForShot(
   shot: { id: string; title: string; prompt: string | null; cameraNotes: string | null },
   visualBible: VisualBibleDraft | null = null,
   characters: CharacterDraft[] = [],
+  referenceCue: { promptLine?: string | null; titles?: string[]; note?: string | null } | null = null,
 ): ShotRenderPreset {
   const kind = getShotKindFromTitle(shot.title);
   const characterSummary = summarizeCharacters(characters);
+  const referenceTitles = Array.isArray(referenceCue?.titles)
+    ? referenceCue.titles.map((item) => String(item).trim()).filter(Boolean)
+    : [];
+  const referencePromptLine = referenceCue?.promptLine ? String(referenceCue.promptLine).trim() : '';
+  const referenceBindingNote = referenceCue?.note ? String(referenceCue.note).trim() : '';
+  const referenceSuffix = referenceTitles.length > 0
+    ? ' | targeted reference: ' + referenceTitles.slice(0, 3).join(' / ')
+    : referencePromptLine
+      ? ' | targeted reference: ' + referencePromptLine
+      : '';
 
   const presetMap: Record<string, Omit<ShotRenderPreset, 'shotId' | 'shotTitle' | 'kind'>> = {
     空间建立: {
@@ -246,11 +260,11 @@ export function getRenderPresetForShot(
     shotId: shot.id,
     shotTitle: shot.title,
     kind,
-    visualStyle: mergeVisualStyle(base.visualStyle, visualBible),
-    cameraMotion: mergeCameraMotion(base.cameraMotion, visualBible),
+    visualStyle: mergeVisualStyle(base.visualStyle, visualBible) + referenceSuffix,
+    cameraMotion: mergeCameraMotion(base.cameraMotion, visualBible) + (referencePromptLine ? ' | ref motion cue: ' + referencePromptLine : ''),
     pacing: base.pacing,
-    emphasis: mergeEmphasis(base.emphasis, visualBible, characterSummary),
-    audioFocus: buildAudioFocus(kind, visualBible, characterSummary, base.audioFocus),
+    emphasis: mergeEmphasis(base.emphasis, visualBible, characterSummary) + referenceSuffix,
+    audioFocus: buildAudioFocus(kind, visualBible, characterSummary, base.audioFocus) + (referenceBindingNote ? ' | binding note: ' + referenceBindingNote : referenceSuffix),
     characterSummary,
     visualBibleStyle: visualBible?.styleName,
     palette: visualBible?.palette,
@@ -258,9 +272,11 @@ export function getRenderPresetForShot(
     lensLanguage: visualBible?.lensLanguage,
     motionLanguage: visualBible?.motionLanguage,
     textureKeywords: visualBible?.textureKeywords,
+    referenceTitles,
+    referencePromptLine: referencePromptLine || undefined,
+    referenceBindingNote: referenceBindingNote || undefined,
   };
 }
-
 function safeJsonParse(text: string | null | undefined) {
   if (!text) return null;
   try {
@@ -373,7 +389,16 @@ export async function exportRenderPresets(projectId: string) {
   const visualBible = getVisualBible(project);
   const characters = getCharacterDrafts(project);
   const referenceProfile = buildReferenceProfile(project.references);
-  const presets = project.shots.map((shot) => getRenderPresetForShot(shot, visualBible, characters));
+  const referenceBindings = buildReferenceBindingSnapshot(project);
+  const presets = project.shots.map((shot) => {
+    const binding = referenceBindings.effectiveShotMap.get(shot.id) || null;
+    return getRenderPresetForShot(
+      shot,
+      visualBible,
+      characters,
+      binding ? { promptLine: binding.promptLine, titles: binding.referenceTitles, note: binding.note } : null,
+    );
+  });
 
   return {
     projectId: project.id,
@@ -382,6 +407,23 @@ export async function exportRenderPresets(projectId: string) {
     visualBible,
     characters,
     referenceProfile,
+    referenceBindings: {
+      sceneBindings: referenceBindings.sceneBindings.map((binding) => ({
+        targetId: binding.targetId,
+        targetLabel: binding.targetLabel,
+        referenceTitles: binding.referenceTitles,
+        note: binding.note,
+        promptLine: binding.promptLine,
+      })),
+      shotBindings: referenceBindings.shotBindings.map((binding) => ({
+        targetId: binding.targetId,
+        targetLabel: binding.targetLabel,
+        referenceTitles: binding.referenceTitles,
+        note: binding.note,
+        promptLine: binding.promptLine,
+      })),
+      effectiveShotBindingCount: referenceBindings.effectiveShotBindingCount,
+    },
     presets,
   };
 }
@@ -404,16 +446,26 @@ export async function exportProviderPayloads(projectId: string) {
   const characterSummary = summarizeCharacters(characters);
   const referenceProfile = buildReferenceProfile(project.references);
   const referenceInsights = getReferenceInsights(project.references);
+  const referenceBindings = buildReferenceBindingSnapshot(project);
   const timeline = await getTimelineBundle(projectId).catch(() => null);
   const timelineSceneMap = new Map((timeline?.scenes || []).map((scene) => [scene.id, scene]));
   const timelineShotMap = new Map((timeline?.scenes || []).flatMap((scene) => scene.shots.map((shot) => [shot.id, { ...shot, sceneId: scene.id, sceneTitle: scene.title }])));
   const sceneTitleMap = new Map(project.scenes.map((scene) => [scene.id, scene.title]));
-  const presets = project.shots.map((shot) => ({
-    shot,
-    preset: getRenderPresetForShot(shot, visualBible, characters),
-  }));
+  const presets = project.shots.map((shot) => {
+    const binding = referenceBindings.effectiveShotMap.get(shot.id) || null;
+    return {
+      shot,
+      binding,
+      preset: getRenderPresetForShot(
+        shot,
+        visualBible,
+        characters,
+        binding ? { promptLine: binding.promptLine, titles: binding.referenceTitles, note: binding.note } : null,
+      ),
+    };
+  });
 
-  const imagePayload = presets.map(({ shot, preset }) => {
+  const imagePayload = presets.map(({ shot, preset, binding }) => {
     const timelineShot = timelineShotMap.get(shot.id);
     return {
       provider: 'image-sequence',
@@ -438,6 +490,11 @@ export async function exportProviderPayloads(projectId: string) {
       referenceHighlights: referenceProfile.highlights,
       referenceSourceUrls: referenceProfile.sourceUrls,
       referenceLocalPaths: referenceProfile.localPaths,
+      boundReferenceTitles: binding?.referenceTitles || [],
+      boundReferencePromptLine: binding?.promptLine || null,
+      boundReferenceNote: binding?.note || '',
+      boundReferenceSourceUrls: binding?.sourceUrls || [],
+      boundReferenceLocalPaths: binding?.localPaths || [],
       plannedDuration: timelineShot?.duration || null,
       timelineStartAt: timelineShot?.startAt || null,
       timelineEndAt: timelineShot?.endAt || null,
@@ -450,6 +507,7 @@ export async function exportProviderPayloads(projectId: string) {
 
   const voicePayload = project.scenes.map((scene) => {
     const timelineScene = timelineSceneMap.get(scene.id);
+    const sceneBinding = referenceBindings.sceneMap.get(scene.id) || null;
     return {
       provider: 'voice-synthesis',
       sceneId: scene.id,
@@ -464,6 +522,11 @@ export async function exportProviderPayloads(projectId: string) {
       referenceNotes: referenceProfile.noteSummary,
       referenceSourceUrls: referenceProfile.sourceUrls,
       referenceLocalPaths: referenceProfile.localPaths,
+      boundReferenceTitles: sceneBinding?.referenceTitles || [],
+      boundReferencePromptLine: sceneBinding?.promptLine || null,
+      boundReferenceNote: sceneBinding?.note || '',
+      boundReferenceSourceUrls: sceneBinding?.sourceUrls || [],
+      boundReferenceLocalPaths: sceneBinding?.localPaths || [],
       targetDuration: timelineScene?.duration || null,
       emotionScore: timelineScene?.emotionScore || null,
       emotionLabel: timelineScene?.emotionLabel || null,
@@ -471,7 +534,7 @@ export async function exportProviderPayloads(projectId: string) {
     };
   });
 
-  const videoPayload = presets.map(({ shot, preset }) => {
+  const videoPayload = presets.map(({ shot, preset, binding }) => {
     const timelineShot = timelineShotMap.get(shot.id);
     const timelineScene = timelineSceneMap.get(shot.sceneId || '');
     return {
@@ -493,6 +556,11 @@ export async function exportProviderPayloads(projectId: string) {
       referenceEmotion: referenceProfile.emotion,
       referenceMovement: referenceProfile.movement,
       referenceHighlights: referenceProfile.highlights,
+      boundReferenceTitles: binding?.referenceTitles || [],
+      boundReferencePromptLine: binding?.promptLine || null,
+      boundReferenceNote: binding?.note || '',
+      boundReferenceSourceUrls: binding?.sourceUrls || [],
+      boundReferenceLocalPaths: binding?.localPaths || [],
       plannedDuration: timelineShot?.duration || null,
       timelineStartAt: timelineShot?.startAt || null,
       timelineEndAt: timelineShot?.endAt || null,
@@ -514,6 +582,23 @@ export async function exportProviderPayloads(projectId: string) {
     characters,
     referenceProfile,
     referenceInsights,
+    referenceBindings: {
+      sceneBindings: referenceBindings.sceneBindings.map((binding) => ({
+        targetId: binding.targetId,
+        targetLabel: binding.targetLabel,
+        referenceTitles: binding.referenceTitles,
+        note: binding.note,
+        promptLine: binding.promptLine,
+      })),
+      shotBindings: referenceBindings.shotBindings.map((binding) => ({
+        targetId: binding.targetId,
+        targetLabel: binding.targetLabel,
+        referenceTitles: binding.referenceTitles,
+        note: binding.note,
+        promptLine: binding.promptLine,
+      })),
+      effectiveShotBindingCount: referenceBindings.effectiveShotBindingCount,
+    },
     timelineSummary: timeline
       ? {
           totalSeconds: timeline.totalSeconds,
@@ -550,6 +635,7 @@ export async function exportProductionBundle(projectId: string) {
   const providerData = await exportProviderPayloads(projectId);
   const generatedMedia = getGeneratedMediaEntries(project);
   const referenceInsights = getReferenceInsights(project.references);
+  const referenceBindings = buildReferenceBindingSnapshot(project);
   const bundle = {
     projectId: project.id,
     projectTitle: project.title,
@@ -558,6 +644,23 @@ export async function exportProductionBundle(projectId: string) {
     characters: presetsData.characters,
     referenceProfile: providerData.referenceProfile,
     referenceInsights,
+    referenceBindings: {
+      sceneBindings: referenceBindings.sceneBindings.map((binding) => ({
+        targetId: binding.targetId,
+        targetLabel: binding.targetLabel,
+        referenceTitles: binding.referenceTitles,
+        note: binding.note,
+        promptLine: binding.promptLine,
+      })),
+      shotBindings: referenceBindings.shotBindings.map((binding) => ({
+        targetId: binding.targetId,
+        targetLabel: binding.targetLabel,
+        referenceTitles: binding.referenceTitles,
+        note: binding.note,
+        promptLine: binding.promptLine,
+      })),
+      effectiveShotBindingCount: referenceBindings.effectiveShotBindingCount,
+    },
     scenes: project.scenes.map((scene) => ({
       id: scene.id,
       title: scene.title,
@@ -666,10 +769,12 @@ export async function createRenderJobsForLatestProject(projectId: string) {
   const characterSummary = summarizeCharacters(characters);
   const shotKindsSummary = summarizeShotKinds(project.shots.map((shot) => shot.title));
   const referenceProfile = buildReferenceProfile(project.references);
+  const referenceBindings = buildReferenceBindingSnapshot(project);
   const referenceReadyShots = project.shots.filter((shot) => hasReferenceFlavor(shot.prompt)).length;
   const directorReadyScenes = project.scenes.filter((scene) => (scene.summary || '').includes('导演处理上强调')).length;
   const presetPreview = project.shots.slice(0, 3).map((shot) => {
-    const preset = getRenderPresetForShot(shot, visualBible, characters);
+    const binding = referenceBindings.effectiveShotMap.get(shot.id) || null;
+    const preset = getRenderPresetForShot(shot, visualBible, characters, binding ? { promptLine: binding.promptLine, titles: binding.referenceTitles, note: binding.note } : null);
     return `${preset.kind}:${preset.visualStyle}`;
   }).join(';');
 
@@ -683,7 +788,7 @@ export async function createRenderJobsForLatestProject(projectId: string) {
         provider: 'image-sequence',
         outputUrl: createJobSeedMeta({
           payloadCount: payloads.providers.imageSequence.length,
-          summary: [`shots:${project.shots.length}`, `kinds:${shotKindsSummary}`, `style:${visualBible?.styleName || 'none'}`, `references:${referenceProfile.total}`, `characters:${characterSummary}`, `presetPreview:${presetPreview}`],
+          summary: [`shots:${project.shots.length}`, `kinds:${shotKindsSummary}`, `style:${visualBible?.styleName || 'none'}`, `references:${referenceProfile.total}`, `boundShots:${referenceBindings.effectiveShotBindingCount}`, `characters:${characterSummary}`, `presetPreview:${presetPreview}`],
         }),
       },
       {
@@ -701,7 +806,7 @@ export async function createRenderJobsForLatestProject(projectId: string) {
         provider: 'video-assembly',
         outputUrl: createJobSeedMeta({
           payloadCount: payloads.providers.videoAssembly.length,
-          summary: [`referenceReady:${referenceReadyShots}`, `references:${referenceProfile.total}`, `style:${visualBible?.styleName || 'none'}`, `characters:${characterSummary}`, 'presetLinked:true'],
+          summary: [`referenceReady:${referenceReadyShots}`, `references:${referenceProfile.total}`, `boundShots:${referenceBindings.effectiveShotBindingCount}`, `style:${visualBible?.styleName || 'none'}`, `characters:${characterSummary}`, 'presetLinked:true'],
         }),
       },
     ],

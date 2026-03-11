@@ -10,7 +10,7 @@ import {
 import { getRenderPresetForShot, getRenderProject, parseRenderJobOutput } from '@/features/render/service';
 import { getTimelineBundle } from '@/features/timeline/service';
 import { getGeneratedMediaEntries, summarizeGeneratedMediaCounts } from '@/features/media/service';
-import { buildReferenceProfile } from '@/features/reference/service';
+import { buildReferenceBindingSnapshot, buildReferenceProfile } from '@/features/reference/service';
 import { getSyncStatus } from '@/features/sync/service';
 import { getVisualBibleBundle } from '@/features/visual/service';
 import { getShotKindFromTitle } from '@/lib/shot-taxonomy';
@@ -105,6 +105,7 @@ export async function RenderStudioData({ projectId }: { projectId?: string }) {
   const summary = summarizeStatus(project.renderJobs.map((job) => job.status));
   const syncStatus = await getSyncStatus(project.id).catch(() => null);
   const referenceProfile = buildReferenceProfile(project.references || []);
+  const referenceBindings = buildReferenceBindingSnapshot(project);
   const generatedMedia = getGeneratedMediaEntries(project);
   const timeline = await getTimelineBundle(project.id).catch(() => null);
   const mediaCounts = summarizeGeneratedMediaCounts(generatedMedia);
@@ -118,7 +119,10 @@ export async function RenderStudioData({ projectId }: { projectId?: string }) {
   const shotKinds = Array.from(new Set(project.shots.map((shot) => getShotKindFromTitle(shot.title))));
   const renderReadyShots = project.shots.filter((shot) => hasReferenceFlavor(shot.prompt) && shot.cameraNotes && shot.prompt).length;
   const visualBible = getVisualBibleBundle(project);
-  const shotPresets = project.shots.slice(0, 6).map((shot) => getRenderPresetForShot(shot, visualBible));
+  const shotPresets = project.shots.slice(0, 6).map((shot) => {
+    const binding = referenceBindings.effectiveShotMap.get(shot.id) || null;
+    return getRenderPresetForShot(shot, visualBible, [], binding ? { promptLine: binding.promptLine, titles: binding.referenceTitles, note: binding.note } : null);
+  });
   const remoteCount = jobOutputs.filter(({ meta }) => meta.mode === 'remote').length;
   const beatMarkedShots = timeline?.scenes.reduce((sum, scene) => sum + scene.shots.filter((shot) => Boolean(shot.beatType)).length, 0) || 0;
   const manualDurationShots = timeline?.scenes.reduce((sum, scene) => sum + scene.shots.filter((shot) => shot.isManualDuration).length, 0) || 0;
@@ -250,6 +254,24 @@ export async function RenderStudioData({ projectId }: { projectId?: string }) {
           <p>{referenceProfile.titleSummary}</p>
         </div>
       </div>
+
+      <div className="asset-grid three-up">
+        <div className="asset-tile">
+          <span className="label">定向参考</span>
+          <h4>分场绑定</h4>
+          <p>当前已有 {referenceBindings.sceneBindingCount} 个分场直接绑定参考素材。</p>
+        </div>
+        <div className="asset-tile">
+          <span className="label">定向参考</span>
+          <h4>镜头绑定</h4>
+          <p>当前已有 {referenceBindings.shotBindingCount} 个镜头直接绑定参考素材。</p>
+        </div>
+        <div className="asset-tile">
+          <span className="label">生效覆盖</span>
+          <h4>镜头生效数</h4>
+          <p>综合分场继承与镜头直绑后，当前共有 {referenceBindings.effectiveShotBindingCount} 个镜头已经继承定向参考。</p>
+        </div>
+      </div>
       <div className="asset-grid three-up">
         <div className="asset-tile">
           <span className="label">时间线总长</span>
@@ -294,6 +316,17 @@ export async function RenderStudioData({ projectId }: { projectId?: string }) {
             <p><strong>节奏：</strong>{preset.pacing}</p>
             <p><strong>强调重点：</strong>{preset.emphasis}</p>
             <p><strong>声音重点：</strong>{preset.audioFocus}</p>
+            {preset.referenceTitles && preset.referenceTitles.length > 0 ? (
+              <>
+                <div className="tag-list">
+                  {preset.referenceTitles.map((title) => (
+                    <span key={`${preset.shotId}-${title}`} className="tag-chip">{title}</span>
+                  ))}
+                </div>
+                {preset.referencePromptLine ? <p><strong>定向参考：</strong>{preset.referencePromptLine}</p> : null}
+                {preset.referenceBindingNote ? <p><strong>绑定说明：</strong>{preset.referenceBindingNote}</p> : null}
+              </>
+            ) : null}
           </div>
         ))}
       </div>

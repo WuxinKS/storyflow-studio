@@ -1,4 +1,8 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
+import { createOutlineVersion, getLatestOutlineByTitle } from '@/lib/outline-store';
+
+export const REFERENCE_BINDINGS_TITLE = 'Reference Bindings';
 
 export type ReferenceNoteDraft = {
   title: string;
@@ -33,6 +37,44 @@ export type ReferenceProfile = {
   noteSummary: string;
   highlights: string[];
   promptLine: string;
+};
+
+export type ReferenceBindingTargetType = 'scene' | 'shot';
+
+export type ReferenceBindingDraft = {
+  targetType: ReferenceBindingTargetType;
+  targetId: string;
+  referenceIds: string[];
+  note: string;
+  updatedAt: string;
+};
+
+export type ResolvedReferenceBinding = {
+  targetType: ReferenceBindingTargetType | 'effective-shot';
+  targetId: string;
+  targetLabel: string;
+  sceneId: string | null;
+  referenceIds: string[];
+  referenceTitles: string[];
+  references: ReferenceInsight[];
+  note: string;
+  promptLine: string | null;
+  sourceUrls: string[];
+  localPaths: string[];
+  sourceSummary: string;
+};
+
+export type ReferenceBindingSnapshot = {
+  bindings: ResolvedReferenceBinding[];
+  sceneBindings: ResolvedReferenceBinding[];
+  shotBindings: ResolvedReferenceBinding[];
+  sceneMap: Map<string, ResolvedReferenceBinding>;
+  shotMap: Map<string, ResolvedReferenceBinding>;
+  effectiveShotMap: Map<string, ResolvedReferenceBinding>;
+  usageByReferenceId: Map<string, { scenes: string[]; shots: string[] }>;
+  sceneBindingCount: number;
+  shotBindingCount: number;
+  effectiveShotBindingCount: number;
 };
 
 function normalizeText(value: string | null | undefined) {
@@ -175,19 +217,207 @@ export function buildReferenceProfile(
   return buildReferenceProfileFromInsights(getReferenceInsights(references));
 }
 
-export async function getReferenceProject(projectId?: string) {
-  const include = {
-    references: { orderBy: { createdAt: 'desc' } },
-  } as const;
+export function parseReferenceBindings(content: string | null | undefined) {
+  if (!content?.trim()) return [] as ReferenceBindingDraft[];
 
+  try {
+    const parsed = JSON.parse(content) as { bindings?: Partial<ReferenceBindingDraft>[] } | Partial<ReferenceBindingDraft>[];
+    const items = Array.isArray(parsed) ? parsed : parsed.bindings || [];
+    const normalized = items
+      .map((item) => ({
+        targetType: (item.targetType === 'scene' ? 'scene' : 'shot') as ReferenceBindingTargetType,
+        targetId: normalizeText(item.targetId),
+        referenceIds: uniqueValues(Array.isArray(item.referenceIds) ? item.referenceIds.map((referenceId) => String(referenceId)) : []),
+        note: normalizeText(item.note),
+        updatedAt: normalizeText(item.updatedAt) || new Date(0).toISOString(),
+      }))
+      .filter((item) => item.targetId);
+
+    const unique = new Map<string, ReferenceBindingDraft>();
+    for (const item of normalized) {
+      unique.set(`${item.targetType}:${item.targetId}`, item);
+    }
+
+    return Array.from(unique.values());
+  } catch {
+    return [] as ReferenceBindingDraft[];
+  }
+}
+
+export function serializeReferenceBindings(bindings: ReferenceBindingDraft[]) {
+  return JSON.stringify({ version: 1, bindings }, null, 2);
+}
+
+function buildResolvedBinding(input: {
+  targetType: ReferenceBindingTargetType | 'effective-shot';
+  targetId: string;
+  targetLabel: string;
+  sceneId?: string | null;
+  references: ReferenceInsight[];
+  note?: string | null;
+}) {
+  const referenceIds = uniqueValues(input.references.map((item) => item.id));
+  const referenceTitles = uniqueValues(input.references.map((item) => item.title));
+  const profile = input.references.length > 0 ? buildReferenceProfileFromInsights(input.references) : null;
+
+  return {
+    targetType: input.targetType,
+    targetId: input.targetId,
+    targetLabel: input.targetLabel,
+    sceneId: input.sceneId || null,
+    referenceIds,
+    referenceTitles,
+    references: input.references,
+    note: normalizeText(input.note),
+    promptLine: profile?.promptLine || null,
+    sourceUrls: profile?.sourceUrls || [],
+    localPaths: profile?.localPaths || [],
+    sourceSummary: profile?.sourceSummary || '当前主要靠结构化参考笔记驱动',
+  } satisfies ResolvedReferenceBinding;
+}
+
+export function buildReferenceBindingSnapshot(project: {
+  references: Array<{
+    id: string;
+    type: string;
+    notes: string | null;
+    sourceUrl?: string | null;
+    localPath?: string | null;
+    createdAt?: Date | string | null;
+  }>;
+  outlines?: Array<{ title: string; summary: string }>;
+  scenes?: Array<{ id: string; title: string }>;
+  shots?: Array<{ id: string; title: string; sceneId?: string | null }>;
+}) {
+  const insights = getReferenceInsights(project.references);
+  const insightMap = new Map(insights.map((item) => [item.id, item]));
+  const bindingOutline = getLatestOutlineByTitle(project.outlines || [], REFERENCE_BINDINGS_TITLE);
+  const bindingDrafts = parseReferenceBindings(bindingOutline?.summary || '');
+  const sceneTitleMap = new Map((project.scenes || []).map((scene) => [scene.id, scene.title]));
+  const shotMetaMap = new Map((project.shots || []).map((shot) => [shot.id, {
+    title: shot.title,
+    sceneId: shot.sceneId || null,
+    sceneTitle: shot.sceneId ? sceneTitleMap.get(shot.sceneId) || '未分场' : '未分场',
+  }]));
+
+  const sceneBindings = bindingDrafts
+    .filter((item) => item.targetType === 'scene')
+    .map((item) => {
+      const references = item.referenceIds.map((referenceId) => insightMap.get(referenceId)).filter(Boolean) as ReferenceInsight[];
+      if (references.length === 0) return null;
+      return buildResolvedBinding({
+        targetType: 'scene',
+        targetId: item.targetId,
+        targetLabel: sceneTitleMap.get(item.targetId) || '未命名分场',
+        sceneId: item.targetId,
+        references,
+        note: item.note,
+      });
+    })
+    .filter(Boolean) as ResolvedReferenceBinding[];
+
+  const shotBindings = bindingDrafts
+    .filter((item) => item.targetType === 'shot')
+    .map((item) => {
+      const references = item.referenceIds.map((referenceId) => insightMap.get(referenceId)).filter(Boolean) as ReferenceInsight[];
+      if (references.length === 0) return null;
+      const shotMeta = shotMetaMap.get(item.targetId);
+      return buildResolvedBinding({
+        targetType: 'shot',
+        targetId: item.targetId,
+        targetLabel: shotMeta?.title || '未命名镜头',
+        sceneId: shotMeta?.sceneId || null,
+        references,
+        note: item.note,
+      });
+    })
+    .filter(Boolean) as ResolvedReferenceBinding[];
+
+  const sceneMap = new Map(sceneBindings.map((item) => [item.targetId, item]));
+  const shotMap = new Map(shotBindings.map((item) => [item.targetId, item]));
+  const effectiveShotMap = new Map<string, ResolvedReferenceBinding>();
+
+  for (const [shotId, shotMeta] of shotMetaMap.entries()) {
+    const sceneBinding = shotMeta.sceneId ? sceneMap.get(shotMeta.sceneId) || null : null;
+    const shotBinding = shotMap.get(shotId) || null;
+    const references = uniqueValues([
+      ...(sceneBinding?.references || []).map((item) => item.id),
+      ...(shotBinding?.references || []).map((item) => item.id),
+    ])
+      .map((referenceId) => insightMap.get(referenceId))
+      .filter(Boolean) as ReferenceInsight[];
+
+    if (references.length === 0) continue;
+
+    effectiveShotMap.set(shotId, buildResolvedBinding({
+      targetType: 'effective-shot',
+      targetId: shotId,
+      targetLabel: shotMeta.title,
+      sceneId: shotMeta.sceneId,
+      references,
+      note: [sceneBinding?.note, shotBinding?.note].filter(Boolean).join(' / '),
+    }));
+  }
+
+  const usageSceneMap = new Map<string, Set<string>>();
+  const usageShotMap = new Map<string, Set<string>>();
+  for (const binding of sceneBindings) {
+    for (const referenceId of binding.referenceIds) {
+      const current = usageSceneMap.get(referenceId) || new Set<string>();
+      current.add(binding.targetLabel);
+      usageSceneMap.set(referenceId, current);
+    }
+  }
+  for (const binding of shotBindings) {
+    for (const referenceId of binding.referenceIds) {
+      const current = usageShotMap.get(referenceId) || new Set<string>();
+      current.add(binding.targetLabel);
+      usageShotMap.set(referenceId, current);
+    }
+  }
+
+  const usageByReferenceId = new Map<string, { scenes: string[]; shots: string[] }>();
+  for (const insight of insights) {
+    usageByReferenceId.set(insight.id, {
+      scenes: Array.from(usageSceneMap.get(insight.id) || []),
+      shots: Array.from(usageShotMap.get(insight.id) || []),
+    });
+  }
+
+  return {
+    bindings: [...sceneBindings, ...shotBindings],
+    sceneBindings,
+    shotBindings,
+    sceneMap,
+    shotMap,
+    effectiveShotMap,
+    usageByReferenceId,
+    sceneBindingCount: sceneBindings.length,
+    shotBindingCount: shotBindings.length,
+    effectiveShotBindingCount: effectiveShotMap.size,
+  } satisfies ReferenceBindingSnapshot;
+}
+
+const referenceProjectInclude = {
+  references: { orderBy: { createdAt: 'desc' } },
+  scenes: { orderBy: { orderIndex: 'asc' } },
+  shots: { orderBy: [{ sceneId: 'asc' }, { orderIndex: 'asc' }] },
+  outlines: { orderBy: { createdAt: 'desc' } },
+} satisfies Prisma.ProjectInclude;
+
+export type ReferenceProject = Prisma.ProjectGetPayload<{
+  include: typeof referenceProjectInclude;
+}>;
+
+export async function getReferenceProject(projectId?: string): Promise<ReferenceProject | null> {
   return projectId
     ? prisma.project.findUnique({
         where: { id: projectId },
-        include,
+        include: referenceProjectInclude,
       })
     : prisma.project.findFirst({
         orderBy: { updatedAt: 'desc' },
-        include,
+        include: referenceProjectInclude,
       });
 }
 
@@ -221,4 +451,49 @@ export async function createReferenceAnalysis(input: {
   });
 
   return getReferenceProject(input.projectId);
+}
+
+export async function saveReferenceBinding(input: {
+  projectId: string;
+  targetType: ReferenceBindingTargetType;
+  targetId: string;
+  referenceIds: string[];
+  note?: string | null;
+}) {
+  const project = await prisma.project.findUnique({
+    where: { id: input.projectId },
+    include: {
+      references: { orderBy: { createdAt: 'desc' } },
+      scenes: { orderBy: { orderIndex: 'asc' } },
+      shots: { orderBy: [{ sceneId: 'asc' }, { orderIndex: 'asc' }] },
+      outlines: { orderBy: { createdAt: 'desc' } },
+    },
+  });
+
+  if (!project) throw new Error('项目不存在');
+
+  const targetId = normalizeText(input.targetId);
+  if (!targetId) throw new Error('缺少绑定目标');
+
+  const targetExists = input.targetType === 'scene'
+    ? project.scenes.some((scene) => scene.id === targetId)
+    : project.shots.some((shot) => shot.id === targetId);
+  if (!targetExists) throw new Error('绑定目标不存在');
+
+  const validReferenceIds = uniqueValues(input.referenceIds || []).filter((referenceId) => project.references.some((reference) => reference.id === referenceId));
+  const currentBindings = parseReferenceBindings(getLatestOutlineByTitle(project.outlines, REFERENCE_BINDINGS_TITLE)?.summary || '');
+  const nextBindings = currentBindings.filter((item) => !(item.targetType === input.targetType && item.targetId === targetId));
+
+  if (validReferenceIds.length > 0) {
+    nextBindings.push({
+      targetType: input.targetType,
+      targetId,
+      referenceIds: validReferenceIds,
+      note: normalizeText(input.note),
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
+  await createOutlineVersion(project.id, REFERENCE_BINDINGS_TITLE, serializeReferenceBindings(nextBindings));
+  return getReferenceProject(project.id);
 }

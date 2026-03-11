@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createReferenceAnalysis, getReferenceProject } from '@/features/reference/service';
+import { createReferenceAnalysis, getReferenceProject, saveReferenceBinding } from '@/features/reference/service';
 
 export async function GET(request: Request) {
   try {
@@ -18,7 +18,17 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const project = await createReferenceAnalysis(body);
+    const action = body.action || 'create';
+    const project = action === 'bind'
+      ? await saveReferenceBinding({
+          projectId: body.projectId,
+          targetType: body.targetType,
+          targetId: body.targetId,
+          referenceIds: Array.isArray(body.referenceIds) ? body.referenceIds.map((item: unknown) => String(item)) : [],
+          note: body.note,
+        })
+      : await createReferenceAnalysis(body);
+
     return NextResponse.json({ ok: true, project }, { status: 201 });
   } catch (error) {
     return NextResponse.json(
