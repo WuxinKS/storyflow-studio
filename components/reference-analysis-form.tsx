@@ -26,6 +26,8 @@ export function ReferenceAnalysisForm({ projectId }: { projectId: string }) {
           emotion: String(formData.get('emotion') || ''),
           movement: String(formData.get('movement') || ''),
           notes: String(formData.get('notes') || ''),
+          sourceUrl: String(formData.get('sourceUrl') || ''),
+          localPath: String(formData.get('localPath') || ''),
         }),
       });
       const data = await response.json();
@@ -65,6 +67,14 @@ export function ReferenceAnalysisForm({ projectId }: { projectId: string }) {
         <label>
           <span>动作 / 节奏</span>
           <input name="movement" placeholder="动作克制、细节强、悬疑节奏" />
+        </label>
+        <label>
+          <span>参考 URL（可选）</span>
+          <input name="sourceUrl" placeholder="https://example.com/reference.jpg" />
+        </label>
+        <label>
+          <span>本地路径（可选）</span>
+          <input name="localPath" placeholder="/Users/hema/Desktop/reference-frame.png" />
         </label>
         <label className="full-width">
           <span>补充说明</span>

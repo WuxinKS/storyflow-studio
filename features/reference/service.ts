@@ -23,6 +23,10 @@ export type ReferenceProfile = {
   videoCount: number;
   titles: string[];
   titleSummary: string;
+  sourceUrls: string[];
+  localPaths: string[];
+  sourceSummary: string;
+  hasSourceMedia: boolean;
   framing: string;
   emotion: string;
   movement: string;
@@ -92,6 +96,9 @@ function buildReferenceProfileFromInsights(insights: ReferenceInsight[]): Refere
   const noteSummary = summarizeNotes(insights.map((item) => item.notes), '暂无额外补充说明。');
   const titleSummary = titles.length > 0 ? titles.slice(0, 3).join(' / ') : '暂无参考标题';
   const highlights = summarizeHighlights(insights);
+  const sourceUrls = uniqueValues(insights.map((item) => item.sourceUrl || ''));
+  const localPaths = uniqueValues(insights.map((item) => item.localPath || ''));
+  const sourceSummary = summarizeValues([...sourceUrls, ...localPaths], '当前主要靠结构化参考笔记驱动', 4);
 
   return {
     total: insights.length,
@@ -99,6 +106,10 @@ function buildReferenceProfileFromInsights(insights: ReferenceInsight[]): Refere
     videoCount: insights.filter((item) => item.sourceType === 'video').length,
     titles,
     titleSummary,
+    sourceUrls,
+    localPaths,
+    sourceSummary,
+    hasSourceMedia: sourceUrls.length > 0 || localPaths.length > 0,
     framing,
     emotion,
     movement,
@@ -188,6 +199,8 @@ export async function createReferenceAnalysis(input: {
   emotion: string;
   movement: string;
   notes: string;
+  sourceUrl?: string | null;
+  localPath?: string | null;
 }) {
   const analysis = [
     `标题：${normalizeText(input.title) || '未命名参考'}`,
@@ -202,8 +215,8 @@ export async function createReferenceAnalysis(input: {
       projectId: input.projectId,
       type: input.sourceType,
       notes: analysis,
-      sourceUrl: null,
-      localPath: null,
+      sourceUrl: normalizeText(input.sourceUrl) || null,
+      localPath: normalizeText(input.localPath) || null,
     },
   });
 

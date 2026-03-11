@@ -68,9 +68,9 @@ export async function ReferenceLabData({ projectId }: { projectId?: string }) {
           <p>{profile.noteSummary}</p>
         </div>
         <div className="asset-tile">
-          <span className="label">下游注入</span>
-          <h4>当前会影响</h4>
-          <p>这些参考画像会直接注入改编实验室与生成工作台，影响 scene 摘要、shot prompt 和 provider payload。</p>
+          <span className="label">参考源</span>
+          <h4>{profile.hasSourceMedia ? '已带入真实参考源' : '当前仅结构化笔记'}</h4>
+          <p>{profile.sourceSummary}</p>
         </div>
       </div>
 
@@ -91,7 +91,11 @@ export async function ReferenceLabData({ projectId }: { projectId?: string }) {
                 <span className="tag-chip">构图：{item.framing}</span>
                 <span className="tag-chip">情绪：{item.emotion}</span>
                 <span className="tag-chip">节奏：{item.movement}</span>
+                {item.sourceUrl ? <span className="tag-chip">已记录 URL</span> : null}
+                {item.localPath ? <span className="tag-chip">已记录本地路径</span> : null}
               </div>
+              {item.sourceUrl ? <p>参考 URL：{item.sourceUrl}</p> : null}
+              {item.localPath ? <p>本地路径：{item.localPath}</p> : null}
             </div>
           ))
         )}
