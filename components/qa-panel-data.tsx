@@ -1,3 +1,4 @@
+import { QaActionCenter } from '@/components/qa-action-center';
 import { getQaCheckToneLabel } from '@/lib/display';
 import { getQaReport } from '@/features/qa/service';
 
@@ -58,6 +59,12 @@ export async function QaPanelData({ projectId }: { projectId?: string }) {
           <p>{report.summary.zipPath || '当前还没有 zip 文件。'}</p>
         </div>
       </div>
+
+      <QaActionCenter
+        projectId={report.projectId}
+        readyToDeliver={report.summary.readyToDeliver}
+        checks={report.checks.map((check) => ({ key: check.key, passed: check.passed }))}
+      />
 
       {Object.entries(report.groupedChecks).map(([group, checks]) => (
         <div key={group} className="page-stack">
