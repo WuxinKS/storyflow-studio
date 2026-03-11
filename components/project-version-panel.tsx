@@ -38,7 +38,7 @@ export async function ProjectVersionPanel({ projectId }: { projectId?: string })
       <div className="snapshot-card">
         <p className="eyebrow">版本回溯</p>
         <h3>项目快照 / 安全回滚</h3>
-        <p>现在可以把当前项目整体状态打成快照，并在需要时恢复。恢复前系统会自动备份一次当前状态，适合在“小说定稿 / 自动分镜前 / 真实渲染联调前”做版本冻结。</p>
+        <p>现在除了整项目恢复，也支持只恢复故事、角色、视觉、时间线。局部恢复会保留下游结果，但会让相关链路进入“建议刷新”状态，更适合创作过程中的安全试错。</p>
         <div className="meta-list">
           <span>当前项目：{project.title}</span>
           <span>阶段：{getProjectStageLabel(project.stage)}</span>
@@ -78,7 +78,34 @@ export async function ProjectVersionPanel({ projectId }: { projectId?: string })
                 projectId={project.id}
                 snapshotId={snapshot.snapshotId}
                 snapshotLabel={snapshot.label}
+                scope="full"
               />
+              <div className="action-row wrap-row compact-row">
+                <ProjectSnapshotRestoreButton
+                  projectId={project.id}
+                  snapshotId={snapshot.snapshotId}
+                  snapshotLabel={snapshot.label}
+                  scope="story"
+                />
+                <ProjectSnapshotRestoreButton
+                  projectId={project.id}
+                  snapshotId={snapshot.snapshotId}
+                  snapshotLabel={snapshot.label}
+                  scope="characters"
+                />
+                <ProjectSnapshotRestoreButton
+                  projectId={project.id}
+                  snapshotId={snapshot.snapshotId}
+                  snapshotLabel={snapshot.label}
+                  scope="visual"
+                />
+                <ProjectSnapshotRestoreButton
+                  projectId={project.id}
+                  snapshotId={snapshot.snapshotId}
+                  snapshotLabel={snapshot.label}
+                  scope="timeline"
+                />
+              </div>
             </div>
           ))
         )}

@@ -3,6 +3,7 @@ import {
   createProjectSnapshot,
   getProjectSnapshotWorkspace,
   restoreProjectSnapshot,
+  type ProjectSnapshotRestoreScope,
 } from '@/features/project-snapshot/service';
 
 export async function GET(request: Request) {
@@ -40,7 +41,8 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: false, error: 'snapshotId 缺失' }, { status: 400 });
       }
 
-      const result = await restoreProjectSnapshot(projectId, snapshotId);
+      const scope = (typeof body.scope === 'string' ? body.scope : 'full') as ProjectSnapshotRestoreScope;
+      const result = await restoreProjectSnapshot(projectId, snapshotId, scope);
       return NextResponse.json({ ok: true, result }, { status: 201 });
     }
 

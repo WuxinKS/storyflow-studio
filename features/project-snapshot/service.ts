@@ -3,6 +3,9 @@ import { prisma } from '@/lib/prisma';
 import { createOutlineVersion } from '@/lib/outline-store';
 
 export const PROJECT_SNAPSHOT_TITLE_PREFIX = 'Project Snapshot :: ';
+export const PROJECT_SNAPSHOT_RESTORE_SCOPES = ['full', 'story', 'characters', 'visual', 'timeline'] as const;
+
+export type ProjectSnapshotRestoreScope = (typeof PROJECT_SNAPSHOT_RESTORE_SCOPES)[number];
 
 export type ProjectSnapshotStats = {
   ideaSeeds: number;
@@ -463,6 +466,57 @@ export async function getProjectSnapshotWorkspace(projectId?: string) {
   };
 }
 
+const STORY_OUTLINE_TITLES = ['Initial Outline Placeholder', 'Story Engine Synopsis', 'Story Engine Beat Sheet', 'AI Novel Chapter Index'] as const;
+const CHARACTER_OUTLINE_TITLES = ['Character Drafts'] as const;
+const VISUAL_OUTLINE_TITLES = ['Visual Bible'] as const;
+const TIMELINE_OUTLINE_TITLES = ['Timeline Overrides'] as const;
+
+function isRestoreScope(value: unknown): value is ProjectSnapshotRestoreScope {
+  return typeof value === 'string' && PROJECT_SNAPSHOT_RESTORE_SCOPES.includes(value as ProjectSnapshotRestoreScope);
+}
+
+function getRestoreScopeLabel(scope: ProjectSnapshotRestoreScope) {
+  if (scope === 'story') return '故事';
+  if (scope === 'characters') return '角色';
+  if (scope === 'visual') return '视觉';
+  if (scope === 'timeline') return '时间线';
+  return '整个项目';
+}
+
+function getSnapshotOutlinesByTitles(snapshot: ProjectSnapshotSummary, titles: readonly string[]) {
+  return snapshot.outlines.filter((outline) => titles.includes(outline.title));
+}
+
+async function replaceOutlines(
+  tx: Prisma.TransactionClient,
+  projectId: string,
+  nextOutlines: Array<{ title: string; summary: string }>,
+  titles?: readonly string[],
+) {
+  const currentTitles = titles && titles.length > 0
+    ? Array.from(new Set(titles.filter(Boolean)))
+    : Array.from(new Set(nextOutlines.map((item) => item.title).filter(Boolean)));
+
+  if (currentTitles.length > 0) {
+    await tx.outline.deleteMany({
+      where: {
+        projectId,
+        title: { in: currentTitles },
+      },
+    });
+  }
+
+  if (nextOutlines.length > 0) {
+    await tx.outline.createMany({
+      data: nextOutlines.map((item) => ({
+        projectId,
+        title: item.title,
+        summary: item.summary,
+      })),
+    });
+  }
+}
+
 export async function createProjectSnapshot(projectId: string, label?: string) {
   const project = await getProjectSnapshotSource(projectId);
   if (!project) throw new Error('项目不存在');
@@ -484,120 +538,234 @@ export async function createProjectSnapshot(projectId: string, label?: string) {
   return snapshot;
 }
 
-async function restoreSnapshotRecords(projectId: string, snapshot: ProjectSnapshotSummary) {
-  await prisma.$transaction(async (tx) => {
-    await tx.renderJob.deleteMany({ where: { projectId } });
-    await tx.shot.deleteMany({ where: { projectId } });
-    await tx.scene.deleteMany({ where: { projectId } });
-    await tx.chapter.deleteMany({ where: { projectId } });
-    await tx.referenceAsset.deleteMany({ where: { projectId } });
-    await tx.ideaSeed.deleteMany({ where: { projectId } });
+async function restoreFullSnapshot(
+  tx: Prisma.TransactionClient,
+  projectId: string,
+  snapshot: ProjectSnapshotSummary,
+  currentProject: SnapshotSourceProject,
+) {
+  await tx.renderJob.deleteMany({ where: { projectId } });
+  await tx.shot.deleteMany({ where: { projectId } });
+  await tx.scene.deleteMany({ where: { projectId } });
+  await tx.chapter.deleteMany({ where: { projectId } });
+  await tx.referenceAsset.deleteMany({ where: { projectId } });
+  await tx.ideaSeed.deleteMany({ where: { projectId } });
 
-    await tx.project.update({
-      where: { id: projectId },
-      data: {
-        title: snapshot.project.title,
-        description: snapshot.project.description,
-        genre: snapshot.project.genre,
-        premise: snapshot.project.premise,
-        stage: snapshot.project.stage as 'IDEA' | 'STORY' | 'ADAPTATION' | 'STORYBOARD' | 'RENDER',
-      },
+  await tx.project.update({
+    where: { id: projectId },
+    data: {
+      title: snapshot.project.title,
+      description: snapshot.project.description,
+      genre: snapshot.project.genre,
+      premise: snapshot.project.premise,
+      stage: snapshot.project.stage as 'IDEA' | 'STORY' | 'ADAPTATION' | 'STORYBOARD' | 'RENDER',
+    },
+  });
+
+  if (snapshot.ideaSeeds.length > 0) {
+    await tx.ideaSeed.createMany({
+      data: snapshot.ideaSeeds.map((item) => ({
+        id: item.id,
+        projectId,
+        input: item.input,
+        styleNotes: item.styleNotes,
+        createdAt: new Date(item.createdAt),
+      })),
     });
+  }
 
-    if (snapshot.ideaSeeds.length > 0) {
-      await tx.ideaSeed.createMany({
-        data: snapshot.ideaSeeds.map((item) => ({
-          id: item.id,
-          projectId,
-          input: item.input,
-          styleNotes: item.styleNotes,
-          createdAt: new Date(item.createdAt),
-        })),
-      });
+  if (snapshot.chapters.length > 0) {
+    await tx.chapter.createMany({
+      data: snapshot.chapters.map((item) => ({
+        id: item.id,
+        projectId,
+        title: item.title,
+        orderIndex: item.orderIndex,
+        content: item.content,
+        createdAt: new Date(item.createdAt),
+      })),
+    });
+  }
+
+  if (snapshot.scenes.length > 0) {
+    await tx.scene.createMany({
+      data: snapshot.scenes.map((item) => ({
+        id: item.id,
+        projectId,
+        chapterId: item.chapterId,
+        title: item.title,
+        summary: item.summary,
+        orderIndex: item.orderIndex,
+        createdAt: new Date(item.createdAt),
+      })),
+    });
+  }
+
+  if (snapshot.shots.length > 0) {
+    await tx.shot.createMany({
+      data: snapshot.shots.map((item) => ({
+        id: item.id,
+        projectId,
+        sceneId: item.sceneId,
+        title: item.title,
+        prompt: item.prompt,
+        cameraNotes: item.cameraNotes,
+        orderIndex: item.orderIndex,
+        createdAt: new Date(item.createdAt),
+      })),
+    });
+  }
+
+  if (snapshot.references.length > 0) {
+    await tx.referenceAsset.createMany({
+      data: snapshot.references.map((item) => ({
+        id: item.id,
+        projectId,
+        type: item.type,
+        sourceUrl: item.sourceUrl,
+        localPath: item.localPath,
+        notes: item.notes,
+        createdAt: new Date(item.createdAt),
+      })),
+    });
+  }
+
+  if (snapshot.renderJobs.length > 0) {
+    await tx.renderJob.createMany({
+      data: snapshot.renderJobs.map((item) => ({
+        id: item.id,
+        projectId,
+        status: item.status,
+        provider: item.provider,
+        outputUrl: item.outputUrl,
+        createdAt: new Date(item.createdAt),
+      })),
+    });
+  }
+
+  const outlineTitles = Array.from(new Set([
+    ...currentProject.outlines
+      .filter((item) => !item.title.startsWith(PROJECT_SNAPSHOT_TITLE_PREFIX))
+      .map((item) => item.title),
+    ...snapshot.outlines.map((item) => item.title),
+  ]));
+
+  await replaceOutlines(tx, projectId, snapshot.outlines, outlineTitles);
+}
+
+async function restoreStorySnapshot(tx: Prisma.TransactionClient, projectId: string, snapshot: ProjectSnapshotSummary) {
+  await tx.ideaSeed.deleteMany({ where: { projectId } });
+  await tx.chapter.deleteMany({ where: { projectId } });
+
+  await tx.project.update({
+    where: { id: projectId },
+    data: {
+      title: snapshot.project.title,
+      description: snapshot.project.description,
+      genre: snapshot.project.genre,
+      premise: snapshot.project.premise,
+      stage: snapshot.project.stage as 'IDEA' | 'STORY' | 'ADAPTATION' | 'STORYBOARD' | 'RENDER',
+    },
+  });
+
+  if (snapshot.ideaSeeds.length > 0) {
+    await tx.ideaSeed.createMany({
+      data: snapshot.ideaSeeds.map((item) => ({
+        id: item.id,
+        projectId,
+        input: item.input,
+        styleNotes: item.styleNotes,
+        createdAt: new Date(item.createdAt),
+      })),
+    });
+  }
+
+  if (snapshot.chapters.length > 0) {
+    await tx.chapter.createMany({
+      data: snapshot.chapters.map((item) => ({
+        id: item.id,
+        projectId,
+        title: item.title,
+        orderIndex: item.orderIndex,
+        content: item.content,
+        createdAt: new Date(item.createdAt),
+      })),
+    });
+  }
+
+  await replaceOutlines(
+    tx,
+    projectId,
+    getSnapshotOutlinesByTitles(snapshot, STORY_OUTLINE_TITLES),
+    STORY_OUTLINE_TITLES,
+  );
+}
+
+async function restoreCharacterSnapshot(tx: Prisma.TransactionClient, projectId: string, snapshot: ProjectSnapshotSummary) {
+  await replaceOutlines(
+    tx,
+    projectId,
+    getSnapshotOutlinesByTitles(snapshot, CHARACTER_OUTLINE_TITLES),
+    CHARACTER_OUTLINE_TITLES,
+  );
+}
+
+async function restoreVisualSnapshot(tx: Prisma.TransactionClient, projectId: string, snapshot: ProjectSnapshotSummary) {
+  await replaceOutlines(
+    tx,
+    projectId,
+    getSnapshotOutlinesByTitles(snapshot, VISUAL_OUTLINE_TITLES),
+    VISUAL_OUTLINE_TITLES,
+  );
+}
+
+async function restoreTimelineSnapshot(tx: Prisma.TransactionClient, projectId: string, snapshot: ProjectSnapshotSummary) {
+  await replaceOutlines(
+    tx,
+    projectId,
+    getSnapshotOutlinesByTitles(snapshot, TIMELINE_OUTLINE_TITLES),
+    TIMELINE_OUTLINE_TITLES,
+  );
+}
+
+async function restoreSnapshotRecords(
+  projectId: string,
+  snapshot: ProjectSnapshotSummary,
+  currentProject: SnapshotSourceProject,
+  scope: ProjectSnapshotRestoreScope = 'full',
+) {
+  await prisma.$transaction(async (tx) => {
+    if (scope === 'story') {
+      await restoreStorySnapshot(tx, projectId, snapshot);
+      return;
     }
 
-    if (snapshot.chapters.length > 0) {
-      await tx.chapter.createMany({
-        data: snapshot.chapters.map((item) => ({
-          id: item.id,
-          projectId,
-          title: item.title,
-          orderIndex: item.orderIndex,
-          content: item.content,
-          createdAt: new Date(item.createdAt),
-        })),
-      });
+    if (scope === 'characters') {
+      await restoreCharacterSnapshot(tx, projectId, snapshot);
+      return;
     }
 
-    if (snapshot.scenes.length > 0) {
-      await tx.scene.createMany({
-        data: snapshot.scenes.map((item) => ({
-          id: item.id,
-          projectId,
-          chapterId: item.chapterId,
-          title: item.title,
-          summary: item.summary,
-          orderIndex: item.orderIndex,
-          createdAt: new Date(item.createdAt),
-        })),
-      });
+    if (scope === 'visual') {
+      await restoreVisualSnapshot(tx, projectId, snapshot);
+      return;
     }
 
-    if (snapshot.shots.length > 0) {
-      await tx.shot.createMany({
-        data: snapshot.shots.map((item) => ({
-          id: item.id,
-          projectId,
-          sceneId: item.sceneId,
-          title: item.title,
-          prompt: item.prompt,
-          cameraNotes: item.cameraNotes,
-          orderIndex: item.orderIndex,
-          createdAt: new Date(item.createdAt),
-        })),
-      });
+    if (scope === 'timeline') {
+      await restoreTimelineSnapshot(tx, projectId, snapshot);
+      return;
     }
 
-    if (snapshot.references.length > 0) {
-      await tx.referenceAsset.createMany({
-        data: snapshot.references.map((item) => ({
-          id: item.id,
-          projectId,
-          type: item.type,
-          sourceUrl: item.sourceUrl,
-          localPath: item.localPath,
-          notes: item.notes,
-          createdAt: new Date(item.createdAt),
-        })),
-      });
-    }
-
-    if (snapshot.renderJobs.length > 0) {
-      await tx.renderJob.createMany({
-        data: snapshot.renderJobs.map((item) => ({
-          id: item.id,
-          projectId,
-          status: item.status,
-          provider: item.provider,
-          outputUrl: item.outputUrl,
-          createdAt: new Date(item.createdAt),
-        })),
-      });
-    }
-
-    if (snapshot.outlines.length > 0) {
-      await tx.outline.createMany({
-        data: snapshot.outlines.map((item) => ({
-          projectId,
-          title: item.title,
-          summary: item.summary,
-        })),
-      });
-    }
+    await restoreFullSnapshot(tx, projectId, snapshot, currentProject);
   });
 }
 
-export async function restoreProjectSnapshot(projectId: string, snapshotId: string) {
+export async function restoreProjectSnapshot(
+  projectId: string,
+  snapshotId: string,
+  scope: ProjectSnapshotRestoreScope = 'full',
+) {
+  if (!isRestoreScope(scope)) throw new Error('不支持的恢复范围');
+
   const project = await getProjectSnapshotSource(projectId);
   if (!project) throw new Error('项目不存在');
 
@@ -613,11 +781,13 @@ export async function restoreProjectSnapshot(projectId: string, snapshotId: stri
   if (!targetSnapshot) throw new Error('快照内容损坏，无法恢复');
   if (targetSnapshot.projectId !== projectId) throw new Error('快照不属于当前项目');
 
-  const backupLabel = `恢复前自动备份 ${formatSnapshotLabel()}`;
+  const backupLabel = `恢复前自动备份（${getRestoreScopeLabel(scope)}） ${formatSnapshotLabel()}`;
   const backupSnapshot = await createProjectSnapshot(projectId, backupLabel);
-  await restoreSnapshotRecords(projectId, targetSnapshot);
+  await restoreSnapshotRecords(projectId, targetSnapshot, project, scope);
 
   return {
+    scope,
+    scopeLabel: getRestoreScopeLabel(scope),
     restored: targetSnapshot,
     backup: backupSnapshot,
     workspace: await getProjectSnapshotWorkspace(projectId),
