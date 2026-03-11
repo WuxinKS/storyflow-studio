@@ -35,6 +35,7 @@ StoryFlow Studio 是一个面向内容创作者的 **AI 导演级创作工作台
 - 镜头级参考绑定：参考素材可直接绑定到分场 / 镜头并进入分镜、渲染与导出链
 - 交付中心：集中回看 bundle、manifest、payload 与 zip 归档
 - 运行诊断台：集中查看 Provider request / response 工件、媒体索引与定向参考注入情况
+- 生成工作台载荷预检：直接在页面上预览 image / voice / video payload 中的定向参考、情绪与时长字段
 
 当前仍可继续深化 provider 接入与产品打磨，但核心工作台已经可以演示、验证和交付。
 

@@ -47,7 +47,7 @@ export function QaActionCenter({
     'generated-media-index',
     'final-video',
   ].some((key) => failedKeys.has(key));
-  const hasReferenceBindingIssue = failedKeys.has('reference-bindings');
+  const hasReferenceBindingIssue = ['reference-bindings', 'provider-bound-references'].some((key) => failedKeys.has(key));
 
   const runAction = async (action: QaAction) => {
     setLoadingAction(action);

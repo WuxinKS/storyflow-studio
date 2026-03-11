@@ -16,6 +16,7 @@ import { getVisualBibleBundle } from '@/features/visual/service';
 import { getShotKindFromTitle } from '@/lib/shot-taxonomy';
 import { getPreviewKindFromGeneratedType, resolvePreviewSource } from '@/lib/media-preview';
 import { MediaPreview } from '@/components/media-preview';
+import { RenderPayloadPreview } from '@/components/render-payload-preview';
 import { buildProjectHref } from '@/lib/project-links';
 
 function summarizeStatus(statuses: string[]) {
@@ -331,6 +332,8 @@ export async function RenderStudioData({ projectId }: { projectId?: string }) {
           </div>
         ))}
       </div>
+
+      <RenderPayloadPreview projectId={project.id} />
 
       <div className="asset-grid three-up">
         <div className="asset-tile">

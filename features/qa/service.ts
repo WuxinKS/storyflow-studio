@@ -104,6 +104,13 @@ export async function getQaReport(projectId?: string, options?: { bundleExport?:
   const flavoredShots = project.shots.filter((shot) => hasReferenceFlavor(shot.prompt)).length;
   const exportedReferenceCount = providerExport.ok ? providerExport.data.referenceProfile.total : 0;
   const referenceBindings = buildReferenceBindingSnapshot(project);
+  const boundPayloadItems = providerExport.ok
+    ? [
+        ...providerExport.data.providers.imageSequence,
+        ...providerExport.data.providers.voiceSynthesis,
+        ...providerExport.data.providers.videoAssembly,
+      ].filter((item) => Array.isArray((item as { boundReferenceTitles?: unknown[] }).boundReferenceTitles) && ((item as { boundReferenceTitles?: unknown[] }).boundReferenceTitles?.length || 0) > 0).length
+    : 0;
 
   const checks: QaCheck[] = [
     {
@@ -186,6 +193,17 @@ export async function getQaReport(projectId?: string, options?: { bundleExport?:
         : `参考 ${referenceCount} 条 / 分场直绑 ${referenceBindings.sceneBindingCount} / 镜头直绑 ${referenceBindings.shotBindingCount} / 生效镜头 ${referenceBindings.effectiveShotBindingCount}。`,
       group: 'content',
       severity: referenceCount > 0 ? 'warning' : 'info',
+      blocksDelivery: false,
+    },
+    {
+      key: 'provider-bound-references',
+      label: '定向参考已进入 Provider 载荷',
+      passed: referenceBindings.effectiveShotBindingCount === 0 || boundPayloadItems > 0,
+      detail: referenceBindings.effectiveShotBindingCount === 0
+        ? '当前没有镜头级或继承后的定向参考，允许跳过。'
+        : `生效镜头 ${referenceBindings.effectiveShotBindingCount} / 已写入 Provider 载荷 ${boundPayloadItems} 条。`,
+      group: 'export',
+      severity: referenceBindings.effectiveShotBindingCount > 0 ? 'warning' : 'info',
       blocksDelivery: false,
     },
     {
