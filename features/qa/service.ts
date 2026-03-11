@@ -4,6 +4,7 @@ import { parseCharacterDrafts } from '@/features/characters/service';
 import { getGeneratedMediaEntries, summarizeGeneratedMediaCounts } from '@/features/media/service';
 import { parseVisualBibleDraft } from '@/features/visual/service';
 import { exportProductionBundle, exportProviderPayloads, exportRenderPresets } from '@/features/render/service';
+import { buildReferenceBindingSnapshot } from '@/features/reference/service';
 import { getSyncStatus } from '@/features/sync/service';
 import { getLatestOutlineByTitle } from '@/lib/outline-store';
 
@@ -102,6 +103,7 @@ export async function getQaReport(projectId?: string, options?: { bundleExport?:
   const referenceCount = project.references.length;
   const flavoredShots = project.shots.filter((shot) => hasReferenceFlavor(shot.prompt)).length;
   const exportedReferenceCount = providerExport.ok ? providerExport.data.referenceProfile.total : 0;
+  const referenceBindings = buildReferenceBindingSnapshot(project);
 
   const checks: QaCheck[] = [
     {
@@ -171,6 +173,17 @@ export async function getQaReport(projectId?: string, options?: { bundleExport?:
       detail: referenceCount === 0
         ? '当前没有参考素材，允许跳过。'
         : `参考 ${referenceCount} 条 / 参考增强镜头 ${flavoredShots} 条 / 载荷参考画像 ${exportedReferenceCount} 条。`,
+      group: 'content',
+      severity: referenceCount > 0 ? 'warning' : 'info',
+      blocksDelivery: false,
+    },
+    {
+      key: 'reference-bindings',
+      label: '参考素材已有精确定向绑定',
+      passed: referenceCount === 0 || referenceBindings.effectiveShotBindingCount > 0,
+      detail: referenceCount === 0
+        ? '当前没有参考素材，允许跳过。'
+        : `参考 ${referenceCount} 条 / 分场直绑 ${referenceBindings.sceneBindingCount} / 镜头直绑 ${referenceBindings.shotBindingCount} / 生效镜头 ${referenceBindings.effectiveShotBindingCount}。`,
       group: 'content',
       severity: referenceCount > 0 ? 'warning' : 'info',
       blocksDelivery: false,

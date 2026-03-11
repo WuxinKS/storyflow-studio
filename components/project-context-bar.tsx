@@ -14,6 +14,7 @@ const WORKSPACE_LINKS = [
   { href: '/timeline', label: '时间线' },
   { href: '/assets', label: '资产' },
   { href: '/render-studio', label: '生成' },
+  { href: '/render-runs', label: '诊断' },
   { href: '/qa-panel', label: 'QA' },
   { href: '/delivery-center', label: '交付' },
   { href: '/settings', label: '设置' },

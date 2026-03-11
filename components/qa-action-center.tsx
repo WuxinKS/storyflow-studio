@@ -47,6 +47,7 @@ export function QaActionCenter({
     'generated-media-index',
     'final-video',
   ].some((key) => failedKeys.has(key));
+  const hasReferenceBindingIssue = failedKeys.has('reference-bindings');
 
   const runAction = async (action: QaAction) => {
     setLoadingAction(action);
@@ -101,7 +102,7 @@ export function QaActionCenter({
       <p>
         {readyToDeliver
           ? '当前 QA 已通过。你可以直接去生成工作台复看产物，或者继续保存快照作为交付版本。'
-          : '这里把最常用的修复动作集中在一起：重跑主链、刷新改编、创建渲染任务、执行渲染，减少在页面间来回切换。'}
+          : '这里把最常用的修复动作集中在一起：重跑主链、刷新改编、创建渲染任务、执行渲染，并新增运行诊断与参考绑定入口，减少在页面间来回切换。'}
       </p>
       <div className="action-row wrap-row">
         <button type="button" className="button-primary" onClick={() => runAction('pipeline-full')} disabled={Boolean(loadingAction)}>
@@ -111,6 +112,7 @@ export function QaActionCenter({
           {getActionLabel('pipeline-prepare', loadingAction === 'pipeline-prepare')}
         </button>
         <Link href={buildProjectHref('/render-studio', projectId)} className="button-ghost">打开生成工作台</Link>
+        <Link href={buildProjectHref('/render-runs', projectId)} className="button-ghost">打开运行诊断</Link>
         <Link href={buildProjectHref('/story-setup', projectId)} className="button-ghost">打开故事设定</Link>
       </div>
       <div className="action-row wrap-row compact-row">
@@ -133,6 +135,9 @@ export function QaActionCenter({
           <button type="button" className="button-ghost" onClick={() => runAction('render-retry')} disabled={Boolean(loadingAction)}>
             {getActionLabel('render-retry', loadingAction === 'render-retry')}
           </button>
+        ) : null}
+        {hasReferenceBindingIssue ? (
+          <Link href={buildProjectHref('/reference-lab', projectId)} className="button-ghost">去补参考绑定</Link>
         ) : null}
       </div>
       {message ? <span className="success-text">{message}</span> : null}

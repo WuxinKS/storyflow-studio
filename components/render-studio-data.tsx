@@ -153,6 +153,7 @@ export async function RenderStudioData({ projectId }: { projectId?: string }) {
           <Link href={buildProjectHref('/storyboard', project.id)} className="button-ghost">返回分镜板</Link>
           <Link href={buildProjectHref('/visual-bible', project.id)} className="button-secondary">查看视觉圣经</Link>
           <Link href={buildProjectHref('/assets', project.id)} className="button-secondary">查看资产中心</Link>
+          <Link href={buildProjectHref('/render-runs', project.id)} className="button-secondary">查看运行诊断</Link>
         </div>
       </div>
 
@@ -341,6 +342,11 @@ export async function RenderStudioData({ projectId }: { projectId?: string }) {
           <span className="label">Provider 导出</span>
           <h4>Provider 可执行载荷</h4>
           <p>可直接导出 image / voice / video 三类 Provider payload。</p><a className="button-ghost" href={exportLinks.providerPayloads} target="_blank" rel="noreferrer">打开 Provider Payload</a>
+        </div>
+        <div className="asset-tile">
+          <span className="label">运行诊断</span>
+          <h4>请求 / 响应工件</h4>
+          <p>集中查看每次 Provider 执行的 request、response 与定向参考注入情况。</p><Link className="button-ghost" href={buildProjectHref('/render-runs', project.id)}>打开运行诊断</Link>
         </div>
         <div className="asset-tile">
           <span className="label">交付包导出</span>

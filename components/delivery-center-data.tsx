@@ -99,6 +99,7 @@ export async function DeliveryCenterData({
               {bundle.projectId ? (
                 <>
                   <Link href={buildProjectHref('/render-studio', bundle.projectId)} className="button-ghost">返回生成</Link>
+                  <Link href={buildProjectHref('/render-runs', bundle.projectId)} className="button-ghost">运行诊断</Link>
                   <Link href={buildProjectHref('/qa-panel', bundle.projectId)} className="button-ghost">查看 QA</Link>
                 </>
               ) : null}

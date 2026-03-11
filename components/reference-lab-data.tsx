@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { ReferenceAnalysisForm } from '@/components/reference-analysis-form';
 import { ReferenceBindingForm } from '@/components/reference-binding-form';
 import {
@@ -7,6 +8,7 @@ import {
   getReferenceProject,
 } from '@/features/reference/service';
 import { getProjectStageLabel, getReferenceSourceTypeLabel } from '@/lib/display';
+import { buildProjectHref } from '@/lib/project-links';
 
 export async function ReferenceLabData({ projectId }: { projectId?: string }) {
   const project = await getReferenceProject(projectId).catch(() => null);
@@ -40,6 +42,11 @@ export async function ReferenceLabData({ projectId }: { projectId?: string }) {
           <span>生效镜头：{bindings.effectiveShotBindingCount}</span>
           <span>项目阶段：{getProjectStageLabel(project.stage)}</span>
         </div>
+        <div className="action-row wrap-row">
+          <Link href={buildProjectHref('/storyboard', project.id)} className="button-ghost">查看分镜板</Link>
+          <Link href={buildProjectHref('/render-studio', project.id)} className="button-secondary">查看生成工作台</Link>
+          <Link href={buildProjectHref('/render-runs', project.id)} className="button-secondary">查看运行诊断</Link>
+        </div>
       </div>
 
       <ReferenceAnalysisForm projectId={project.id} />
@@ -50,6 +57,15 @@ export async function ReferenceLabData({ projectId }: { projectId?: string }) {
           references={insights.map((item) => ({ id: item.id, title: item.title }))}
           scenes={project.scenes.map((scene) => ({ id: scene.id, title: scene.title }))}
           shots={project.shots.map((shot) => ({ id: shot.id, title: shot.title, sceneTitle: project.scenes.find((scene) => scene.id === shot.sceneId)?.title || '未分场' }))}
+          currentBindings={bindings.bindings.map((binding) => ({
+            targetType: binding.targetType === 'scene' ? 'scene' : 'shot',
+            targetId: binding.targetId,
+            targetLabel: binding.targetLabel,
+            referenceIds: binding.referenceIds,
+            referenceTitles: binding.referenceTitles,
+            note: binding.note,
+            promptLine: binding.promptLine,
+          }))}
         />
       ) : null}
 

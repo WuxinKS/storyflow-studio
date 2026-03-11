@@ -15,6 +15,7 @@ export const navigation = [
   { href: '/adaptation-lab', label: '改编实验室', section: '改编' },
   { href: '/storyboard', label: '分镜板', section: '分镜' },
   { href: '/render-studio', label: '生成工作台', section: '生成' },
+  { href: '/render-runs', label: '运行诊断', section: '诊断' },
   { href: '/reference-lab', label: '参考实验室', section: '参考' },
   { href: '/assets', label: '资产中心', section: '资产' },
   { href: '/timeline', label: '时间线', section: '时间' },
