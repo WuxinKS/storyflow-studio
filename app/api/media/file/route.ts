@@ -26,6 +26,9 @@ const MIME_BY_EXTENSION: Record<string, string> = {
   '.mov': 'video/quicktime',
   '.mkv': 'video/x-matroska',
   '.m4v': 'video/x-m4v',
+  '.json': 'application/json; charset=utf-8',
+  '.txt': 'text/plain; charset=utf-8',
+  '.zip': 'application/zip',
 };
 
 function normalizePathInput(value: string) {

@@ -1,3 +1,4 @@
+import { DeliveryCenterData } from '@/components/delivery-center-data';
 import { Pipeline } from '@/components/pipeline';
 import { PipelineCommandCenter } from '@/components/pipeline-command-center';
 import { ProjectContextBar } from '@/components/project-context-bar';
@@ -41,6 +42,14 @@ export default async function HomePage({
       <ProjectSnapshot />
       <PipelineCommandCenter projectId={projectId} />
       <ProjectVersionPanel projectId={projectId} />
+
+      <SectionCard
+        title="交付中心"
+        description="最近导出的交付包、manifest、provider payload 与 zip 会集中沉淀在这里，方便直接复验和交付。"
+      >
+        <DeliveryCenterData projectId={projectId} limit={3} />
+      </SectionCard>
+
       <ProjectList />
 
       <SectionCard

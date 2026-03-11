@@ -19,5 +19,6 @@ export const navigation = [
   { href: '/assets', label: '资产中心', section: '资产' },
   { href: '/timeline', label: '时间线', section: '时间' },
   { href: '/qa-panel', label: '质量检查', section: '质量' },
+  { href: '/delivery-center', label: '交付中心', section: '交付' },
   { href: '/settings', label: '设置', section: '设置' },
 ];

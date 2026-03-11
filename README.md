@@ -32,6 +32,7 @@ StoryFlow Studio 是一个面向内容创作者的 **AI 导演级创作工作台
 - Assets v1：手动录入资产并关联角色 / 场景 / 镜头
 - QA v1：成熟度等级、阻断项、sync stale 检查
 - Render 执行链：真实 provider endpoint 接口 + mock fallback + 导出包
+- 交付中心：集中回看 bundle、manifest、payload 与 zip 归档
 
 当前仍可继续深化 provider 接入与产品打磨，但核心工作台已经可以演示、验证和交付。
 
@@ -64,6 +65,7 @@ PROJECT_PLAN.md       # 完整项目计划
 - Adaptation Lab
 - 分镜板
 - 生成工作台
+- 交付中心
 - Reference Lab
 - Assets
 - Settings
