@@ -101,6 +101,7 @@ export async function RenderRunCenterData({
                 <div className="meta-list">
                   <span>供应商：{provider.providerName || provider.matchedJob?.providerName || '未记录'}</span>
                   <span>模型：{provider.providerModel || provider.matchedJob?.providerModel || '未记录'}</span>
+                  <span>适配：{provider.matchedJob?.adapter || '未记录'}</span>
                   <span>载荷项：{provider.payloadCount}</span>
                   <span>场次：{provider.sceneCount}</span>
                   <span>镜头：{provider.shotCount}</span>

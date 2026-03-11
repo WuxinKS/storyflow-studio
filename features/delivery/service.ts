@@ -90,6 +90,7 @@ export type RenderRunProviderRecord = {
     lastError: string | null;
     providerName: string | null;
     providerModel: string | null;
+    adapter: string | null;
   } | null;
 };
 
@@ -498,6 +499,7 @@ async function loadRenderRunRecord(
             lastError: matched.meta.lastError || null,
             providerName: matched.meta.providerName || null,
             providerModel: matched.meta.providerModel || null,
+            adapter: matched.meta.adapter || null,
           }
         : null,
     } satisfies RenderRunProviderRecord;

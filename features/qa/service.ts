@@ -127,7 +127,7 @@ export async function getQaReport(projectId?: string, options?: { bundleExport?:
       return `${getRenderProviderLabel(profile.provider)}: 缺少${missing.join('、')}`;
     }
 
-    return `${getRenderProviderLabel(profile.provider)}: ${profile.providerName} / ${profile.providerModel || 'mock'}`;
+    return `${getRenderProviderLabel(profile.provider)}: ${profile.providerName} / ${profile.providerModel || 'mock'} / ${profile.adapter || 'auto'}`;
   }).join(' / ');
 
   const checks: QaCheck[] = [

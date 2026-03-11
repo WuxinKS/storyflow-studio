@@ -10,6 +10,7 @@ export type ProviderRuntimeConfig = {
   url: string;
   providerName: string;
   providerModel: string;
+  adapter: string;
   nameSource: ProviderProfileSource;
   modelSource: ProviderProfileSource;
   authHeader: string;
@@ -147,6 +148,8 @@ export function getProviderRuntimeConfig(provider: ProviderKind): ProviderRuntim
 
   const apiKeySource: ApiKeySource = explicitApiKey ? 'provider' : sharedApiKey ? 'shared' : 'none';
 
+  const adapter = normalizeText(process.env[`${envConfig.nameEnv.replace('_NAME', '')}_ADAPTER`]) || '';
+
   return {
     provider,
     channel: envConfig.channel,
@@ -154,6 +157,7 @@ export function getProviderRuntimeConfig(provider: ProviderKind): ProviderRuntim
     url,
     providerName,
     providerModel,
+    adapter,
     nameSource: explicitName ? 'env' : inferredName ? 'inferred' : 'mock-default',
     modelSource: explicitModel ? 'env' : url ? 'missing' : 'mock-default',
     authHeader: pickConfiguredValue(process.env[envConfig.authHeaderEnv], sharedAuthHeader),

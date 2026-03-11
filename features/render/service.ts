@@ -21,6 +21,11 @@ import {
   getProviderRuntimeConfig,
   type ProviderKind,
 } from '@/lib/provider-config';
+import {
+  buildProviderAdapterRequest,
+  getProviderAdapterConfig,
+  normalizeAdapterResponse,
+} from '@/lib/provider-adapters';
 
 const execFileAsync = promisify(execFile);
 
@@ -48,6 +53,7 @@ type RenderJobMeta = {
   timeoutMs?: number;
   providerName?: string;
   providerModel?: string;
+  adapter?: string;
 };
 
 const DEFAULT_JOB_META: RenderJobMeta = {
@@ -829,6 +835,7 @@ async function writeExecutionArtifacts(projectTitle: string, provider: ProviderK
 
 async function executeProvider(provider: ProviderKind, project: { id: string; title: string }, payload: unknown[]) {
   const providerProfile = getProviderProfileSnapshot(provider);
+  const adapterConfig = getProviderAdapterConfig(provider);
   const endpoint = getProviderEndpoint(provider);
   const timeoutMs = getProviderTimeoutMs(provider);
   const { runDir, requestPath } = await writeExecutionArtifacts(project.title, provider, payload);
@@ -843,6 +850,7 @@ async function executeProvider(provider: ProviderKind, project: { id: string; ti
       itemCount: payload.length,
       providerName: providerProfile.providerName,
       providerModel: providerProfile.providerModel || null,
+      adapter: adapterConfig.mode,
       message: '未配置真实 provider endpoint，已生成 mock 执行结果，可继续走 QA / 导出闭环。',
     };
     await writeFile(responsePath, JSON.stringify(mockResponse, null, 2), 'utf8');
@@ -855,56 +863,89 @@ async function executeProvider(provider: ProviderKind, project: { id: string; ti
       responsePath,
       responseBody: mockResponse,
       preview: mockResponse.message,
-      summary: [`mode:mock`, `items:${payload.length}`, `timeout:${timeoutMs}ms`, `response:${path.basename(responsePath)}`],
+      summary: [`mode:mock`, `adapter:${adapterConfig.mode}`, `items:${payload.length}`, `timeout:${timeoutMs}ms`, `response:${path.basename(responsePath)}`],
     };
   }
 
-  const headers = buildProviderHeaders(provider);
+  const requestPlan = buildProviderAdapterRequest({
+    provider,
+    project,
+    payload,
+    headers: buildProviderHeaders(provider),
+  });
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(`timeout:${timeoutMs}`), timeoutMs);
 
-  let response: Response;
   try {
-    response = await fetch(endpoint, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        projectId: project.id,
-        projectTitle: project.title,
-        provider,
-        items: payload,
-      }),
-      cache: 'no-store',
-      signal: controller.signal,
-    });
+    if (requestPlan.batchMode === 'batch') {
+      const response = await fetch(requestPlan.endpoint, {
+        method: 'POST',
+        headers: requestPlan.requestHeaders,
+        body: JSON.stringify(requestPlan.requestBody),
+        cache: 'no-store',
+        signal: controller.signal,
+      });
+      const rawText = await response.text();
+      const responseBody = safeJsonParse(rawText) || rawText;
+      await writeFile(responsePath, typeof responseBody === 'string' ? responseBody : JSON.stringify(responseBody, null, 2), 'utf8');
+
+      if (!response.ok) {
+        throw new Error(`${provider} provider failed: ${response.status} ${rawText.slice(0, 240)}`);
+      }
+
+      return {
+        mode: 'remote' as const,
+        endpoint: requestPlan.endpoint,
+        timeoutMs,
+        runDir,
+        requestPath,
+        responsePath,
+        responseBody,
+        preview: rawText.slice(0, 180),
+        summary: [`mode:remote`, `adapter:${adapterConfig.mode}`, `items:${payload.length}`, `timeout:${timeoutMs}ms`, `endpoint:${requestPlan.endpoint}`, `response:${path.basename(responsePath)}`],
+      };
+    }
+
+    const responseBodies: unknown[] = [];
+    const requestBodies = Array.isArray(requestPlan.requestBody) ? requestPlan.requestBody : [requestPlan.requestBody];
+    for (const requestBody of requestBodies) {
+      const response = await fetch(requestPlan.endpoint, {
+        method: 'POST',
+        headers: requestPlan.requestHeaders,
+        body: JSON.stringify(requestBody),
+        cache: 'no-store',
+        signal: controller.signal,
+      });
+      const rawText = await response.text();
+      const responseBody = safeJsonParse(rawText) || rawText;
+      if (!response.ok) {
+        throw new Error(`${provider} provider failed: ${response.status} ${rawText.slice(0, 240)}`);
+      }
+      responseBodies.push(responseBody);
+    }
+
+    const normalizedResponse = normalizeAdapterResponse(responseBodies, requestPlan);
+    await writeFile(responsePath, JSON.stringify(normalizedResponse, null, 2), 'utf8');
+
+    return {
+      mode: 'remote' as const,
+      endpoint: requestPlan.endpoint,
+      timeoutMs,
+      runDir,
+      requestPath,
+      responsePath,
+      responseBody: normalizedResponse,
+      preview: JSON.stringify(normalizedResponse).slice(0, 180),
+      summary: [`mode:remote`, `adapter:${adapterConfig.mode}`, `items:${payload.length}`, `timeout:${timeoutMs}ms`, `endpoint:${requestPlan.endpoint}`, `response:${path.basename(responsePath)}`],
+    };
   } catch (error) {
-    clearTimeout(timer);
     if (error instanceof Error && error.name === 'AbortError') {
       throw new Error(`${provider} provider timed out after ${timeoutMs}ms`);
     }
     throw error;
+  } finally {
+    clearTimeout(timer);
   }
-  clearTimeout(timer);
-
-  const rawText = await response.text();
-  const responseBody = safeJsonParse(rawText) || rawText;
-  await writeFile(responsePath, typeof responseBody === 'string' ? responseBody : JSON.stringify(responseBody, null, 2), 'utf8');
-
-  if (!response.ok) {
-    throw new Error(`${provider} provider failed: ${response.status} ${rawText.slice(0, 240)}`);
-  }
-
-  return {
-    mode: 'remote' as const,
-    endpoint,
-    timeoutMs,
-    runDir,
-    requestPath,
-    responsePath,
-    responseBody,
-    preview: rawText.slice(0, 180),
-    summary: [`mode:remote`, `items:${payload.length}`, `timeout:${timeoutMs}ms`, `endpoint:${endpoint}`, `response:${path.basename(responsePath)}`],
-  };
 }
 
 type RenderPayloadRecord = Record<string, unknown>;
@@ -1222,6 +1263,7 @@ async function executeRenderJob(projectId: string, jobId: string) {
 
   const provider = job.provider as ProviderKind;
   const providerProfile = getProviderProfileSnapshot(provider);
+  const adapterConfig = getProviderAdapterConfig(provider);
   const existingMeta = parseRenderJobOutput(job.outputUrl);
   const providerPayloads = await exportProviderPayloads(projectId);
   const payload = getProviderPayloadByKind(providerPayloads.providers, provider);
@@ -1277,6 +1319,7 @@ async function executeRenderJob(projectId: string, jobId: string) {
           timeoutMs: result.timeoutMs,
           providerName: providerProfile.providerName,
           providerModel: providerProfile.providerModel || undefined,
+          adapter: adapterConfig.mode,
           summary: [...summary, `assets:${mediaArtifacts.entries.length}`],
         }),
       },
@@ -1295,6 +1338,7 @@ async function executeRenderJob(projectId: string, jobId: string) {
           timeoutMs: getProviderTimeoutMs(provider),
           providerName: providerProfile.providerName,
           providerModel: providerProfile.providerModel || undefined,
+          adapter: adapterConfig.mode,
           summary: [...existingMeta.summary.filter((item) => item !== 'status:running'), 'status:failed'],
         }),
       },

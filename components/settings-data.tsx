@@ -203,6 +203,7 @@ export async function SettingsData({ projectId }: { projectId?: string }) {
               <div className="meta-list">
                 <span>供应商：{provider.providerName}</span>
                 <span>模型：{provider.providerModel || '未指定模型'}</span>
+                <span>适配：{provider.adapter || 'auto'}</span>
                 <span>鉴权头：{provider.authHeader}</span>
                 <span>鉴权方案：{provider.authScheme}</span>
                 <span>超时：{provider.timeoutMs} ms</span>
