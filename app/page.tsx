@@ -3,6 +3,7 @@ import { PipelineCommandCenter } from '@/components/pipeline-command-center';
 import { ProjectContextBar } from '@/components/project-context-bar';
 import { ProjectList } from '@/components/project-list';
 import { ProjectSnapshot } from '@/components/project-snapshot';
+import { ProjectVersionPanel } from '@/components/project-version-panel';
 import { SectionCard } from '@/components/section-card';
 import { normalizeProjectId } from '@/lib/project-links';
 import { dashboardHighlights, pipelineStages } from '@/lib/sample-data';
@@ -39,6 +40,7 @@ export default async function HomePage({
       <ProjectContextBar currentPath="/" projectId={projectId} />
       <ProjectSnapshot />
       <PipelineCommandCenter projectId={projectId} />
+      <ProjectVersionPanel projectId={projectId} />
       <ProjectList />
 
       <SectionCard
