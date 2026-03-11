@@ -7,7 +7,15 @@ type PayloadRecord = Record<string, unknown>;
 type ProviderPayloadGroup = {
   provider: 'image-sequence' | 'voice-synthesis' | 'video-assembly';
   items: PayloadRecord[];
+  profile: PayloadRecord | null;
 };
+
+function toRecord(value: unknown) {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return value as PayloadRecord;
+  }
+  return null;
+}
 
 function toRecordArray(value: unknown) {
   if (!Array.isArray(value)) return [] as PayloadRecord[];
@@ -32,19 +40,22 @@ function toStringArray(value: unknown) {
   return uniqueValues(value.map((item) => normalizeText(item)).filter(Boolean));
 }
 
-function getPayloadGroups(providers: Record<string, unknown>) {
+function getPayloadGroups(providers: Record<string, unknown>, providerProfiles?: Record<string, unknown> | null) {
   return [
     {
       provider: 'image-sequence',
       items: toRecordArray(providers.imageSequence),
+      profile: toRecord(providerProfiles?.imageSequence),
     },
     {
       provider: 'voice-synthesis',
       items: toRecordArray(providers.voiceSynthesis),
+      profile: toRecord(providerProfiles?.voiceSynthesis),
     },
     {
       provider: 'video-assembly',
       items: toRecordArray(providers.videoAssembly),
+      profile: toRecord(providerProfiles?.videoAssembly),
     },
   ] satisfies ProviderPayloadGroup[];
 }
@@ -75,6 +86,19 @@ function getPayloadContext(item: PayloadRecord) {
   const shotTitle = normalizeText(item.shotTitle);
   if (sceneTitle && shotTitle) return `${sceneTitle} · ${shotTitle}`;
   return sceneTitle || shotTitle || '暂无上下文';
+}
+
+
+function getProviderName(profile: PayloadRecord | null, item?: PayloadRecord) {
+  return normalizeText(profile?.providerName) || normalizeText(item?.providerName) || 'Mock Fallback';
+}
+
+function getProviderModel(profile: PayloadRecord | null, item?: PayloadRecord) {
+  return normalizeText(profile?.providerModel) || normalizeText(item?.providerModel) || '未指定模型';
+}
+
+function getProviderMode(profile: PayloadRecord | null, item?: PayloadRecord) {
+  return normalizeText(profile?.executionModeHint) || normalizeText(item?.providerMode) || 'mock';
 }
 
 function getPayloadSummary(provider: ProviderPayloadGroup['provider'], item: PayloadRecord) {
@@ -166,7 +190,10 @@ export async function RenderPayloadPreview({ projectId }: { projectId: string })
     );
   }
 
-  const groups = getPayloadGroups(payloadExport.providers as Record<string, unknown>);
+  const groups = getPayloadGroups(
+    payloadExport.providers as Record<string, unknown>,
+    (payloadExport as { providerProfiles?: Record<string, unknown> }).providerProfiles || null,
+  );
 
   return (
     <div className="page-stack">
@@ -179,6 +206,9 @@ export async function RenderPayloadPreview({ projectId }: { projectId: string })
               <h4>{getRenderProviderLabel(group.provider)}</h4>
               <p>当前共有 {group.items.length} 条载荷，其中 {summary.boundCount} 条已带精确定向参考，{summary.referenceCount} 条带全局参考画像。</p>
               <div className="meta-list">
+                <span>供应商：{getProviderName(group.profile)}</span>
+                <span>模型：{getProviderModel(group.profile)}</span>
+                <span>模式：{getProviderMode(group.profile) === 'remote' ? '真实执行' : '模拟执行'}</span>
                 <span>定向参考：{summary.boundCount}</span>
                 <span>参考源命中：{summary.sourceMediaCount}</span>
                 <span>样例数：{Math.min(group.items.length, 3)}</span>
@@ -207,6 +237,8 @@ export async function RenderPayloadPreview({ projectId }: { projectId: string })
               <p>{getPayloadSummary(group.provider, item)}</p>
               <div className="meta-list">
                 <span>{getPayloadContext(item)}</span>
+                <span>供应商 {getProviderName(group.profile, item)}</span>
+                <span>模型 {getProviderModel(group.profile, item)}</span>
                 <span>参考源 {getSourceMediaCount(item)}</span>
                 {meta.map((entry) => <span key={`${group.provider}-${entry}`}>{entry}</span>)}
               </div>

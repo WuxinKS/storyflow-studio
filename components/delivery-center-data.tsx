@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { getDeliveryCenterData } from '@/features/delivery/service';
 import { buildLocalMediaPreviewHref } from '@/lib/media-preview';
 import { buildProjectHref } from '@/lib/project-links';
+import { getRenderProviderLabel } from '@/lib/display';
 
 function formatDateTime(value: string | null) {
   if (!value) return '暂无导出记录';
@@ -72,6 +73,15 @@ export async function DeliveryCenterData({
             <p><strong>目录：</strong>{bundle.bundleDir}</p>
             <p><strong>视觉风格：</strong>{bundle.styleName || '未写入视觉风格'}</p>
             <p><strong>角色摘要：</strong>{bundle.characterSummary || '未写入角色摘要'}</p>
+            {bundle.providerProfiles.length > 0 ? (
+              <div className="tag-list">
+                {bundle.providerProfiles.map((profile) => (
+                  <span key={`${bundle.bundleName}-${profile.provider}`} className="tag-chip">
+                    {getRenderProviderLabel(profile.provider)}：{profile.providerName || '未命名'} / {profile.providerModel || '未指定模型'}
+                  </span>
+                ))}
+              </div>
+            ) : null}
             <div className="meta-list">
               <span>图像载荷：{bundle.providerCounts.image}</span>
               <span>语音载荷：{bundle.providerCounts.voice}</span>

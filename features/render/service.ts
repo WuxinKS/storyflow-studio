@@ -15,10 +15,15 @@ import {
   type GeneratedMediaEntry,
   type GeneratedMediaType,
 } from '@/features/media/service';
+import {
+  getProviderProfileSnapshot,
+  getProviderProfileSnapshotMap,
+  getProviderRuntimeConfig,
+  type ProviderKind,
+} from '@/lib/provider-config';
 
 const execFileAsync = promisify(execFile);
 
-export type ProviderKind = 'image-sequence' | 'voice-synthesis' | 'video-assembly';
 type RenderExecutionMode = 'mock' | 'remote';
 
 export type RenderJobQuery = {
@@ -41,6 +46,8 @@ type RenderJobMeta = {
   assetCount?: number;
   artifactIndexPath?: string;
   timeoutMs?: number;
+  providerName?: string;
+  providerModel?: string;
 };
 
 const DEFAULT_JOB_META: RenderJobMeta = {
@@ -50,48 +57,6 @@ const DEFAULT_JOB_META: RenderJobMeta = {
   payloadCount: 0,
   summary: [],
 };
-
-const PROVIDER_ENV_MAP: Record<ProviderKind, string | undefined> = {
-  'image-sequence': process.env.STORYFLOW_IMAGE_PROVIDER_URL,
-  'voice-synthesis': process.env.STORYFLOW_VOICE_PROVIDER_URL,
-  'video-assembly': process.env.STORYFLOW_VIDEO_PROVIDER_URL,
-};
-
-const PROVIDER_API_KEY_ENV_MAP: Record<ProviderKind, string | undefined> = {
-  'image-sequence': process.env.STORYFLOW_IMAGE_PROVIDER_API_KEY,
-  'voice-synthesis': process.env.STORYFLOW_VOICE_PROVIDER_API_KEY,
-  'video-assembly': process.env.STORYFLOW_VIDEO_PROVIDER_API_KEY,
-};
-
-const PROVIDER_AUTH_HEADER_ENV_MAP: Record<ProviderKind, string | undefined> = {
-  'image-sequence': process.env.STORYFLOW_IMAGE_PROVIDER_AUTH_HEADER,
-  'voice-synthesis': process.env.STORYFLOW_VOICE_PROVIDER_AUTH_HEADER,
-  'video-assembly': process.env.STORYFLOW_VIDEO_PROVIDER_AUTH_HEADER,
-};
-
-const PROVIDER_AUTH_SCHEME_ENV_MAP: Record<ProviderKind, string | undefined> = {
-  'image-sequence': process.env.STORYFLOW_IMAGE_PROVIDER_AUTH_SCHEME,
-  'voice-synthesis': process.env.STORYFLOW_VOICE_PROVIDER_AUTH_SCHEME,
-  'video-assembly': process.env.STORYFLOW_VIDEO_PROVIDER_AUTH_SCHEME,
-};
-
-const PROVIDER_TIMEOUT_ENV_MAP: Record<ProviderKind, string | undefined> = {
-  'image-sequence': process.env.STORYFLOW_IMAGE_PROVIDER_TIMEOUT_MS,
-  'voice-synthesis': process.env.STORYFLOW_VOICE_PROVIDER_TIMEOUT_MS,
-  'video-assembly': process.env.STORYFLOW_VIDEO_PROVIDER_TIMEOUT_MS,
-};
-
-function pickConfiguredValue(preferred?: string, fallback?: string) {
-  if (typeof preferred === 'string' && preferred.trim()) return preferred.trim();
-  if (typeof fallback === 'string' && fallback.trim()) return fallback.trim();
-  return null;
-}
-
-function parseTimeoutMs(value: string | null | undefined, fallback: number) {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
-  return Math.round(parsed);
-}
 
 function hasReferenceFlavor(text: string | null) {
   if (!text) return false;
@@ -313,23 +278,23 @@ function serializeRenderJobOutput(meta: Partial<RenderJobMeta>) {
 }
 
 function getProviderEndpoint(provider: ProviderKind) {
-  return PROVIDER_ENV_MAP[provider] || null;
+  return getProviderRuntimeConfig(provider).url || null;
 }
 
 function getProviderApiKey(provider: ProviderKind) {
-  return pickConfiguredValue(PROVIDER_API_KEY_ENV_MAP[provider], process.env.STORYFLOW_PROVIDER_API_KEY);
+  return getProviderRuntimeConfig(provider).apiKey;
 }
 
 function getProviderAuthHeader(provider: ProviderKind) {
-  return pickConfiguredValue(PROVIDER_AUTH_HEADER_ENV_MAP[provider], process.env.STORYFLOW_PROVIDER_AUTH_HEADER) || 'Authorization';
+  return getProviderRuntimeConfig(provider).authHeader || 'Authorization';
 }
 
 function getProviderAuthScheme(provider: ProviderKind) {
-  return pickConfiguredValue(PROVIDER_AUTH_SCHEME_ENV_MAP[provider], process.env.STORYFLOW_PROVIDER_AUTH_SCHEME) || 'Bearer';
+  return getProviderRuntimeConfig(provider).authScheme || 'Bearer';
 }
 
 function getProviderTimeoutMs(provider: ProviderKind) {
-  return parseTimeoutMs(pickConfiguredValue(PROVIDER_TIMEOUT_ENV_MAP[provider], process.env.STORYFLOW_PROVIDER_TIMEOUT_MS), 300000);
+  return getProviderRuntimeConfig(provider).timeoutMs;
 }
 
 function buildProviderHeaders(provider: ProviderKind) {
@@ -447,6 +412,7 @@ export async function exportProviderPayloads(projectId: string) {
   const referenceProfile = buildReferenceProfile(project.references);
   const referenceInsights = getReferenceInsights(project.references);
   const referenceBindings = buildReferenceBindingSnapshot(project);
+  const providerProfiles = getProviderProfileSnapshotMap();
   const timeline = await getTimelineBundle(projectId).catch(() => null);
   const timelineSceneMap = new Map((timeline?.scenes || []).map((scene) => [scene.id, scene]));
   const timelineShotMap = new Map((timeline?.scenes || []).flatMap((scene) => scene.shots.map((shot) => [shot.id, { ...shot, sceneId: scene.id, sceneTitle: scene.title }])));
@@ -469,6 +435,11 @@ export async function exportProviderPayloads(projectId: string) {
     const timelineShot = timelineShotMap.get(shot.id);
     return {
       provider: 'image-sequence',
+      providerName: providerProfiles.imageSequence.providerName,
+      providerModel: providerProfiles.imageSequence.providerModel || null,
+      providerEndpoint: providerProfiles.imageSequence.url || null,
+      providerMode: providerProfiles.imageSequence.executionModeHint,
+      providerTimeoutMs: providerProfiles.imageSequence.timeoutMs,
       shotId: shot.id,
       shotTitle: shot.title,
       sceneTitle: sceneTitleMap.get(shot.sceneId || '') || '未分场',
@@ -510,6 +481,11 @@ export async function exportProviderPayloads(projectId: string) {
     const sceneBinding = referenceBindings.sceneMap.get(scene.id) || null;
     return {
       provider: 'voice-synthesis',
+      providerName: providerProfiles.voiceSynthesis.providerName,
+      providerModel: providerProfiles.voiceSynthesis.providerModel || null,
+      providerEndpoint: providerProfiles.voiceSynthesis.url || null,
+      providerMode: providerProfiles.voiceSynthesis.executionModeHint,
+      providerTimeoutMs: providerProfiles.voiceSynthesis.timeoutMs,
       sceneId: scene.id,
       sceneTitle: scene.title,
       summary: scene.summary,
@@ -539,6 +515,11 @@ export async function exportProviderPayloads(projectId: string) {
     const timelineScene = timelineSceneMap.get(shot.sceneId || '');
     return {
       provider: 'video-assembly',
+      providerName: providerProfiles.videoAssembly.providerName,
+      providerModel: providerProfiles.videoAssembly.providerModel || null,
+      providerEndpoint: providerProfiles.videoAssembly.url || null,
+      providerMode: providerProfiles.videoAssembly.executionModeHint,
+      providerTimeoutMs: providerProfiles.videoAssembly.timeoutMs,
       shotId: shot.id,
       shotTitle: shot.title,
       sceneTitle: sceneTitleMap.get(shot.sceneId || '') || '未分场',
@@ -609,6 +590,7 @@ export async function exportProviderPayloads(projectId: string) {
           beatMarkerCount: timeline.scenes.reduce((sum, scene) => sum + scene.shots.filter((shot) => Boolean(shot.beatType)).length, 0),
         }
       : null,
+    providerProfiles,
     providers: {
       imageSequence: imagePayload,
       voiceSynthesis: voicePayload,
@@ -683,6 +665,7 @@ export async function exportProductionBundle(projectId: string) {
     })),
     generatedMedia,
     presets: presetsData.presets,
+    providerProfiles: providerData.providerProfiles,
     providerPayloads: providerData.providers,
   };
 
@@ -710,6 +693,7 @@ export async function exportProductionBundle(projectId: string) {
     bundleDir,
     visualBibleStyle: presetsData.visualBible?.styleName || null,
     characterSummary: summarizeCharacters(presetsData.characters),
+    providerProfiles: providerData.providerProfiles,
     files: [
       'render-presets.json',
       'provider-payloads.json',
@@ -740,12 +724,19 @@ export async function exportProductionBundle(projectId: string) {
   };
 }
 
-function createJobSeedMeta(input: { payloadCount: number; summary: string[] }) {
+function createJobSeedMeta(input: {
+  payloadCount: number;
+  summary: string[];
+  providerName?: string;
+  providerModel?: string;
+}) {
   return serializeRenderJobOutput({
     mode: 'mock',
     payloadCount: input.payloadCount,
     retryCount: 0,
     summary: input.summary,
+    providerName: input.providerName,
+    providerModel: input.providerModel,
   });
 }
 
@@ -764,6 +755,7 @@ export async function createRenderJobsForLatestProject(projectId: string) {
   if (project.shots.length === 0) throw new Error('没有可用于渲染的 shot');
 
   const payloads = await exportProviderPayloads(projectId);
+  const providerProfiles = payloads.providerProfiles;
   const visualBible = getVisualBible(project);
   const characters = getCharacterDrafts(project);
   const characterSummary = summarizeCharacters(characters);
@@ -788,6 +780,8 @@ export async function createRenderJobsForLatestProject(projectId: string) {
         provider: 'image-sequence',
         outputUrl: createJobSeedMeta({
           payloadCount: payloads.providers.imageSequence.length,
+          providerName: providerProfiles.imageSequence.providerName,
+          providerModel: providerProfiles.imageSequence.providerModel,
           summary: [`shots:${project.shots.length}`, `kinds:${shotKindsSummary}`, `style:${visualBible?.styleName || 'none'}`, `references:${referenceProfile.total}`, `boundShots:${referenceBindings.effectiveShotBindingCount}`, `characters:${characterSummary}`, `presetPreview:${presetPreview}`],
         }),
       },
@@ -797,6 +791,8 @@ export async function createRenderJobsForLatestProject(projectId: string) {
         provider: 'voice-synthesis',
         outputUrl: createJobSeedMeta({
           payloadCount: payloads.providers.voiceSynthesis.length,
+          providerName: providerProfiles.voiceSynthesis.providerName,
+          providerModel: providerProfiles.voiceSynthesis.providerModel,
           summary: [`scenes:${project.scenes.length}`, `directorReady:${directorReadyScenes}`, `style:${visualBible?.styleName || 'none'}`, `references:${referenceProfile.total}`, `characters:${characterSummary}`, 'audioPlan:dialogue+ambience'],
         }),
       },
@@ -806,6 +802,8 @@ export async function createRenderJobsForLatestProject(projectId: string) {
         provider: 'video-assembly',
         outputUrl: createJobSeedMeta({
           payloadCount: payloads.providers.videoAssembly.length,
+          providerName: providerProfiles.videoAssembly.providerName,
+          providerModel: providerProfiles.videoAssembly.providerModel,
           summary: [`referenceReady:${referenceReadyShots}`, `references:${referenceProfile.total}`, `boundShots:${referenceBindings.effectiveShotBindingCount}`, `style:${visualBible?.styleName || 'none'}`, `characters:${characterSummary}`, 'presetLinked:true'],
         }),
       },
@@ -830,6 +828,7 @@ async function writeExecutionArtifacts(projectTitle: string, provider: ProviderK
 }
 
 async function executeProvider(provider: ProviderKind, project: { id: string; title: string }, payload: unknown[]) {
+  const providerProfile = getProviderProfileSnapshot(provider);
   const endpoint = getProviderEndpoint(provider);
   const timeoutMs = getProviderTimeoutMs(provider);
   const { runDir, requestPath } = await writeExecutionArtifacts(project.title, provider, payload);
@@ -842,6 +841,8 @@ async function executeProvider(provider: ProviderKind, project: { id: string; ti
       projectId: project.id,
       generatedAt: new Date().toISOString(),
       itemCount: payload.length,
+      providerName: providerProfile.providerName,
+      providerModel: providerProfile.providerModel || null,
       message: '未配置真实 provider endpoint，已生成 mock 执行结果，可继续走 QA / 导出闭环。',
     };
     await writeFile(responsePath, JSON.stringify(mockResponse, null, 2), 'utf8');
@@ -1220,6 +1221,7 @@ async function executeRenderJob(projectId: string, jobId: string) {
   if (!job.provider) throw new Error('渲染任务缺少 provider');
 
   const provider = job.provider as ProviderKind;
+  const providerProfile = getProviderProfileSnapshot(provider);
   const existingMeta = parseRenderJobOutput(job.outputUrl);
   const providerPayloads = await exportProviderPayloads(projectId);
   const payload = getProviderPayloadByKind(providerPayloads.providers, provider);
@@ -1273,6 +1275,8 @@ async function executeRenderJob(projectId: string, jobId: string) {
           assetCount: mediaArtifacts.entries.length,
           artifactIndexPath: mediaArtifacts.indexPath,
           timeoutMs: result.timeoutMs,
+          providerName: providerProfile.providerName,
+          providerModel: providerProfile.providerModel || undefined,
           summary: [...summary, `assets:${mediaArtifacts.entries.length}`],
         }),
       },
@@ -1289,6 +1293,8 @@ async function executeRenderJob(projectId: string, jobId: string) {
           executedAt: new Date().toISOString(),
           lastError: error instanceof Error ? error.message : 'Unknown error',
           timeoutMs: getProviderTimeoutMs(provider),
+          providerName: providerProfile.providerName,
+          providerModel: providerProfile.providerModel || undefined,
           summary: [...existingMeta.summary.filter((item) => item !== 'status:running'), 'status:failed'],
         }),
       },

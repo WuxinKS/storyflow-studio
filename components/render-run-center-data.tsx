@@ -99,6 +99,8 @@ export async function RenderRunCenterData({
                 <h4>{getRenderProviderLabel(provider.provider)}</h4>
                 <p>{provider.message || provider.responsePreview || '已记录请求与响应工件，可直接打开排查。'}</p>
                 <div className="meta-list">
+                  <span>供应商：{provider.providerName || provider.matchedJob?.providerName || '未记录'}</span>
+                  <span>模型：{provider.providerModel || provider.matchedJob?.providerModel || '未记录'}</span>
                   <span>载荷项：{provider.payloadCount}</span>
                   <span>场次：{provider.sceneCount}</span>
                   <span>镜头：{provider.shotCount}</span>
@@ -120,6 +122,8 @@ export async function RenderRunCenterData({
                     <p><strong>执行时间：</strong>{formatDateTime(provider.matchedJob.executedAt)}</p>
                     <p><strong>重试次数：</strong>{provider.matchedJob.retryCount} / <strong>产物数：</strong>{provider.matchedJob.assetCount}</p>
                     {provider.matchedJob.endpoint ? <p><strong>Endpoint：</strong>{provider.matchedJob.endpoint}</p> : null}
+                    {provider.matchedJob.providerName ? <p><strong>供应商：</strong>{provider.matchedJob.providerName}</p> : null}
+                    {provider.matchedJob.providerModel ? <p><strong>模型：</strong>{provider.matchedJob.providerModel}</p> : null}
                     {provider.matchedJob.lastError ? <p><strong>错误：</strong>{provider.matchedJob.lastError}</p> : null}
                   </>
                 ) : null}

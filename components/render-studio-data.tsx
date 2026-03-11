@@ -410,6 +410,8 @@ export async function RenderStudioData({ projectId }: { projectId?: string }) {
               <p>{meta.summary.join(' / ') || '暂无输出标记'}</p>
               <div className="meta-list">
                 <span>模式：{getRenderExecutionModeLabel(meta.mode)}</span>
+                <span>供应商：{meta.providerName || '未记录'}</span>
+                <span>模型：{meta.providerModel || '未指定模型'}</span>
                 <span>重试：{meta.retryCount}</span>
                 <span>载荷：{meta.payloadCount}</span>
                 <span>产物：{meta.assetCount || 0}</span>

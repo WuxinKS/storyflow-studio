@@ -4,6 +4,7 @@ import { getProjectStageLabel } from '@/lib/display';
 import { getLlmConfig } from '@/lib/llm';
 import { getGeneratedMediaEntries, summarizeGeneratedMediaCounts } from '@/features/media/service';
 import { buildProjectHref } from '@/lib/project-links';
+import { listProviderRuntimeConfigs } from '@/lib/provider-config';
 
 type RuntimeProbe = {
   state: 'not-configured' | 'reachable' | 'warn' | 'error';
@@ -20,18 +21,6 @@ function maskUrl(url: string) {
   } catch {
     return url;
   }
-}
-
-function pickConfiguredValue(preferred?: string, fallback?: string) {
-  if (typeof preferred === 'string' && preferred.trim()) return preferred.trim();
-  if (typeof fallback === 'string' && fallback.trim()) return fallback.trim();
-  return '';
-}
-
-function parseTimeoutMs(value: string | undefined, fallback: number) {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
-  return Math.round(parsed);
 }
 
 function buildAuthHeaderValue(authScheme: string, apiKey: string) {
@@ -105,42 +94,11 @@ export async function SettingsData({ projectId }: { projectId?: string }) {
   const llm = getLlmConfig();
   const sharedAuthHeader = process.env.STORYFLOW_PROVIDER_AUTH_HEADER || 'Authorization';
   const sharedAuthScheme = process.env.STORYFLOW_PROVIDER_AUTH_SCHEME || 'Bearer';
-  const sharedProviderTimeoutMs = parseTimeoutMs(process.env.STORYFLOW_PROVIDER_TIMEOUT_MS, 300000);
-  const sharedApiKey = process.env.STORYFLOW_PROVIDER_API_KEY || '';
-  const providers = [
-    {
-      key: 'image',
-      title: '图像 Provider',
-      url: process.env.STORYFLOW_IMAGE_PROVIDER_URL || '',
-      authHeader: pickConfiguredValue(process.env.STORYFLOW_IMAGE_PROVIDER_AUTH_HEADER, sharedAuthHeader),
-      authScheme: pickConfiguredValue(process.env.STORYFLOW_IMAGE_PROVIDER_AUTH_SCHEME, sharedAuthScheme),
-      timeoutMs: parseTimeoutMs(process.env.STORYFLOW_IMAGE_PROVIDER_TIMEOUT_MS, sharedProviderTimeoutMs),
-      apiKey: pickConfiguredValue(process.env.STORYFLOW_IMAGE_PROVIDER_API_KEY, sharedApiKey),
-      apiKeySource: process.env.STORYFLOW_IMAGE_PROVIDER_API_KEY ? '独立 Key' : sharedApiKey ? '共享 Key' : '未配置 Key',
-    },
-    {
-      key: 'voice',
-      title: '语音 Provider',
-      url: process.env.STORYFLOW_VOICE_PROVIDER_URL || '',
-      authHeader: pickConfiguredValue(process.env.STORYFLOW_VOICE_PROVIDER_AUTH_HEADER, sharedAuthHeader),
-      authScheme: pickConfiguredValue(process.env.STORYFLOW_VOICE_PROVIDER_AUTH_SCHEME, sharedAuthScheme),
-      timeoutMs: parseTimeoutMs(process.env.STORYFLOW_VOICE_PROVIDER_TIMEOUT_MS, sharedProviderTimeoutMs),
-      apiKey: pickConfiguredValue(process.env.STORYFLOW_VOICE_PROVIDER_API_KEY, sharedApiKey),
-      apiKeySource: process.env.STORYFLOW_VOICE_PROVIDER_API_KEY ? '独立 Key' : sharedApiKey ? '共享 Key' : '未配置 Key',
-    },
-    {
-      key: 'video',
-      title: '视频 Provider',
-      url: process.env.STORYFLOW_VIDEO_PROVIDER_URL || '',
-      authHeader: pickConfiguredValue(process.env.STORYFLOW_VIDEO_PROVIDER_AUTH_HEADER, sharedAuthHeader),
-      authScheme: pickConfiguredValue(process.env.STORYFLOW_VIDEO_PROVIDER_AUTH_SCHEME, sharedAuthScheme),
-      timeoutMs: parseTimeoutMs(process.env.STORYFLOW_VIDEO_PROVIDER_TIMEOUT_MS, sharedProviderTimeoutMs),
-      apiKey: pickConfiguredValue(process.env.STORYFLOW_VIDEO_PROVIDER_API_KEY, sharedApiKey),
-      apiKeySource: process.env.STORYFLOW_VIDEO_PROVIDER_API_KEY ? '独立 Key' : sharedApiKey ? '共享 Key' : '未配置 Key',
-    },
-  ];
-  const enabledProviders = providers.filter((item) => item.url).length;
-  const providerSpecificKeyCount = providers.filter((item) => item.apiKeySource === '独立 Key').length;
+  const providers = listProviderRuntimeConfigs();
+  const enabledProviders = providers.filter((item) => item.executionModeHint === 'remote').length;
+  const providerSpecificKeyCount = providers.filter((item) => item.apiKeySource === 'provider').length;
+  const namedProviders = providers.filter((item) => item.nameConfigured).length;
+  const modeledProviders = providers.filter((item) => item.modelConfigured).length;
   const latestProject = await (projectId
     ? prisma.project.findUnique({
         where: { id: projectId },
@@ -178,7 +136,7 @@ export async function SettingsData({ projectId }: { projectId?: string }) {
 
   const providerProbes = await Promise.all(
     providers.map(async (provider) => ({
-      key: provider.key,
+      key: provider.provider,
       probe: await probeEndpoint({
         url: provider.url || undefined,
         timeoutMs: provider.timeoutMs,
@@ -204,6 +162,8 @@ export async function SettingsData({ projectId }: { projectId?: string }) {
           <span>LLM：{llm.enabled ? '已接通' : '未接通，回退模板输出'}</span>
           <span>真实 Provider：{enabledProviders} / {providers.length}</span>
           <span>已连通 Provider：{reachableProviders} / {providers.length}</span>
+          <span>已命名供应商：{namedProviders} / {providers.length}</span>
+          <span>已声明模型：{modeledProviders} / {providers.length}</span>
           <span>独立鉴权：{providerSpecificKeyCount} / {providers.length}</span>
           <span>共享鉴权：{sharedAuthHeader} / {sharedAuthScheme}</span>
         </div>
@@ -229,27 +189,32 @@ export async function SettingsData({ projectId }: { projectId?: string }) {
           <p>{llmProbe.detail}</p>
         </div>
         {providers.map((provider) => {
-          const probe = providerProbes.find((item) => item.key === provider.key)?.probe || {
+          const probe = providerProbes.find((item) => item.key === provider.provider)?.probe || {
             state: 'error',
             detail: '探测结果缺失。',
             checkedAt: new Date().toISOString(),
           } satisfies RuntimeProbe;
 
           return (
-            <div key={provider.key} className="asset-tile">
+            <div key={provider.provider} className="asset-tile">
               <span className="label">{provider.title}</span>
-              <h4>{provider.url ? '已配置真实 endpoint' : '当前走 mock fallback'}</h4>
+              <h4>{provider.executionModeHint === 'remote' ? `${provider.providerName} / ${provider.providerModel || '未指定模型'}` : '当前走 mock fallback'}</h4>
               <p>{provider.url ? maskUrl(provider.url) : '未配置真实 endpoint 时，生成工作台仍可生成请求 / 响应工件并完成质量检查 / 导出闭环。'}</p>
               <div className="meta-list">
+                <span>供应商：{provider.providerName}</span>
+                <span>模型：{provider.providerModel || '未指定模型'}</span>
                 <span>鉴权头：{provider.authHeader}</span>
                 <span>鉴权方案：{provider.authScheme}</span>
                 <span>超时：{provider.timeoutMs} ms</span>
                 <span>探测：{getProbeLabel(probe)}</span>
                 {typeof probe.httpStatus === 'number' ? <span>HTTP：{probe.httpStatus}</span> : null}
                 {typeof probe.latencyMs === 'number' ? <span>延迟：{probe.latencyMs} ms</span> : null}
-                <span>{provider.apiKeySource}</span>
+                <span>{provider.apiKeySourceLabel}</span>
               </div>
               <p>{probe.detail}</p>
+              {provider.executionModeHint === 'remote' && (!provider.nameConfigured || !provider.modelConfigured) ? (
+                <p>建议补齐环境变量：{!provider.nameConfigured ? '供应商名' : ''}{!provider.nameConfigured && !provider.modelConfigured ? ' + ' : ''}{!provider.modelConfigured ? '模型名' : ''}。</p>
+              ) : null}
             </div>
           );
         })}
@@ -259,7 +224,7 @@ export async function SettingsData({ projectId }: { projectId?: string }) {
         <div className="asset-tile">
           <span className="label">执行策略</span>
           <h4>真实执行与模拟执行</h4>
-          <p>{enabledProviders > 0 ? '当前至少已有一个真实 Provider 可用；未配置的 Provider 仍会自动回退到模拟执行。' : '当前三个生成环节都还没有配置真实 Provider，系统会统一走模拟执行闭环。'}</p>
+          <p>{enabledProviders > 0 ? '当前至少已有一个真实 Provider 可用；未配置的 Provider 仍会自动回退到模拟执行。建议同时补齐供应商名与模型名，便于联调和诊断。' : '当前三个生成环节都还没有配置真实 Provider，系统会统一走模拟执行闭环。'}</p>
         </div>
         <div className="asset-tile">
           <span className="label">导出目录</span>
@@ -269,7 +234,7 @@ export async function SettingsData({ projectId }: { projectId?: string }) {
         <div className="asset-tile">
           <span className="label">下一步建议</span>
           <h4>环境补齐顺序</h4>
-          <p>{llm.enabled ? '优先继续补图像 / 语音 / 视频 Provider，并按 Provider 拆分独立鉴权。' : '先补 LLM endpoint，再补图像 / 语音 / 视频 Provider，能最快形成真实主链。'}</p>
+          <p>{llm.enabled ? '优先继续补图像 / 语音 / 视频 Provider 的供应商名、模型名和独立鉴权。' : '先补 LLM endpoint，再补图像 / 语音 / 视频 Provider 的供应商、模型与鉴权，能最快形成真实主链。'}</p>
         </div>
       </div>
 

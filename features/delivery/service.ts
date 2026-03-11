@@ -16,6 +16,12 @@ export type DeliveryBundleRecord = {
   bundleDir: string;
   styleName: string | null;
   characterSummary: string | null;
+  providerProfiles: Array<{
+    provider: string;
+    providerName: string | null;
+    providerModel: string | null;
+    executionModeHint: string | null;
+  }>;
   mediaCounts: GeneratedMediaCounts;
   providerCounts: {
     image: number;
@@ -52,6 +58,8 @@ export type DeliveryCenterData = {
 
 export type RenderRunProviderRecord = {
   provider: string;
+  providerName: string | null;
+  providerModel: string | null;
   requestPath: string | null;
   responsePath: string | null;
   payloadCount: number;
@@ -80,6 +88,8 @@ export type RenderRunProviderRecord = {
     endpoint: string | null;
     artifactIndexPath: string | null;
     lastError: string | null;
+    providerName: string | null;
+    providerModel: string | null;
   } | null;
 };
 
@@ -133,6 +143,11 @@ type ProviderPayloadExport = {
     imageSequence?: unknown[];
     voiceSynthesis?: unknown[];
     videoAssembly?: unknown[];
+  };
+  providerProfiles?: {
+    imageSequence?: Record<string, unknown>;
+    voiceSynthesis?: Record<string, unknown>;
+    videoAssembly?: Record<string, unknown>;
   };
 };
 
@@ -253,6 +268,27 @@ async function loadBundleRecord(bundleDir: string) {
     stat(bundleDir).catch(() => null),
   ]);
 
+  const providerProfiles = [
+    {
+      provider: 'image-sequence',
+      providerName: pickString(toRecord(providerPayloads?.providerProfiles?.imageSequence), ['providerName']),
+      providerModel: pickString(toRecord(providerPayloads?.providerProfiles?.imageSequence), ['providerModel']),
+      executionModeHint: pickString(toRecord(providerPayloads?.providerProfiles?.imageSequence), ['executionModeHint']),
+    },
+    {
+      provider: 'voice-synthesis',
+      providerName: pickString(toRecord(providerPayloads?.providerProfiles?.voiceSynthesis), ['providerName']),
+      providerModel: pickString(toRecord(providerPayloads?.providerProfiles?.voiceSynthesis), ['providerModel']),
+      executionModeHint: pickString(toRecord(providerPayloads?.providerProfiles?.voiceSynthesis), ['executionModeHint']),
+    },
+    {
+      provider: 'video-assembly',
+      providerName: pickString(toRecord(providerPayloads?.providerProfiles?.videoAssembly), ['providerName']),
+      providerModel: pickString(toRecord(providerPayloads?.providerProfiles?.videoAssembly), ['providerModel']),
+      executionModeHint: pickString(toRecord(providerPayloads?.providerProfiles?.videoAssembly), ['executionModeHint']),
+    },
+  ].filter((item) => item.providerName || item.providerModel || item.executionModeHint);
+
   const exportedAt = typeof manifest.exportedAt === 'string' && manifest.exportedAt.trim()
     ? manifest.exportedAt
     : directoryStat?.mtime.toISOString() || new Date(0).toISOString();
@@ -267,6 +303,7 @@ async function loadBundleRecord(bundleDir: string) {
     bundleDir,
     styleName: typeof manifest.visualBibleStyle === 'string' ? manifest.visualBibleStyle : null,
     characterSummary: typeof manifest.characterSummary === 'string' ? manifest.characterSummary : null,
+    providerProfiles,
     mediaCounts,
     providerCounts: {
       image: Array.isArray(providerPayloads?.providers?.imageSequence) ? providerPayloads.providers.imageSequence.length : 0,
@@ -405,6 +442,8 @@ async function loadRenderRunRecord(
     }
 
     const responseRecord = toRecord(responseJson);
+    const providerNames = uniqueValues(requestItems.map((item) => normalizeText(item.providerName)).filter(Boolean));
+    const providerModels = uniqueValues(requestItems.map((item) => normalizeText(item.providerModel)).filter(Boolean));
     const requestLookupPath = files.requestPath ? path.resolve(files.requestPath) : '';
     const responseLookupPath = files.responsePath ? path.resolve(files.responsePath) : '';
     const matched = (requestLookupPath && jobLookup.byPath.get(requestLookupPath))
@@ -426,6 +465,8 @@ async function loadRenderRunRecord(
 
     return {
       provider,
+      providerName: providerNames[0] || pickString(responseRecord, ['providerName']) || matched?.meta.providerName || null,
+      providerModel: providerModels[0] || pickString(responseRecord, ['providerModel']) || matched?.meta.providerModel || null,
       requestPath: files.requestPath,
       responsePath: files.responsePath,
       payloadCount: requestItems.length,
@@ -455,6 +496,8 @@ async function loadRenderRunRecord(
             endpoint: matched.meta.endpoint || null,
             artifactIndexPath: matched.meta.artifactIndexPath || null,
             lastError: matched.meta.lastError || null,
+            providerName: matched.meta.providerName || null,
+            providerModel: matched.meta.providerModel || null,
           }
         : null,
     } satisfies RenderRunProviderRecord;

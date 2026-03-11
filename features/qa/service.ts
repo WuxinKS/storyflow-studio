@@ -7,6 +7,8 @@ import { exportProductionBundle, exportProviderPayloads, exportRenderPresets } f
 import { buildReferenceBindingSnapshot } from '@/features/reference/service';
 import { getSyncStatus } from '@/features/sync/service';
 import { getLatestOutlineByTitle } from '@/lib/outline-store';
+import { getRenderProviderLabel } from '@/lib/display';
+import { listProviderProfileSnapshots } from '@/lib/provider-config';
 
 const TARGET_SCENE_COUNT = 5;
 const TARGET_SHOT_COUNT = 20;
@@ -74,6 +76,7 @@ export async function getQaReport(projectId?: string, options?: { bundleExport?:
   const syncStatus = await getSyncStatus(project.id).catch(() => null);
   const generatedMedia = getGeneratedMediaEntries(project);
   const mediaCounts = summarizeGeneratedMediaCounts(generatedMedia);
+  const providerProfiles = listProviderProfileSnapshots();
 
   const shotKinds = project.shots.map((shot) => getShotKindFromTitle(shot.title));
   const invalidShotKinds = shotKinds.filter((kind) => !ALLOWED_SHOT_TITLES.includes(kind));
@@ -111,6 +114,21 @@ export async function getQaReport(projectId?: string, options?: { bundleExport?:
         ...providerExport.data.providers.videoAssembly,
       ].filter((item) => Array.isArray((item as { boundReferenceTitles?: unknown[] }).boundReferenceTitles) && ((item as { boundReferenceTitles?: unknown[] }).boundReferenceTitles?.length || 0) > 0).length
     : 0;
+  const providerProfileWarnings = providerProfiles.filter((profile) => profile.executionModeHint === 'remote' && (!profile.nameConfigured || !profile.modelConfigured));
+  const configuredProviderCount = providerProfiles.filter((profile) => profile.executionModeHint === 'remote').length;
+  const providerProfileDetail = providerProfiles.map((profile) => {
+    const missing: string[] = [];
+    if (profile.executionModeHint === 'remote') {
+      if (!profile.nameConfigured) missing.push('供应商');
+      if (!profile.modelConfigured) missing.push('模型');
+    }
+
+    if (missing.length > 0) {
+      return `${getRenderProviderLabel(profile.provider)}: 缺少${missing.join('、')}`;
+    }
+
+    return `${getRenderProviderLabel(profile.provider)}: ${profile.providerName} / ${profile.providerModel || 'mock'}`;
+  }).join(' / ');
 
   const checks: QaCheck[] = [
     {
@@ -204,6 +222,17 @@ export async function getQaReport(projectId?: string, options?: { bundleExport?:
         : `生效镜头 ${referenceBindings.effectiveShotBindingCount} / 已写入 Provider 载荷 ${boundPayloadItems} 条。`,
       group: 'export',
       severity: referenceBindings.effectiveShotBindingCount > 0 ? 'warning' : 'info',
+      blocksDelivery: false,
+    },
+    {
+      key: 'provider-profiles',
+      label: '真实 Provider 已声明供应商与模型',
+      passed: providerProfileWarnings.length === 0,
+      detail: configuredProviderCount === 0
+        ? '当前仍以 mock fallback 为主，允许先继续演示闭环。'
+        : providerProfileDetail,
+      group: 'render',
+      severity: configuredProviderCount > 0 ? 'warning' : 'info',
       blocksDelivery: false,
     },
     {
