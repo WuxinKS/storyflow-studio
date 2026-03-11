@@ -57,11 +57,11 @@ export async function POST(request: Request) {
 
     const project =
       action === 'run'
-        ? await runRenderJobs(body.projectId)
+        ? await runRenderJobs(body.projectId, { provider: body.provider, jobId: body.jobId })
         : action === 'retry'
-          ? await retryFailedRenderJobs(body.projectId)
+          ? await retryFailedRenderJobs(body.projectId, { provider: body.provider, jobId: body.jobId })
           : action === 'advance'
-            ? await advanceRenderJobs(body.projectId)
+            ? await advanceRenderJobs(body.projectId, { provider: body.provider, jobId: body.jobId })
             : await createRenderJobsForLatestProject(body.projectId);
 
     return NextResponse.json({ ok: true, project }, { status: 201 });

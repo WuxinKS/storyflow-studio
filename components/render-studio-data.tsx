@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { RenderGenerateButton } from '@/components/render-generate-button';
+import { RenderJobActionButton } from '@/components/render-job-action-button';
 import { SyncNoticeCard } from '@/components/sync-notice-card';
 import {
   getRenderExecutionModeLabel,
@@ -364,6 +365,8 @@ export async function RenderStudioData({ projectId }: { projectId?: string }) {
               {meta.responsePath ? <p>响应工件：{meta.responsePath}</p> : null}
               {meta.artifactIndexPath ? <p>媒体索引：{meta.artifactIndexPath}</p> : null}
               {meta.lastError ? <p>错误：{meta.lastError}</p> : null}
+              {job.status === 'queued' ? <RenderJobActionButton projectId={project.id} jobId={job.id} action="run" label="只执行这个任务" /> : null}
+              {job.status === 'failed' ? <RenderJobActionButton projectId={project.id} jobId={job.id} action="retry" label="只重试这个任务" /> : null}
             </div>
           ))
         )}

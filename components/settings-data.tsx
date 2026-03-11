@@ -5,6 +5,14 @@ import { getLlmConfig } from '@/lib/llm';
 import { getGeneratedMediaEntries, summarizeGeneratedMediaCounts } from '@/features/media/service';
 import { buildProjectHref } from '@/lib/project-links';
 
+type RuntimeProbe = {
+  state: 'not-configured' | 'reachable' | 'warn' | 'error';
+  detail: string;
+  httpStatus?: number;
+  latencyMs?: number;
+  checkedAt: string;
+};
+
 function maskUrl(url: string) {
   try {
     const parsed = new URL(url);
@@ -26,11 +34,79 @@ function parseTimeoutMs(value: string | undefined, fallback: number) {
   return Math.round(parsed);
 }
 
+function buildAuthHeaderValue(authScheme: string, apiKey: string) {
+  if (!apiKey) return null;
+  return /^(raw|none)$/i.test(authScheme) ? apiKey : `${authScheme} ${apiKey}`.trim();
+}
+
+async function probeEndpoint(input: {
+  url?: string;
+  timeoutMs: number;
+  headers?: Record<string, string>;
+}) {
+  const checkedAt = new Date().toISOString();
+  if (!input.url) {
+    return {
+      state: 'not-configured',
+      detail: '未配置 endpoint，当前不会做真实连通性检查。',
+      checkedAt,
+    } satisfies RuntimeProbe;
+  }
+
+  const controller = new AbortController();
+  const effectiveTimeoutMs = Math.min(input.timeoutMs, 4000);
+  const timer = setTimeout(() => controller.abort(), effectiveTimeoutMs);
+  const startedAt = Date.now();
+
+  try {
+    const response = await fetch(input.url, {
+      method: 'GET',
+      headers: input.headers,
+      cache: 'no-store',
+      signal: controller.signal,
+    });
+    const latencyMs = Date.now() - startedAt;
+    const accepted = response.ok || [401, 403, 404, 405].includes(response.status);
+
+    return {
+      state: accepted ? 'reachable' : 'warn',
+      detail: accepted ? `已收到响应（HTTP ${response.status}）。` : `已连通，但返回 HTTP ${response.status}。`,
+      httpStatus: response.status,
+      latencyMs,
+      checkedAt,
+    } satisfies RuntimeProbe;
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      return {
+        state: 'error',
+        detail: `探测超时（>${effectiveTimeoutMs}ms）。`,
+        checkedAt,
+      } satisfies RuntimeProbe;
+    }
+
+    return {
+      state: 'error',
+      detail: error instanceof Error ? error.message : '探测失败',
+      checkedAt,
+    } satisfies RuntimeProbe;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function getProbeLabel(probe: RuntimeProbe) {
+  if (probe.state === 'reachable') return '已连通';
+  if (probe.state === 'warn') return '已响应';
+  if (probe.state === 'error') return '不可达';
+  return '未配置';
+}
+
 export async function SettingsData({ projectId }: { projectId?: string }) {
   const llm = getLlmConfig();
   const sharedAuthHeader = process.env.STORYFLOW_PROVIDER_AUTH_HEADER || 'Authorization';
   const sharedAuthScheme = process.env.STORYFLOW_PROVIDER_AUTH_SCHEME || 'Bearer';
-  const sharedApiKeyConfigured = Boolean(process.env.STORYFLOW_PROVIDER_API_KEY);
+  const sharedProviderTimeoutMs = parseTimeoutMs(process.env.STORYFLOW_PROVIDER_TIMEOUT_MS, 300000);
+  const sharedApiKey = process.env.STORYFLOW_PROVIDER_API_KEY || '';
   const providers = [
     {
       key: 'image',
@@ -38,8 +114,9 @@ export async function SettingsData({ projectId }: { projectId?: string }) {
       url: process.env.STORYFLOW_IMAGE_PROVIDER_URL || '',
       authHeader: pickConfiguredValue(process.env.STORYFLOW_IMAGE_PROVIDER_AUTH_HEADER, sharedAuthHeader),
       authScheme: pickConfiguredValue(process.env.STORYFLOW_IMAGE_PROVIDER_AUTH_SCHEME, sharedAuthScheme),
-      timeoutMs: parseTimeoutMs(pickConfiguredValue(process.env.STORYFLOW_IMAGE_PROVIDER_TIMEOUT_MS, process.env.STORYFLOW_PROVIDER_TIMEOUT_MS), 300000),
-      apiKeySource: process.env.STORYFLOW_IMAGE_PROVIDER_API_KEY ? '独立 Key' : sharedApiKeyConfigured ? '共享 Key' : '未配置 Key',
+      timeoutMs: parseTimeoutMs(process.env.STORYFLOW_IMAGE_PROVIDER_TIMEOUT_MS, sharedProviderTimeoutMs),
+      apiKey: pickConfiguredValue(process.env.STORYFLOW_IMAGE_PROVIDER_API_KEY, sharedApiKey),
+      apiKeySource: process.env.STORYFLOW_IMAGE_PROVIDER_API_KEY ? '独立 Key' : sharedApiKey ? '共享 Key' : '未配置 Key',
     },
     {
       key: 'voice',
@@ -47,8 +124,9 @@ export async function SettingsData({ projectId }: { projectId?: string }) {
       url: process.env.STORYFLOW_VOICE_PROVIDER_URL || '',
       authHeader: pickConfiguredValue(process.env.STORYFLOW_VOICE_PROVIDER_AUTH_HEADER, sharedAuthHeader),
       authScheme: pickConfiguredValue(process.env.STORYFLOW_VOICE_PROVIDER_AUTH_SCHEME, sharedAuthScheme),
-      timeoutMs: parseTimeoutMs(pickConfiguredValue(process.env.STORYFLOW_VOICE_PROVIDER_TIMEOUT_MS, process.env.STORYFLOW_PROVIDER_TIMEOUT_MS), 300000),
-      apiKeySource: process.env.STORYFLOW_VOICE_PROVIDER_API_KEY ? '独立 Key' : sharedApiKeyConfigured ? '共享 Key' : '未配置 Key',
+      timeoutMs: parseTimeoutMs(process.env.STORYFLOW_VOICE_PROVIDER_TIMEOUT_MS, sharedProviderTimeoutMs),
+      apiKey: pickConfiguredValue(process.env.STORYFLOW_VOICE_PROVIDER_API_KEY, sharedApiKey),
+      apiKeySource: process.env.STORYFLOW_VOICE_PROVIDER_API_KEY ? '独立 Key' : sharedApiKey ? '共享 Key' : '未配置 Key',
     },
     {
       key: 'video',
@@ -56,8 +134,9 @@ export async function SettingsData({ projectId }: { projectId?: string }) {
       url: process.env.STORYFLOW_VIDEO_PROVIDER_URL || '',
       authHeader: pickConfiguredValue(process.env.STORYFLOW_VIDEO_PROVIDER_AUTH_HEADER, sharedAuthHeader),
       authScheme: pickConfiguredValue(process.env.STORYFLOW_VIDEO_PROVIDER_AUTH_SCHEME, sharedAuthScheme),
-      timeoutMs: parseTimeoutMs(pickConfiguredValue(process.env.STORYFLOW_VIDEO_PROVIDER_TIMEOUT_MS, process.env.STORYFLOW_PROVIDER_TIMEOUT_MS), 300000),
-      apiKeySource: process.env.STORYFLOW_VIDEO_PROVIDER_API_KEY ? '独立 Key' : sharedApiKeyConfigured ? '共享 Key' : '未配置 Key',
+      timeoutMs: parseTimeoutMs(process.env.STORYFLOW_VIDEO_PROVIDER_TIMEOUT_MS, sharedProviderTimeoutMs),
+      apiKey: pickConfiguredValue(process.env.STORYFLOW_VIDEO_PROVIDER_API_KEY, sharedApiKey),
+      apiKeySource: process.env.STORYFLOW_VIDEO_PROVIDER_API_KEY ? '独立 Key' : sharedApiKey ? '共享 Key' : '未配置 Key',
     },
   ];
   const enabledProviders = providers.filter((item) => item.url).length;
@@ -87,16 +166,44 @@ export async function SettingsData({ projectId }: { projectId?: string }) {
       })).catch(() => null);
   const generatedMediaCounts = summarizeGeneratedMediaCounts(getGeneratedMediaEntries(latestProject));
 
+  const llmProbe = await probeEndpoint({
+    url: llm.enabled ? `${llm.baseUrl}/models` : undefined,
+    timeoutMs: llm.timeoutMs,
+    headers: llm.apiKey
+      ? {
+          Authorization: `Bearer ${llm.apiKey}`,
+        }
+      : undefined,
+  });
+
+  const providerProbes = await Promise.all(
+    providers.map(async (provider) => ({
+      key: provider.key,
+      probe: await probeEndpoint({
+        url: provider.url || undefined,
+        timeoutMs: provider.timeoutMs,
+        headers: provider.apiKey
+          ? {
+              [provider.authHeader]: buildAuthHeaderValue(provider.authScheme, provider.apiKey) || '',
+            }
+          : undefined,
+      }),
+    })),
+  );
+
+  const reachableProviders = providerProbes.filter((item) => item.probe.state === 'reachable').length;
+
   return (
     <div className="page-stack">
       <div className="snapshot-card">
         <p className="eyebrow">运行时设置</p>
         <h3>模型与 Provider 状态</h3>
-        <p>这里集中展示默认模型、真实 Provider、鉴权策略、模拟回退与导出目录，方便判断当前环境更适合演示、联调还是正式执行。</p>
+        <p>这里集中展示默认模型、真实 Provider、鉴权策略、模拟回退、超时和连通性体检，方便判断当前环境更适合演示、联调还是正式执行。</p>
         <div className="meta-list">
           <span>默认模型：{llm.model}</span>
           <span>LLM：{llm.enabled ? '已接通' : '未接通，回退模板输出'}</span>
           <span>真实 Provider：{enabledProviders} / {providers.length}</span>
+          <span>已连通 Provider：{reachableProviders} / {providers.length}</span>
           <span>独立鉴权：{providerSpecificKeyCount} / {providers.length}</span>
           <span>共享鉴权：{sharedAuthHeader} / {sharedAuthScheme}</span>
         </div>
@@ -115,21 +222,37 @@ export async function SettingsData({ projectId }: { projectId?: string }) {
             <span>模型：{llm.model}</span>
             <span>API Key：{llm.apiKey ? '已配置' : '未配置'}</span>
             <span>超时：{llm.timeoutMs} ms</span>
+            <span>探测：{getProbeLabel(llmProbe)}</span>
+            {typeof llmProbe.httpStatus === 'number' ? <span>HTTP：{llmProbe.httpStatus}</span> : null}
+            {typeof llmProbe.latencyMs === 'number' ? <span>延迟：{llmProbe.latencyMs} ms</span> : null}
           </div>
+          <p>{llmProbe.detail}</p>
         </div>
-        {providers.map((provider) => (
-          <div key={provider.key} className="asset-tile">
-            <span className="label">{provider.title}</span>
-            <h4>{provider.url ? '已配置真实 endpoint' : '当前走 mock fallback'}</h4>
-            <p>{provider.url ? maskUrl(provider.url) : '未配置真实 endpoint 时，生成工作台仍可生成请求 / 响应工件并完成质量检查 / 导出闭环。'}</p>
-            <div className="meta-list">
-              <span>鉴权头：{provider.authHeader}</span>
-              <span>鉴权方案：{provider.authScheme}</span>
-              <span>超时：{provider.timeoutMs} ms</span>
-              <span>{provider.apiKeySource}</span>
+        {providers.map((provider) => {
+          const probe = providerProbes.find((item) => item.key === provider.key)?.probe || {
+            state: 'error',
+            detail: '探测结果缺失。',
+            checkedAt: new Date().toISOString(),
+          } satisfies RuntimeProbe;
+
+          return (
+            <div key={provider.key} className="asset-tile">
+              <span className="label">{provider.title}</span>
+              <h4>{provider.url ? '已配置真实 endpoint' : '当前走 mock fallback'}</h4>
+              <p>{provider.url ? maskUrl(provider.url) : '未配置真实 endpoint 时，生成工作台仍可生成请求 / 响应工件并完成质量检查 / 导出闭环。'}</p>
+              <div className="meta-list">
+                <span>鉴权头：{provider.authHeader}</span>
+                <span>鉴权方案：{provider.authScheme}</span>
+                <span>超时：{provider.timeoutMs} ms</span>
+                <span>探测：{getProbeLabel(probe)}</span>
+                {typeof probe.httpStatus === 'number' ? <span>HTTP：{probe.httpStatus}</span> : null}
+                {typeof probe.latencyMs === 'number' ? <span>延迟：{probe.latencyMs} ms</span> : null}
+                <span>{provider.apiKeySource}</span>
+              </div>
+              <p>{probe.detail}</p>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <div className="asset-grid three-up">

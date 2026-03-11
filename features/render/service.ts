@@ -18,8 +18,13 @@ import {
 
 const execFileAsync = promisify(execFile);
 
-type ProviderKind = 'image-sequence' | 'voice-synthesis' | 'video-assembly';
+export type ProviderKind = 'image-sequence' | 'voice-synthesis' | 'video-assembly';
 type RenderExecutionMode = 'mock' | 'remote';
+
+export type RenderJobQuery = {
+  provider?: ProviderKind;
+  jobId?: string;
+};
 
 type RenderJobMeta = {
   version: 1;
@@ -1072,6 +1077,31 @@ async function syncGeneratedMediaArtifacts(input: {
   return { entries, indexPath };
 }
 
+
+function buildRenderJobLabel(input?: RenderJobQuery, failedOnly = false) {
+  if (input?.jobId) return failedOnly ? '当前没有可重试的指定任务' : '当前没有可执行的指定任务';
+  if (input?.provider) {
+    const label = input.provider === 'image-sequence' ? '图像任务' : input.provider === 'voice-synthesis' ? '语音任务' : '视频任务';
+    return failedOnly ? `当前没有失败的${label}可重试` : `当前没有可执行的${label}`;
+  }
+  return failedOnly ? '当前没有失败任务可重试' : '当前没有可执行的渲染任务';
+}
+
+async function findRenderJobs(projectId: string, statuses: string[], query?: RenderJobQuery) {
+  const where: Record<string, unknown> = {
+    projectId,
+    status: { in: statuses },
+  };
+
+  if (query?.provider) where.provider = query.provider;
+  if (query?.jobId) where.id = query.jobId;
+
+  return prisma.renderJob.findMany({
+    where,
+    orderBy: { createdAt: 'asc' },
+  });
+}
+
 async function executeRenderJob(projectId: string, jobId: string) {
   const project = await getRenderProjectById(projectId);
   if (!project) throw new Error('项目不存在');
@@ -1157,13 +1187,10 @@ async function executeRenderJob(projectId: string, jobId: string) {
   }
 }
 
-export async function runRenderJobs(projectId: string) {
-  const jobs = await prisma.renderJob.findMany({
-    where: { projectId, status: { in: ['queued', 'failed'] } },
-    orderBy: { createdAt: 'asc' },
-  });
+export async function runRenderJobs(projectId: string, query?: RenderJobQuery) {
+  const jobs = await findRenderJobs(projectId, ['queued', 'failed'], query);
 
-  if (jobs.length === 0) throw new Error('当前没有可执行的渲染任务');
+  if (jobs.length === 0) throw new Error(buildRenderJobLabel(query, false));
 
   for (const job of jobs) {
     await executeRenderJob(projectId, job.id);
@@ -1172,13 +1199,10 @@ export async function runRenderJobs(projectId: string) {
   return getRenderProjectById(projectId);
 }
 
-export async function retryFailedRenderJobs(projectId: string) {
-  const jobs = await prisma.renderJob.findMany({
-    where: { projectId, status: 'failed' },
-    orderBy: { createdAt: 'asc' },
-  });
+export async function retryFailedRenderJobs(projectId: string, query?: RenderJobQuery) {
+  const jobs = await findRenderJobs(projectId, ['failed'], query);
 
-  if (jobs.length === 0) throw new Error('当前没有失败任务可重试');
+  if (jobs.length === 0) throw new Error(buildRenderJobLabel(query, true));
 
   for (const job of jobs) {
     await executeRenderJob(projectId, job.id);
@@ -1187,6 +1211,6 @@ export async function retryFailedRenderJobs(projectId: string) {
   return getRenderProjectById(projectId);
 }
 
-export async function advanceRenderJobs(projectId: string) {
-  return runRenderJobs(projectId);
+export async function advanceRenderJobs(projectId: string, query?: RenderJobQuery) {
+  return runRenderJobs(projectId, query);
 }
