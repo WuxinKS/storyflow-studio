@@ -10,7 +10,7 @@ type QaActionCheck = {
   passed: boolean;
 };
 
-type QaAction = 'pipeline-full' | 'pipeline-prepare' | 'adaptation' | 'render-create' | 'render-run' | 'render-retry';
+type QaAction = 'pipeline-full' | 'pipeline-prepare' | 'adaptation' | 'render-create' | 'render-run' | 'render-advance' | 'render-retry';
 
 function getActionLabel(action: QaAction, loading: boolean) {
   if (action === 'pipeline-full') return loading ? '主链重跑中…' : '一键重跑完整主链';
@@ -18,6 +18,7 @@ function getActionLabel(action: QaAction, loading: boolean) {
   if (action === 'adaptation') return loading ? '刷新改编中…' : '只刷新改编';
   if (action === 'render-create') return loading ? '创建渲染任务中…' : '创建渲染任务';
   if (action === 'render-run') return loading ? '执行渲染中…' : '执行渲染任务';
+  if (action === 'render-advance') return loading ? '推进执行中任务…' : '推进执行中任务';
   return loading ? '重试失败渲染中…' : '重试失败渲染';
 }
 
@@ -64,7 +65,9 @@ export function QaActionCenter({
                 ? { url: '/api/render', body: { projectId, action: 'create' } }
                 : action === 'render-run'
                   ? { url: '/api/render', body: { projectId, action: 'run' } }
-                  : { url: '/api/render', body: { projectId, action: 'retry' } };
+                  : action === 'render-advance'
+                    ? { url: '/api/render', body: { projectId, action: 'advance' } }
+                    : { url: '/api/render', body: { projectId, action: 'retry' } };
 
       const response = await fetch(payload.url, {
         method: 'POST',
@@ -85,7 +88,9 @@ export function QaActionCenter({
                 ? '已创建渲染任务'
                 : action === 'render-run'
                   ? '已执行可运行的渲染任务'
-                  : '已重试失败渲染任务',
+                  : action === 'render-advance'
+                    ? '已推进执行中的异步任务'
+                    : '已重试失败渲染任务',
       );
       router.refresh();
     } catch (error) {
@@ -129,6 +134,11 @@ export function QaActionCenter({
         {hasRenderExecutionIssue ? (
           <button type="button" className="button-ghost" onClick={() => runAction('render-run')} disabled={Boolean(loadingAction)}>
             {getActionLabel('render-run', loadingAction === 'render-run')}
+          </button>
+        ) : null}
+        {hasRenderExecutionIssue ? (
+          <button type="button" className="button-ghost" onClick={() => runAction('render-advance')} disabled={Boolean(loadingAction)}>
+            {getActionLabel('render-advance', loadingAction === 'render-advance')}
           </button>
         ) : null}
         {hasRenderCreateIssue || hasRenderExecutionIssue ? (

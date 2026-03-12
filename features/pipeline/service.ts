@@ -6,7 +6,7 @@ import { generateCharacterDrafts } from '@/features/characters/service';
 import { generateVisualBible } from '@/features/visual/service';
 import { generateAdaptationFromLatestChapter } from '@/features/adaptation/service';
 import { getQaReport } from '@/features/qa/service';
-import { createRenderJobsForLatestProject, exportProductionBundle, runRenderJobs } from '@/features/render/service';
+import { advanceRenderJobs, createRenderJobsForLatestProject, exportProductionBundle, runRenderJobs } from '@/features/render/service';
 
 export const PIPELINE_RUN_LOG_TITLE = 'Pipeline Run Log';
 
@@ -35,6 +35,17 @@ export type PipelineRunLog = {
 
 function nowIso() {
   return new Date().toISOString();
+}
+
+const PIPELINE_RENDER_ADVANCE_ROUNDS = Math.max(1, Number(process.env.STORYFLOW_PIPELINE_RENDER_ADVANCE_ROUNDS || '3'));
+
+function summarizeRenderExecution(project: { renderJobs?: Array<{ status: string }> } | null | undefined) {
+  const statuses = project?.renderJobs?.map((job) => job.status) || [];
+  const done = statuses.filter((status) => status === 'done').length;
+  const running = statuses.filter((status) => status === 'running').length;
+  const failed = statuses.filter((status) => status === 'failed').length;
+  const queued = statuses.filter((status) => status === 'queued').length;
+  return { done, running, failed, queued };
 }
 
 function createStep(input: Omit<PipelineStep, 'startedAt' | 'endedAt'> & { startedAt?: string; endedAt?: string }) {
@@ -154,13 +165,31 @@ export async function runProjectPipeline(projectId: string, options?: { mode?: P
     });
 
     if (mode === 'full') {
-      const renderProject = await runStep('render-execution', '执行生成', () => runRenderJobs(projectId), (project) => {
-        const done = project?.renderJobs.filter((job) => job.status === 'done').length || 0;
-        const failed = project?.renderJobs.filter((job) => job.status === 'failed').length || 0;
-        return failed > 0 ? `已执行渲染任务，但仍有 ${failed} 个任务失败。` : `已完成 ${done} 个渲染任务执行。`;
+      let renderProject = await runStep('render-execution', '执行生成', () => runRenderJobs(projectId), (project) => {
+        const summary = summarizeRenderExecution(project);
+        if (summary.failed > 0) return `已执行渲染任务，但仍有 ${summary.failed} 个任务失败。`;
+        if (summary.running > 0) return `首轮提交完成，已完成 ${summary.done} 个任务，仍有 ${summary.running} 个异步任务等待回查。`;
+        return `已完成 ${summary.done} 个渲染任务执行。`;
       });
-      if (renderProject?.renderJobs.some((job) => job.status === 'failed')) {
+
+      let advanceRound = 0;
+      while ((renderProject?.renderJobs.some((job) => job.status === 'running')) && advanceRound < PIPELINE_RENDER_ADVANCE_ROUNDS) {
+        const round = advanceRound + 1;
+        renderProject = await runStep(`render-advance-${round}`, `推进异步生成（第 ${round} 轮）`, () => advanceRenderJobs(projectId), (project) => {
+          const summary = summarizeRenderExecution(project);
+          if (summary.failed > 0) return `第 ${round} 轮推进后，失败 ${summary.failed} 个，完成 ${summary.done} 个，仍有 ${summary.running} 个执行中。`;
+          if (summary.running > 0) return `第 ${round} 轮推进后，已完成 ${summary.done} 个，仍有 ${summary.running} 个执行中。`;
+          return `第 ${round} 轮推进后，全部 ${summary.done} 个渲染任务已完成。`;
+        });
+        advanceRound += 1;
+      }
+
+      const renderSummary = summarizeRenderExecution(renderProject);
+      if (renderSummary.failed > 0) {
         throw new Error('部分渲染任务执行失败，请到生成工作台查看错误详情。');
+      }
+      if (renderSummary.running > 0) {
+        throw new Error(`仍有 ${renderSummary.running} 个异步渲染任务未完成，请到生成工作台点击“推进执行中任务”继续回查。`);
       }
 
       const bundle = await runStep('production-bundle', '导出交付包', () => exportProductionBundle(projectId), (result) => {
