@@ -9,7 +9,7 @@ const PROVIDER_OPTIONS = [
   { key: 'video-assembly', label: '视频' },
 ] as const;
 
-type RenderAction = 'create' | 'run' | 'retry';
+type RenderAction = 'create' | 'run' | 'retry' | 'advance';
 type ProviderKey = (typeof PROVIDER_OPTIONS)[number]['key'];
 
 export function RenderGenerateButton({ projectId }: { projectId: string }) {
@@ -41,9 +41,13 @@ export function RenderGenerateButton({ projectId }: { projectId: string }) {
             ? providerLabel
               ? `已执行 ${providerLabel} Provider 的可运行任务`
               : '已执行全部可运行任务'
-            : providerLabel
-              ? `已重试 ${providerLabel} Provider 的失败任务`
-              : '已重试全部失败任务',
+            : action === 'retry'
+              ? providerLabel
+                ? `已重试 ${providerLabel} Provider 的失败任务`
+                : '已重试全部失败任务'
+              : providerLabel
+                ? `已推进 ${providerLabel} Provider 的执行中任务`
+                : '已推进全部执行中任务',
       );
       router.refresh();
     } catch (error) {
@@ -64,6 +68,9 @@ export function RenderGenerateButton({ projectId }: { projectId: string }) {
         </button>
         <button type="button" className="button-ghost" onClick={() => callApi('retry')} disabled={Boolean(loadingAction)}>
           {loadingAction === 'retry:all' ? '重试中…' : '重试失败任务'}
+        </button>
+        <button type="button" className="button-ghost" onClick={() => callApi('advance')} disabled={Boolean(loadingAction)}>
+          {loadingAction === 'advance:all' ? '推进中…' : '推进执行中任务'}
         </button>
       </div>
       <div className="action-row wrap-row compact-row">
@@ -89,6 +96,19 @@ export function RenderGenerateButton({ projectId }: { projectId: string }) {
             disabled={Boolean(loadingAction)}
           >
             {loadingAction === `retry:${provider.key}` ? `重试${provider.label}中…` : `只重试${provider.label}`}
+          </button>
+        ))}
+      </div>
+      <div className="action-row wrap-row compact-row">
+        {PROVIDER_OPTIONS.map((provider) => (
+          <button
+            key={`advance-${provider.key}`}
+            type="button"
+            className="button-ghost"
+            onClick={() => callApi('advance', { provider: provider.key })}
+            disabled={Boolean(loadingAction)}
+          >
+            {loadingAction === `advance:${provider.key}` ? `推进${provider.label}中…` : `只推进${provider.label}`}
           </button>
         ))}
       </div>

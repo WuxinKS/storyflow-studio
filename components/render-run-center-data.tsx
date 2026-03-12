@@ -125,6 +125,10 @@ export async function RenderRunCenterData({
                     {provider.matchedJob.endpoint ? <p><strong>Endpoint：</strong>{provider.matchedJob.endpoint}</p> : null}
                     {provider.matchedJob.providerName ? <p><strong>供应商：</strong>{provider.matchedJob.providerName}</p> : null}
                     {provider.matchedJob.providerModel ? <p><strong>模型：</strong>{provider.matchedJob.providerModel}</p> : null}
+                    {provider.matchedJob.taskStatus ? <p><strong>任务状态：</strong>{provider.matchedJob.taskStatus}</p> : null}
+                    {provider.matchedJob.pollAttempts > 0 ? <p><strong>轮询次数：</strong>{provider.matchedJob.pollAttempts}</p> : null}
+                    {provider.matchedJob.pendingTasks > 0 ? <p><strong>待推进任务：</strong>{provider.matchedJob.pendingTasks}</p> : null}
+                    {provider.matchedJob.pollPath ? <p><strong>回查路径：</strong>{provider.matchedJob.pollPath}</p> : null}
                     {provider.matchedJob.lastError ? <p><strong>错误：</strong>{provider.matchedJob.lastError}</p> : null}
                   </>
                 ) : null}
@@ -142,6 +146,9 @@ export async function RenderRunCenterData({
                   ) : null}
                   {provider.matchedJob?.artifactIndexPath ? (
                     <a className="button-ghost" href={buildLocalMediaPreviewHref(provider.matchedJob.artifactIndexPath)} target="_blank" rel="noreferrer">媒体索引</a>
+                  ) : null}
+                  {provider.matchedJob?.pollTracePath ? (
+                    <a className="button-ghost" href={buildLocalMediaPreviewHref(provider.matchedJob.pollTracePath)} target="_blank" rel="noreferrer">轮询工件</a>
                   ) : null}
                 </div>
               </div>

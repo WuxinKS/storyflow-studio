@@ -91,6 +91,11 @@ export type RenderRunProviderRecord = {
     providerName: string | null;
     providerModel: string | null;
     adapter: string | null;
+    pollPath: string | null;
+    pollTracePath: string | null;
+    pollAttempts: number;
+    taskStatus: string | null;
+    pendingTasks: number;
   } | null;
 };
 
@@ -500,6 +505,11 @@ async function loadRenderRunRecord(
             providerName: matched.meta.providerName || null,
             providerModel: matched.meta.providerModel || null,
             adapter: matched.meta.adapter || null,
+            pollPath: matched.meta.pollPath || null,
+            pollTracePath: matched.meta.pollTracePath || null,
+            pollAttempts: matched.meta.pollAttempts || 0,
+            taskStatus: matched.meta.taskStatus || null,
+            pendingTasks: Array.isArray(matched.meta.pendingTasks) ? matched.meta.pendingTasks.length : 0,
           }
         : null,
     } satisfies RenderRunProviderRecord;

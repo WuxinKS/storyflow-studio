@@ -11,7 +11,7 @@ export function RenderJobActionButton({
 }: {
   projectId: string;
   jobId: string;
-  action: 'run' | 'retry';
+  action: 'run' | 'retry' | 'advance';
   label: string;
 }) {
   const router = useRouter();
@@ -29,7 +29,13 @@ export function RenderJobActionButton({
       });
       const data = await response.json();
       if (!response.ok || !data.ok) throw new Error(data.error || '任务执行失败');
-      setMessage(action === 'retry' ? '已重试该任务' : '已执行该任务');
+      setMessage(
+        action === 'retry'
+          ? '已重试该任务'
+          : action === 'advance'
+            ? '已推进该任务'
+            : '已执行该任务',
+      );
       router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '操作失败');

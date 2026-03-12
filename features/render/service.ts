@@ -1,4 +1,4 @@
-import { writeFile, mkdir } from 'node:fs/promises';
+import { writeFile, mkdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -23,6 +23,7 @@ import {
 } from '@/lib/provider-config';
 import {
   buildProviderAdapterRequest,
+  buildProviderPollRequest,
   getProviderAdapterConfig,
   normalizeAdapterResponse,
 } from '@/lib/provider-adapters';
@@ -36,8 +37,15 @@ export type RenderJobQuery = {
   jobId?: string;
 };
 
+type PendingRenderTask = {
+  index: number;
+  taskId?: string;
+  status?: string;
+  pollUrl?: string;
+};
+
 type RenderJobMeta = {
-  version: 1;
+  version: 1 | 2;
   mode: RenderExecutionMode;
   retryCount: number;
   payloadCount: number;
@@ -54,14 +62,20 @@ type RenderJobMeta = {
   providerName?: string;
   providerModel?: string;
   adapter?: string;
+  pollPath?: string;
+  pollTracePath?: string;
+  pollAttempts?: number;
+  taskStatus?: string;
+  pendingTasks?: PendingRenderTask[];
 };
 
 const DEFAULT_JOB_META: RenderJobMeta = {
-  version: 1,
+  version: 2,
   mode: 'mock',
   retryCount: 0,
   payloadCount: 0,
   summary: [],
+  pendingTasks: [],
 };
 
 function hasReferenceFlavor(text: string | null) {
@@ -265,6 +279,17 @@ export function parseRenderJobOutput(outputUrl: string | null) {
       ...DEFAULT_JOB_META,
       ...meta,
       summary: Array.isArray(meta.summary) ? meta.summary.map((item) => String(item)) : [],
+      pendingTasks: Array.isArray(meta.pendingTasks)
+        ? meta.pendingTasks.map((item, index) => {
+            const record = item && typeof item === 'object' ? item as Record<string, unknown> : {};
+            return {
+              index: typeof record.index === 'number' ? record.index : index,
+              taskId: typeof record.taskId === 'string' && record.taskId.trim() ? record.taskId.trim() : undefined,
+              status: typeof record.status === 'string' && record.status.trim() ? record.status.trim() : undefined,
+              pollUrl: typeof record.pollUrl === 'string' && record.pollUrl.trim() ? record.pollUrl.trim() : undefined,
+            } satisfies PendingRenderTask;
+          })
+        : [],
     } satisfies RenderJobMeta;
   }
 
@@ -280,6 +305,7 @@ function serializeRenderJobOutput(meta: Partial<RenderJobMeta>) {
     ...DEFAULT_JOB_META,
     ...meta,
     summary: meta.summary || [],
+    pendingTasks: Array.isArray(meta.pendingTasks) ? meta.pendingTasks : [],
   } satisfies RenderJobMeta);
 }
 
@@ -314,6 +340,336 @@ function buildProviderHeaders(provider: ProviderKind) {
   const authScheme = getProviderAuthScheme(provider);
   headers[authHeader] = /^(raw|none)$/i.test(authScheme) ? apiKey : `${authScheme} ${apiKey}`.trim();
   return headers;
+}
+
+const REMOTE_INLINE_DATA_KEYS = ['inlineData', 'inline_data'];
+const REMOTE_SOURCE_KEYS = ['url', 'outputUrl', 'sourceUrl', 'imageUrl', 'videoUrl', 'audioUrl', 'downloadUrl', 'uri', 'src', 'href'];
+const REMOTE_LOCAL_KEYS = ['localPath', 'path', 'filePath', 'outputPath', 'destination', 'savePath', 'targetPath'];
+const VOLATILE_SUMMARY_PREFIXES = ['status:', 'pendingTasks:', 'pollAttempts:', 'pollPath:', 'assets:', 'lastTaskStatus:'];
+
+type ProviderAsyncTraceEntry = {
+  attempt: number;
+  endpoint: string;
+  status: number | null;
+  preview: string;
+  taskId?: string;
+  taskStatus?: string | null;
+  checkedAt: string;
+};
+
+type ProviderAsyncResolution = {
+  lifecycle: 'completed' | 'pending';
+  responseBody: unknown;
+  preview: string;
+  pollAttempts: number;
+  pollPath: string | null;
+  pendingTask: PendingRenderTask | null;
+  taskStatus: string | null;
+  trace: ProviderAsyncTraceEntry[];
+};
+
+function toLooseRecord(value: unknown): Record<string, unknown> {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+  return {};
+}
+
+function pickTextDeepLoose(value: unknown, keys: string[], depth = 0): string | null {
+  if (depth > 6 || value == null) return null;
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const nested = pickTextDeepLoose(item, keys, depth + 1);
+      if (nested) return nested;
+    }
+    return null;
+  }
+
+  const record = toLooseRecord(value);
+  for (const key of keys) {
+    const candidate = record[key];
+    if (typeof candidate === 'string' && candidate.trim()) return candidate.trim();
+  }
+
+  for (const nested of Object.values(record)) {
+    const resolved = pickTextDeepLoose(nested, keys, depth + 1);
+    if (resolved) return resolved;
+  }
+
+  return null;
+}
+
+function hasImmediateMediaArtifact(value: unknown, depth = 0): boolean {
+  if (depth > 6 || value == null) return false;
+  if (Array.isArray(value)) return value.some((item) => hasImmediateMediaArtifact(item, depth + 1));
+
+  const record = toLooseRecord(value);
+  for (const key of REMOTE_SOURCE_KEYS.concat(REMOTE_LOCAL_KEYS)) {
+    const candidate = record[key];
+    if (typeof candidate === 'string' && candidate.trim()) return true;
+  }
+
+  for (const key of REMOTE_INLINE_DATA_KEYS) {
+    const node = toLooseRecord(record[key]);
+    if (typeof node.data === 'string' && node.data.trim()) return true;
+  }
+
+  return Object.values(record).some((item) => hasImmediateMediaArtifact(item, depth + 1));
+}
+
+function summarizeRemotePreview(value: unknown) {
+  if (typeof value === 'string') return value.trim().slice(0, 180);
+  try {
+    return JSON.stringify(value).slice(0, 180);
+  } catch {
+    return String(value).slice(0, 180);
+  }
+}
+
+function normalizeStatusToken(value: string | null | undefined) {
+  if (!value) return null;
+  const normalized = value.trim().toLowerCase().replace(/[\s-]+/g, '_');
+  return normalized || null;
+}
+
+function matchesStatus(status: string | null, values: string[]) {
+  const normalizedStatus = normalizeStatusToken(status);
+  if (!normalizedStatus) return false;
+  return values.some((item) => normalizeStatusToken(item) === normalizedStatus);
+}
+
+function classifyAsyncResponse(input: {
+  adapterConfig: ReturnType<typeof getProviderAdapterConfig>;
+  responseBody: unknown;
+  index: number;
+  pendingHint?: PendingRenderTask | null;
+}) {
+  const taskId = pickTextDeepLoose(input.responseBody, input.adapterConfig.poll.taskIdKeys) || input.pendingHint?.taskId;
+  const statusText = pickTextDeepLoose(input.responseBody, input.adapterConfig.poll.statusKeys) || input.pendingHint?.status || null;
+  const pollUrl = pickTextDeepLoose(input.responseBody, input.adapterConfig.poll.statusUrlKeys) || input.pendingHint?.pollUrl;
+  const pendingTask = {
+    index: input.index,
+    taskId: taskId || undefined,
+    status: statusText || undefined,
+    pollUrl: pollUrl || undefined,
+  } satisfies PendingRenderTask;
+
+  if (!input.adapterConfig.poll.enabled) {
+    return {
+      state: 'completed' as const,
+      pendingTask: null,
+      statusText,
+    };
+  }
+
+  if (matchesStatus(statusText, input.adapterConfig.poll.failureValues)) {
+    return {
+      state: 'failed' as const,
+      pendingTask,
+      statusText,
+    };
+  }
+
+  if (matchesStatus(statusText, input.adapterConfig.poll.pendingValues)) {
+    return {
+      state: 'pending' as const,
+      pendingTask,
+      statusText,
+    };
+  }
+
+  if (matchesStatus(statusText, input.adapterConfig.poll.successValues) || hasImmediateMediaArtifact(input.responseBody)) {
+    return {
+      state: 'completed' as const,
+      pendingTask: null,
+      statusText,
+    };
+  }
+
+  if (pendingTask.taskId || pendingTask.pollUrl) {
+    return {
+      state: 'pending' as const,
+      pendingTask,
+      statusText,
+    };
+  }
+
+  return {
+    state: 'completed' as const,
+    pendingTask: null,
+    statusText,
+  };
+}
+
+async function waitWithAbort(ms: number, signal: AbortSignal) {
+  if (ms <= 0) return;
+
+  await new Promise<void>((resolve, reject) => {
+    let timer: NodeJS.Timeout | null = null;
+    const onAbort = () => {
+      if (timer) clearTimeout(timer);
+      signal.removeEventListener('abort', onAbort);
+      const error = new Error('Aborted');
+      error.name = 'AbortError';
+      reject(error);
+    };
+
+    if (signal.aborted) {
+      onAbort();
+      return;
+    }
+
+    timer = setTimeout(() => {
+      signal.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    signal.addEventListener('abort', onAbort);
+  });
+}
+
+function buildNormalizedSingleResponse(responses: unknown[], responseItemsKey?: string) {
+  return {
+    mode: 'remote',
+    itemCount: responses.length,
+    items: responses,
+    [responseItemsKey || 'items']: responses,
+  } satisfies Record<string, unknown>;
+}
+
+function getPendingTaskLabel(task: PendingRenderTask | null) {
+  if (!task) return '任务进入异步执行';
+  if (task.taskId && task.status) return `异步任务 ${task.taskId}（${task.status}）仍在执行`;
+  if (task.taskId) return `异步任务 ${task.taskId} 仍在执行`;
+  return '异步任务仍在执行';
+}
+
+function stripVolatileSummary(summary: string[]) {
+  return summary.filter((item) => !VOLATILE_SUMMARY_PREFIXES.some((prefix) => item.startsWith(prefix)));
+}
+
+async function settleAsyncResponse(input: {
+  provider: ProviderKind;
+  adapterConfig: ReturnType<typeof getProviderAdapterConfig>;
+  headers: Record<string, string>;
+  initialResponseBody: unknown;
+  index: number;
+  signal: AbortSignal;
+  pendingHint?: PendingRenderTask | null;
+}) {
+  const initial = classifyAsyncResponse({
+    adapterConfig: input.adapterConfig,
+    responseBody: input.initialResponseBody,
+    index: input.index,
+    pendingHint: input.pendingHint,
+  });
+
+  if (initial.state === 'failed') {
+    throw new Error(`${input.provider} provider task failed: ${initial.statusText || summarizeRemotePreview(input.initialResponseBody)}`);
+  }
+
+  if (initial.state === 'completed') {
+    return {
+      lifecycle: 'completed' as const,
+      responseBody: input.initialResponseBody,
+      preview: summarizeRemotePreview(input.initialResponseBody),
+      pollAttempts: 0,
+      pollPath: null,
+      pendingTask: null,
+      taskStatus: initial.statusText,
+      trace: [],
+    } satisfies ProviderAsyncResolution;
+  }
+
+  const pendingTask = initial.pendingTask;
+  const pollRequest = buildProviderPollRequest({
+    provider: input.provider,
+    taskId: pendingTask?.taskId,
+    headers: input.headers,
+    overrideUrl: pendingTask?.pollUrl,
+  });
+
+  if (!pollRequest) {
+    return {
+      lifecycle: 'pending' as const,
+      responseBody: input.initialResponseBody,
+      preview: getPendingTaskLabel(pendingTask),
+      pollAttempts: 0,
+      pollPath: pendingTask?.pollUrl || null,
+      pendingTask,
+      taskStatus: initial.statusText,
+      trace: [],
+    } satisfies ProviderAsyncResolution;
+  }
+
+  let latestBody = input.initialResponseBody;
+  let latestTask = pendingTask;
+  let latestStatus = initial.statusText;
+  const trace: ProviderAsyncTraceEntry[] = [];
+
+  for (let attempt = 1; attempt <= input.adapterConfig.poll.maxAttempts; attempt += 1) {
+    await waitWithAbort(input.adapterConfig.poll.intervalMs, input.signal);
+    const response = await fetch(pollRequest.endpoint, {
+      method: pollRequest.method,
+      headers: pollRequest.requestHeaders,
+      body: pollRequest.requestBody ? JSON.stringify(pollRequest.requestBody) : undefined,
+      cache: 'no-store',
+      signal: input.signal,
+    });
+    const rawText = await response.text();
+    const parsed = safeJsonParse(rawText) || rawText;
+    const classified = classifyAsyncResponse({
+      adapterConfig: input.adapterConfig,
+      responseBody: parsed,
+      index: input.index,
+      pendingHint: latestTask,
+    });
+
+    trace.push({
+      attempt,
+      endpoint: pollRequest.endpoint,
+      status: response.status,
+      preview: rawText.slice(0, 180),
+      taskId: classified.pendingTask?.taskId || latestTask?.taskId,
+      taskStatus: classified.statusText,
+      checkedAt: new Date().toISOString(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`${input.provider} poll failed: ${response.status} ${rawText.slice(0, 240)}`);
+    }
+
+    latestBody = parsed;
+    latestTask = classified.pendingTask || latestTask;
+    latestStatus = classified.statusText;
+
+    if (classified.state === 'failed') {
+      throw new Error(`${input.provider} provider task failed: ${classified.statusText || rawText.slice(0, 160)}`);
+    }
+
+    if (classified.state === 'completed') {
+      return {
+        lifecycle: 'completed' as const,
+        responseBody: latestBody,
+        preview: summarizeRemotePreview(latestBody),
+        pollAttempts: attempt,
+        pollPath: pollRequest.endpoint,
+        pendingTask: null,
+        taskStatus: latestStatus,
+        trace,
+      } satisfies ProviderAsyncResolution;
+    }
+  }
+
+  return {
+    lifecycle: 'pending' as const,
+    responseBody: latestBody,
+    preview: getPendingTaskLabel(latestTask),
+    pollAttempts: trace.length,
+    pollPath: pollRequest.endpoint,
+    pendingTask: latestTask,
+    taskStatus: latestStatus,
+    trace,
+  } satisfies ProviderAsyncResolution;
 }
 
 async function getRenderProjectById(projectId: string) {
@@ -840,6 +1196,7 @@ async function executeProvider(provider: ProviderKind, project: { id: string; ti
   const timeoutMs = getProviderTimeoutMs(provider);
   const { runDir, requestPath } = await writeExecutionArtifacts(project.title, provider, payload);
   const responsePath = path.join(runDir, `${provider}-response.json`);
+  const pollTracePath = path.join(runDir, `${provider}-poll-trace.json`);
 
   if (!endpoint) {
     const mockResponse = {
@@ -856,6 +1213,7 @@ async function executeProvider(provider: ProviderKind, project: { id: string; ti
     await writeFile(responsePath, JSON.stringify(mockResponse, null, 2), 'utf8');
     return {
       mode: 'mock' as const,
+      lifecycle: 'completed' as const,
       endpoint: null,
       timeoutMs,
       runDir,
@@ -864,6 +1222,11 @@ async function executeProvider(provider: ProviderKind, project: { id: string; ti
       responseBody: mockResponse,
       preview: mockResponse.message,
       summary: [`mode:mock`, `adapter:${adapterConfig.mode}`, `items:${payload.length}`, `timeout:${timeoutMs}ms`, `response:${path.basename(responsePath)}`],
+      pollAttempts: 0,
+      pollPath: null,
+      pollTracePath: null,
+      taskStatus: null,
+      pendingTasks: [] as PendingRenderTask[],
     };
   }
 
@@ -877,6 +1240,9 @@ async function executeProvider(provider: ProviderKind, project: { id: string; ti
   const timer = setTimeout(() => controller.abort(`timeout:${timeoutMs}`), timeoutMs);
 
   try {
+    const baseSummary = [`mode:remote`, `adapter:${adapterConfig.mode}`, `items:${payload.length}`, `timeout:${timeoutMs}ms`, `endpoint:${requestPlan.endpoint}`, `response:${path.basename(responsePath)}`];
+    const traceEntries: ProviderAsyncTraceEntry[] = [];
+
     if (requestPlan.batchMode === 'batch') {
       const response = await fetch(requestPlan.endpoint, {
         method: 'POST',
@@ -887,28 +1253,75 @@ async function executeProvider(provider: ProviderKind, project: { id: string; ti
       });
       const rawText = await response.text();
       const responseBody = safeJsonParse(rawText) || rawText;
-      await writeFile(responsePath, typeof responseBody === 'string' ? responseBody : JSON.stringify(responseBody, null, 2), 'utf8');
-
       if (!response.ok) {
         throw new Error(`${provider} provider failed: ${response.status} ${rawText.slice(0, 240)}`);
       }
 
+      const settled = await settleAsyncResponse({
+        provider,
+        adapterConfig,
+        headers: requestPlan.requestHeaders,
+        initialResponseBody: responseBody,
+        index: 0,
+        signal: controller.signal,
+      });
+      traceEntries.push(...settled.trace);
+      await writeFile(responsePath, typeof settled.responseBody === 'string' ? settled.responseBody : JSON.stringify(settled.responseBody, null, 2), 'utf8');
+      if (traceEntries.length > 0) {
+        await writeFile(pollTracePath, JSON.stringify({ provider, generatedAt: new Date().toISOString(), items: traceEntries }, null, 2), 'utf8');
+      }
+
+      if (settled.lifecycle === 'pending') {
+        return {
+          mode: 'remote' as const,
+          lifecycle: 'pending' as const,
+          endpoint: requestPlan.endpoint,
+          timeoutMs,
+          runDir,
+          requestPath,
+          responsePath,
+          responseBody: settled.responseBody,
+          preview: settled.preview,
+          summary: [...baseSummary, `pollAttempts:${settled.pollAttempts}`, 'pendingTasks:1'],
+          pollAttempts: settled.pollAttempts,
+          pollPath: settled.pollPath,
+          pollTracePath: traceEntries.length > 0 ? pollTracePath : null,
+          taskStatus: settled.taskStatus,
+          pendingTasks: settled.pendingTask ? [settled.pendingTask] : [],
+        };
+      }
+
+      const completedSummary = settled.pollAttempts > 0
+        ? [...baseSummary, `pollAttempts:${settled.pollAttempts}`]
+        : baseSummary;
+
       return {
         mode: 'remote' as const,
+        lifecycle: 'completed' as const,
         endpoint: requestPlan.endpoint,
         timeoutMs,
         runDir,
         requestPath,
         responsePath,
-        responseBody,
-        preview: rawText.slice(0, 180),
-        summary: [`mode:remote`, `adapter:${adapterConfig.mode}`, `items:${payload.length}`, `timeout:${timeoutMs}ms`, `endpoint:${requestPlan.endpoint}`, `response:${path.basename(responsePath)}`],
+        responseBody: settled.responseBody,
+        preview: settled.preview,
+        summary: completedSummary,
+        pollAttempts: settled.pollAttempts,
+        pollPath: settled.pollPath,
+        pollTracePath: traceEntries.length > 0 ? pollTracePath : null,
+        taskStatus: settled.taskStatus,
+        pendingTasks: [] as PendingRenderTask[],
       };
     }
 
-    const responseBodies: unknown[] = [];
     const requestBodies = Array.isArray(requestPlan.requestBody) ? requestPlan.requestBody : [requestPlan.requestBody];
-    for (const requestBody of requestBodies) {
+    const responseBodies: unknown[] = [];
+    const pendingTasks: PendingRenderTask[] = [];
+    let totalPollAttempts = 0;
+    let pollPath: string | null = null;
+    let taskStatus: string | null = null;
+
+    for (const [index, requestBody] of requestBodies.entries()) {
       const response = await fetch(requestPlan.endpoint, {
         method: 'POST',
         headers: requestPlan.requestHeaders,
@@ -921,14 +1334,57 @@ async function executeProvider(provider: ProviderKind, project: { id: string; ti
       if (!response.ok) {
         throw new Error(`${provider} provider failed: ${response.status} ${rawText.slice(0, 240)}`);
       }
-      responseBodies.push(responseBody);
+
+      const settled = await settleAsyncResponse({
+        provider,
+        adapterConfig,
+        headers: requestPlan.requestHeaders,
+        initialResponseBody: responseBody,
+        index,
+        signal: controller.signal,
+      });
+
+      responseBodies[index] = settled.responseBody;
+      totalPollAttempts += settled.pollAttempts;
+      taskStatus = settled.taskStatus || taskStatus;
+      pollPath = settled.pollPath || pollPath;
+      traceEntries.push(...settled.trace);
+      if (settled.pendingTask) pendingTasks.push(settled.pendingTask);
     }
 
     const normalizedResponse = normalizeAdapterResponse(responseBodies, requestPlan);
     await writeFile(responsePath, JSON.stringify(normalizedResponse, null, 2), 'utf8');
+    if (traceEntries.length > 0) {
+      await writeFile(pollTracePath, JSON.stringify({ provider, generatedAt: new Date().toISOString(), items: traceEntries }, null, 2), 'utf8');
+    }
+
+    if (pendingTasks.length > 0) {
+      return {
+        mode: 'remote' as const,
+        lifecycle: 'pending' as const,
+        endpoint: requestPlan.endpoint,
+        timeoutMs,
+        runDir,
+        requestPath,
+        responsePath,
+        responseBody: normalizedResponse,
+        preview: `已有 ${pendingTasks.length} 个异步任务进入回查阶段`,
+        summary: [...baseSummary, `pollAttempts:${totalPollAttempts}`, `pendingTasks:${pendingTasks.length}`],
+        pollAttempts: totalPollAttempts,
+        pollPath,
+        pollTracePath: traceEntries.length > 0 ? pollTracePath : null,
+        taskStatus,
+        pendingTasks,
+      };
+    }
+
+    const completedSummary = totalPollAttempts > 0
+      ? [...baseSummary, `pollAttempts:${totalPollAttempts}`]
+      : baseSummary;
 
     return {
       mode: 'remote' as const,
+      lifecycle: 'completed' as const,
       endpoint: requestPlan.endpoint,
       timeoutMs,
       runDir,
@@ -936,7 +1392,12 @@ async function executeProvider(provider: ProviderKind, project: { id: string; ti
       responsePath,
       responseBody: normalizedResponse,
       preview: JSON.stringify(normalizedResponse).slice(0, 180),
-      summary: [`mode:remote`, `adapter:${adapterConfig.mode}`, `items:${payload.length}`, `timeout:${timeoutMs}ms`, `endpoint:${requestPlan.endpoint}`, `response:${path.basename(responsePath)}`],
+      summary: completedSummary,
+      pollAttempts: totalPollAttempts,
+      pollPath,
+      pollTracePath: traceEntries.length > 0 ? pollTracePath : null,
+      taskStatus,
+      pendingTasks: [] as PendingRenderTask[],
     };
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
@@ -947,6 +1408,7 @@ async function executeProvider(provider: ProviderKind, project: { id: string; ti
     clearTimeout(timer);
   }
 }
+
 
 type RenderPayloadRecord = Record<string, unknown>;
 type ProviderResponseRecord = Record<string, unknown>;
@@ -1265,6 +1727,15 @@ function buildRenderJobLabel(input?: RenderJobQuery, failedOnly = false) {
   return failedOnly ? '当前没有失败任务可重试' : '当前没有可执行的渲染任务';
 }
 
+function buildAdvanceJobLabel(input?: RenderJobQuery) {
+  if (input?.jobId) return '当前指定任务没有待推进的异步执行';
+  if (input?.provider) {
+    const label = input.provider === 'image-sequence' ? '图像任务' : input.provider === 'voice-synthesis' ? '语音任务' : '视频任务';
+    return `当前没有执行中的${label}可推进`;
+  }
+  return '当前没有执行中的异步任务可推进';
+}
+
 async function findRenderJobs(projectId: string, statuses: string[], query?: RenderJobQuery) {
   const where: Record<string, unknown> = {
     projectId,
@@ -1278,6 +1749,176 @@ async function findRenderJobs(projectId: string, statuses: string[], query?: Ren
     where,
     orderBy: { createdAt: 'asc' },
   });
+}
+
+async function continueRunningRenderJob(input: {
+  projectId: string;
+  project: Awaited<ReturnType<typeof getRenderProjectById>>;
+  jobId: string;
+  provider: ProviderKind;
+  providerProfile: ReturnType<typeof getProviderProfileSnapshot>;
+  adapterConfig: ReturnType<typeof getProviderAdapterConfig>;
+  existingMeta: RenderJobMeta;
+  payload: unknown[];
+}) {
+  const requestPath = input.existingMeta.requestPath;
+  const responsePath = input.existingMeta.responsePath;
+  if (!requestPath || !responsePath) {
+    throw new Error('当前任务缺少请求 / 响应工件，无法继续推进异步任务');
+  }
+
+  const pendingTasks = Array.isArray(input.existingMeta.pendingTasks) ? input.existingMeta.pendingTasks : [];
+  if (pendingTasks.length === 0) {
+    throw new Error('当前运行任务没有待推进的异步子任务');
+  }
+
+  const previousText = await readFile(responsePath, 'utf8').catch(() => '');
+  const previousJson = safeJsonParse(previousText);
+  const previousRecord = toLooseRecord(previousJson);
+  const previousItems = Array.isArray(previousJson)
+    ? [...previousJson]
+    : Array.isArray(previousRecord.items)
+      ? [...previousRecord.items]
+      : Array.isArray(previousRecord[input.adapterConfig.responseItemsKey])
+        ? [...(previousRecord[input.adapterConfig.responseItemsKey] as unknown[])]
+        : input.payload.map(() => previousJson ?? {});
+
+  while (previousItems.length < input.payload.length) previousItems.push({});
+
+  const headers = buildProviderHeaders(input.provider);
+  const timeoutMs = getProviderTimeoutMs(input.provider);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(`timeout:${timeoutMs}`), timeoutMs);
+  const pollTracePath = path.join(path.dirname(requestPath), `${input.provider}-poll-trace.json`);
+
+  try {
+    const traceEntries: ProviderAsyncTraceEntry[] = [];
+    const remainingPending: PendingRenderTask[] = [];
+    let totalPollAttempts = 0;
+    let pollPath: string | null = input.existingMeta.pollPath || null;
+    let taskStatus: string | null = input.existingMeta.taskStatus || null;
+
+    for (const pendingTask of pendingTasks) {
+      const settled = await settleAsyncResponse({
+        provider: input.provider,
+        adapterConfig: input.adapterConfig,
+        headers,
+        initialResponseBody: previousItems[pendingTask.index] ?? {},
+        index: pendingTask.index,
+        signal: controller.signal,
+        pendingHint: pendingTask,
+      });
+      previousItems[pendingTask.index] = settled.responseBody;
+      totalPollAttempts += settled.pollAttempts;
+      pollPath = settled.pollPath || pollPath;
+      taskStatus = settled.taskStatus || taskStatus;
+      traceEntries.push(...settled.trace);
+      if (settled.pendingTask) remainingPending.push(settled.pendingTask);
+    }
+
+    const normalizedResponse = buildNormalizedSingleResponse(previousItems, input.adapterConfig.responseItemsKey);
+    await writeFile(responsePath, JSON.stringify(normalizedResponse, null, 2), 'utf8');
+    if (traceEntries.length > 0) {
+      await writeFile(pollTracePath, JSON.stringify({ provider: input.provider, generatedAt: new Date().toISOString(), items: traceEntries }, null, 2), 'utf8');
+    }
+
+    if (remainingPending.length > 0) {
+      const summary = [
+        ...stripVolatileSummary(input.existingMeta.summary),
+        'status:pending',
+        `pendingTasks:${remainingPending.length}`,
+        `pollAttempts:${(input.existingMeta.pollAttempts || 0) + totalPollAttempts}`,
+      ];
+      if (pollPath) summary.push(`pollPath:${pollPath}`);
+      if (taskStatus) summary.push(`lastTaskStatus:${taskStatus}`);
+
+      await prisma.renderJob.update({
+        where: { id: input.jobId },
+        data: {
+          status: 'running',
+          outputUrl: serializeRenderJobOutput({
+            ...input.existingMeta,
+            mode: 'remote',
+            requestPath,
+            responsePath,
+            preview: `仍有 ${remainingPending.length} 个异步任务在执行`,
+            executedAt: new Date().toISOString(),
+            lastError: undefined,
+            timeoutMs,
+            providerName: input.providerProfile.providerName,
+            providerModel: input.providerProfile.providerModel || undefined,
+            adapter: input.adapterConfig.mode,
+            pollPath: pollPath || undefined,
+            pollTracePath: traceEntries.length > 0 ? pollTracePath : input.existingMeta.pollTracePath,
+            pollAttempts: (input.existingMeta.pollAttempts || 0) + totalPollAttempts,
+            taskStatus: taskStatus || undefined,
+            pendingTasks: remainingPending,
+            summary,
+          }),
+        },
+      });
+
+      return;
+    }
+
+    const mediaArtifacts = await syncGeneratedMediaArtifacts({
+      projectId: input.projectId,
+      provider: input.provider,
+      jobId: input.jobId,
+      payload: input.payload,
+      runDir: path.dirname(requestPath),
+      requestPath,
+      responsePath,
+      responseBody: normalizedResponse,
+      mode: 'remote',
+    });
+    const summary = input.provider === 'video-assembly'
+      ? [...stripVolatileSummary(input.existingMeta.summary), 'final-cut:preview-ready']
+      : input.provider === 'voice-synthesis'
+        ? [...stripVolatileSummary(input.existingMeta.summary), 'voice-track:generated']
+        : [...stripVolatileSummary(input.existingMeta.summary), 'frames:generated'];
+    summary.push(`assets:${mediaArtifacts.entries.length}`);
+    if ((input.existingMeta.pollAttempts || 0) + totalPollAttempts > 0) {
+      summary.push(`pollAttempts:${(input.existingMeta.pollAttempts || 0) + totalPollAttempts}`);
+    }
+    if (pollPath) summary.push(`pollPath:${pollPath}`);
+    if (taskStatus) summary.push(`lastTaskStatus:${taskStatus}`);
+
+    await prisma.renderJob.update({
+      where: { id: input.jobId },
+      data: {
+        status: 'done',
+        outputUrl: serializeRenderJobOutput({
+          ...input.existingMeta,
+          mode: 'remote',
+          requestPath,
+          responsePath,
+          preview: summarizeRemotePreview(normalizedResponse),
+          executedAt: new Date().toISOString(),
+          lastError: undefined,
+          assetCount: mediaArtifacts.entries.length,
+          artifactIndexPath: mediaArtifacts.indexPath,
+          timeoutMs,
+          providerName: input.providerProfile.providerName,
+          providerModel: input.providerProfile.providerModel || undefined,
+          adapter: input.adapterConfig.mode,
+          pollPath: pollPath || undefined,
+          pollTracePath: traceEntries.length > 0 ? pollTracePath : input.existingMeta.pollTracePath,
+          pollAttempts: (input.existingMeta.pollAttempts || 0) + totalPollAttempts,
+          taskStatus: taskStatus || undefined,
+          pendingTasks: [],
+          summary,
+        }),
+      },
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error(`${input.provider} provider timed out after ${timeoutMs}ms`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 async function executeRenderJob(projectId: string, jobId: string) {
@@ -1295,6 +1936,19 @@ async function executeRenderJob(projectId: string, jobId: string) {
   const providerPayloads = await exportProviderPayloads(projectId);
   const payload = getProviderPayloadByKind(providerPayloads.providers, provider);
 
+  if (job.status === 'running' && existingMeta.pendingTasks && existingMeta.pendingTasks.length > 0) {
+    return continueRunningRenderJob({
+      projectId,
+      project,
+      jobId,
+      provider,
+      providerProfile,
+      adapterConfig,
+      existingMeta,
+      payload,
+    });
+  }
+
   await prisma.renderJob.update({
     where: { id: jobId },
     data: {
@@ -1302,13 +1956,53 @@ async function executeRenderJob(projectId: string, jobId: string) {
       outputUrl: serializeRenderJobOutput({
         ...existingMeta,
         payloadCount: payload.length,
-        summary: [...existingMeta.summary, 'status:running'],
+        pendingTasks: [],
+        pollAttempts: existingMeta.pollAttempts || 0,
+        taskStatus: undefined,
+        summary: [...stripVolatileSummary(existingMeta.summary), 'status:running'],
       }),
     },
   });
 
   try {
     const result = await executeProvider(provider, { id: project.id, title: project.title }, payload);
+
+    if (result.lifecycle === 'pending') {
+      const summary = [...stripVolatileSummary(existingMeta.summary), ...result.summary, 'status:pending'];
+      if (result.pollPath) summary.push(`pollPath:${result.pollPath}`);
+      if (result.taskStatus) summary.push(`lastTaskStatus:${result.taskStatus}`);
+
+      await prisma.renderJob.update({
+        where: { id: jobId },
+        data: {
+          status: 'running',
+          outputUrl: serializeRenderJobOutput({
+            ...existingMeta,
+            mode: result.mode,
+            endpoint: result.endpoint || undefined,
+            requestPath: result.requestPath,
+            responsePath: result.responsePath,
+            payloadCount: payload.length,
+            retryCount: existingMeta.retryCount,
+            preview: result.preview,
+            executedAt: new Date().toISOString(),
+            lastError: undefined,
+            timeoutMs: result.timeoutMs,
+            providerName: providerProfile.providerName,
+            providerModel: providerProfile.providerModel || undefined,
+            adapter: adapterConfig.mode,
+            pollPath: result.pollPath || undefined,
+            pollTracePath: result.pollTracePath || undefined,
+            pollAttempts: result.pollAttempts,
+            taskStatus: result.taskStatus || undefined,
+            pendingTasks: result.pendingTasks,
+            summary,
+          }),
+        },
+      });
+      return;
+    }
+
     const mediaArtifacts = await syncGeneratedMediaArtifacts({
       projectId,
       provider,
@@ -1321,10 +2015,13 @@ async function executeRenderJob(projectId: string, jobId: string) {
       mode: result.mode,
     });
     const summary = provider === 'video-assembly'
-      ? [...result.summary, 'final-cut:preview-ready']
+      ? [...stripVolatileSummary(existingMeta.summary), ...result.summary, 'final-cut:preview-ready']
       : provider === 'voice-synthesis'
-        ? [...result.summary, 'voice-track:generated']
-        : [...result.summary, 'frames:generated'];
+        ? [...stripVolatileSummary(existingMeta.summary), ...result.summary, 'voice-track:generated']
+        : [...stripVolatileSummary(existingMeta.summary), ...result.summary, 'frames:generated'];
+    summary.push(`assets:${mediaArtifacts.entries.length}`);
+    if (result.pollPath) summary.push(`pollPath:${result.pollPath}`);
+    if (result.taskStatus) summary.push(`lastTaskStatus:${result.taskStatus}`);
 
     await prisma.renderJob.update({
       where: { id: jobId },
@@ -1347,7 +2044,12 @@ async function executeRenderJob(projectId: string, jobId: string) {
           providerName: providerProfile.providerName,
           providerModel: providerProfile.providerModel || undefined,
           adapter: adapterConfig.mode,
-          summary: [...summary, `assets:${mediaArtifacts.entries.length}`],
+          pollPath: result.pollPath || undefined,
+          pollTracePath: result.pollTracePath || undefined,
+          pollAttempts: result.pollAttempts,
+          taskStatus: result.taskStatus || undefined,
+          pendingTasks: [],
+          summary,
         }),
       },
     });
@@ -1366,7 +2068,8 @@ async function executeRenderJob(projectId: string, jobId: string) {
           providerName: providerProfile.providerName,
           providerModel: providerProfile.providerModel || undefined,
           adapter: adapterConfig.mode,
-          summary: [...existingMeta.summary.filter((item) => item !== 'status:running'), 'status:failed'],
+          pendingTasks: [],
+          summary: [...stripVolatileSummary(existingMeta.summary), 'status:failed'],
         }),
       },
     });
@@ -1398,5 +2101,13 @@ export async function retryFailedRenderJobs(projectId: string, query?: RenderJob
 }
 
 export async function advanceRenderJobs(projectId: string, query?: RenderJobQuery) {
-  return runRenderJobs(projectId, query);
+  const jobs = await findRenderJobs(projectId, ['running'], query);
+
+  if (jobs.length === 0) throw new Error(buildAdvanceJobLabel(query));
+
+  for (const job of jobs) {
+    await executeRenderJob(projectId, job.id);
+  }
+
+  return getRenderProjectById(projectId);
 }

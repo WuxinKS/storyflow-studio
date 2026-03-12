@@ -421,11 +421,17 @@ export async function RenderStudioData({ projectId }: { projectId?: string }) {
               {meta.endpoint ? <p>Endpoint：{meta.endpoint}</p> : null}
               {meta.timeoutMs ? <p>超时：{meta.timeoutMs} ms</p> : null}
               {meta.executedAt ? <p>执行时间：{meta.executedAt}</p> : null}
+              {meta.taskStatus ? <p>任务状态：{meta.taskStatus}</p> : null}
+              {typeof meta.pollAttempts === 'number' && meta.pollAttempts > 0 ? <p>轮询次数：{meta.pollAttempts}</p> : null}
+              {meta.pendingTasks?.length ? <p>待完成异步任务：{meta.pendingTasks.length}</p> : null}
               {meta.requestPath ? <p>请求工件：{meta.requestPath}</p> : null}
               {meta.responsePath ? <p>响应工件：{meta.responsePath}</p> : null}
+              {meta.pollTracePath ? <p>轮询工件：{meta.pollTracePath}</p> : null}
+              {meta.pollPath ? <p>回查路径：{meta.pollPath}</p> : null}
               {meta.artifactIndexPath ? <p>媒体索引：{meta.artifactIndexPath}</p> : null}
               {meta.lastError ? <p>错误：{meta.lastError}</p> : null}
               {job.status === 'queued' ? <RenderJobActionButton projectId={project.id} jobId={job.id} action="run" label="只执行这个任务" /> : null}
+              {job.status === 'running' ? <RenderJobActionButton projectId={project.id} jobId={job.id} action="advance" label="继续推进该任务" /> : null}
               {job.status === 'failed' ? <RenderJobActionButton projectId={project.id} jobId={job.id} action="retry" label="只重试这个任务" /> : null}
             </div>
           ))

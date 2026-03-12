@@ -19,6 +19,21 @@ export type ProviderAdapterMode =
   | 'kling-video'
   | 'seedance-video';
 
+export type ProviderPollConfig = {
+  enabled: boolean;
+  path: string;
+  method: 'GET' | 'POST';
+  intervalMs: number;
+  maxAttempts: number;
+  taskIdKeys: string[];
+  statusUrlKeys: string[];
+  statusKeys: string[];
+  pendingValues: string[];
+  successValues: string[];
+  failureValues: string[];
+  appendTaskId: boolean;
+};
+
 export type ProviderAdapterConfig = {
   mode: ProviderAdapterMode;
   requestPath: string;
@@ -26,6 +41,7 @@ export type ProviderAdapterConfig = {
   extraHeaders: Record<string, string>;
   extraBody: JsonRecord;
   voiceId: string;
+  poll: ProviderPollConfig;
 };
 
 export type ProviderAdapterRequest = {
@@ -34,6 +50,13 @@ export type ProviderAdapterRequest = {
   requestHeaders: Record<string, string>;
   responseItemsKey?: string;
   batchMode: 'single' | 'batch';
+};
+
+export type ProviderPollRequest = {
+  endpoint: string;
+  method: 'GET' | 'POST';
+  requestHeaders: Record<string, string>;
+  requestBody?: unknown;
 };
 
 function normalizeText(value: string | undefined) {
@@ -67,6 +90,38 @@ function parseStringRecord(value: string | undefined) {
       .filter((entry): entry is [string, string] => typeof entry[1] === 'string' && entry[0].trim().length > 0)
       .map(([key, item]) => [key.trim(), item.trim()]),
   );
+}
+
+function parseStringList(value: string | undefined, fallback: string[]) {
+  const raw = normalizeText(value);
+  if (!raw) return fallback;
+
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (Array.isArray(parsed)) {
+      const values = parsed.map((item) => String(item).trim()).filter(Boolean);
+      return values.length > 0 ? values : fallback;
+    }
+  } catch {
+    // ignore and fall back to comma-separated parsing
+  }
+
+  const values = raw.split(',').map((item) => item.trim()).filter(Boolean);
+  return values.length > 0 ? values : fallback;
+}
+
+function parsePositiveInteger(value: string | undefined, fallback: number) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return Math.round(parsed);
+}
+
+function parseBoolean(value: string | undefined, fallback: boolean) {
+  const normalized = normalizeText(value).toLowerCase();
+  if (!normalized) return fallback;
+  if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
+  if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
+  return fallback;
 }
 
 function trimSlash(text: string) {
@@ -110,6 +165,10 @@ function inferAdapterMode(provider: ProviderRuntimeConfig): ProviderAdapterMode 
   return 'generic-batch';
 }
 
+function isAsyncVideoMode(mode: ProviderAdapterMode) {
+  return mode === 'runway-video' || mode === 'minimax-video' || mode === 'kling-video' || mode === 'seedance-video';
+}
+
 function buildPromptFromItem(item: JsonRecord, fallbackLabel: string) {
   const candidates = [
     item.prompt,
@@ -135,6 +194,46 @@ function getAdapterEnvPrefix(provider: ProviderKind) {
   return 'STORYFLOW_VIDEO_PROVIDER';
 }
 
+function buildProviderEndpoint(profile: ProviderRuntimeConfig, adapter: ProviderAdapterConfig) {
+  return adapter.mode === 'gemini-image'
+    ? buildGeminiEndpoint(profile.url, adapter.requestPath, profile.providerModel)
+    : joinUrl(profile.url, adapter.requestPath);
+}
+
+function buildPollEndpoint(input: {
+  providerProfile: ProviderRuntimeConfig;
+  adapter: ProviderAdapterConfig;
+  taskId?: string;
+  overrideUrl?: string;
+}) {
+  const overrideUrl = normalizeText(input.overrideUrl);
+  if (overrideUrl) {
+    return /^https?:\/\//i.test(overrideUrl)
+      ? overrideUrl
+      : joinUrl(input.providerProfile.url, overrideUrl);
+  }
+
+  const rawPollPath = input.adapter.poll.path;
+  const submitEndpoint = buildProviderEndpoint(input.providerProfile, input.adapter);
+  if (!rawPollPath) {
+    if (!input.taskId || !input.adapter.poll.appendTaskId) return submitEndpoint;
+    return `${trimSlash(submitEndpoint)}/${encodeURIComponent(input.taskId)}`;
+  }
+
+  const replaced = rawPollPath
+    .replace(/\{taskId\}/g, input.taskId || '')
+    .replace(/\{task_id\}/g, input.taskId || '')
+    .replace(/\{jobId\}/g, input.taskId || '')
+    .replace(/\{id\}/g, input.taskId || '');
+
+  const baseEndpoint = /^https?:\/\//i.test(replaced)
+    ? replaced
+    : joinUrl(input.providerProfile.url, replaced);
+
+  if (!input.taskId || replaced !== rawPollPath || !input.adapter.poll.appendTaskId) return baseEndpoint;
+  return `${trimSlash(baseEndpoint)}/${encodeURIComponent(input.taskId)}`;
+}
+
 export function getProviderAdapterConfig(provider: ProviderKind): ProviderAdapterConfig {
   const runtime = getProviderRuntimeConfig(provider);
   const prefix = getAdapterEnvPrefix(provider);
@@ -156,9 +255,10 @@ export function getProviderAdapterConfig(provider: ProviderKind): ProviderAdapte
           ? 'data'
           : mode === 'elevenlabs-tts'
             ? 'audio'
-            : mode === 'runway-video' || mode === 'minimax-video' || mode === 'kling-video' || mode === 'seedance-video'
+            : isAsyncVideoMode(mode)
               ? 'data'
               : 'items';
+  const asyncByDefault = isAsyncVideoMode(mode);
 
   return {
     mode,
@@ -167,6 +267,20 @@ export function getProviderAdapterConfig(provider: ProviderKind): ProviderAdapte
     extraHeaders: parseStringRecord(process.env[`${prefix}_EXTRA_HEADERS_JSON`]),
     extraBody: parseJsonRecord(process.env[`${prefix}_EXTRA_BODY_JSON`]),
     voiceId: normalizeText(process.env[`${prefix}_VOICE_ID`]),
+    poll: {
+      enabled: parseBoolean(process.env[`${prefix}_POLL_ENABLED`], asyncByDefault),
+      path: normalizeText(process.env[`${prefix}_POLL_PATH`]),
+      method: pickConfiguredValue(process.env[`${prefix}_POLL_METHOD`], 'GET').toUpperCase() === 'POST' ? 'POST' : 'GET',
+      intervalMs: parsePositiveInteger(process.env[`${prefix}_POLL_INTERVAL_MS`], 4000),
+      maxAttempts: parsePositiveInteger(process.env[`${prefix}_POLL_MAX_ATTEMPTS`], 12),
+      taskIdKeys: parseStringList(process.env[`${prefix}_TASK_ID_KEYS`], ['taskId', 'task_id', 'jobId', 'job_id', 'task', 'id', 'uuid']),
+      statusUrlKeys: parseStringList(process.env[`${prefix}_STATUS_URL_KEYS`], ['statusUrl', 'status_url', 'pollUrl', 'poll_url', 'retrieveUrl', 'retrieve_url', 'taskUrl', 'task_url']),
+      statusKeys: parseStringList(process.env[`${prefix}_STATUS_KEYS`], ['status', 'state', 'phase', 'taskStatus', 'task_status']),
+      pendingValues: parseStringList(process.env[`${prefix}_PENDING_STATUS_VALUES`], ['queued', 'pending', 'running', 'processing', 'submitted', 'in_progress']),
+      successValues: parseStringList(process.env[`${prefix}_SUCCEEDED_STATUS_VALUES`], ['succeeded', 'success', 'completed', 'done', 'finished', 'ready']),
+      failureValues: parseStringList(process.env[`${prefix}_FAILED_STATUS_VALUES`], ['failed', 'error', 'cancelled', 'canceled']),
+      appendTaskId: parseBoolean(process.env[`${prefix}_POLL_APPEND_TASK_ID`], asyncByDefault),
+    },
   };
 }
 
@@ -278,9 +392,7 @@ export function buildProviderAdapterRequest(input: {
   const providerProfile = getProviderRuntimeConfig(input.provider);
   const adapter = getProviderAdapterConfig(input.provider);
   const items = input.payload.map((item) => toJsonRecord(item));
-  const endpoint = adapter.mode === 'gemini-image'
-    ? buildGeminiEndpoint(providerProfile.url, adapter.requestPath, providerProfile.providerModel)
-    : joinUrl(providerProfile.url, adapter.requestPath);
+  const endpoint = buildProviderEndpoint(providerProfile, adapter);
   const headers = mergeRequestHeaders(input.headers, adapter.extraHeaders);
 
   if (adapter.mode === 'single-item') {
@@ -347,7 +459,7 @@ export function buildProviderAdapterRequest(input: {
     } satisfies ProviderAdapterRequest;
   }
 
-  if (adapter.mode === 'runway-video' || adapter.mode === 'minimax-video' || adapter.mode === 'kling-video' || adapter.mode === 'seedance-video') {
+  if (isAsyncVideoMode(adapter.mode)) {
     return {
       endpoint,
       requestBody: items.map((item) => buildVideoPromptBody(item, providerProfile, adapter, adapter.mode)),
@@ -367,6 +479,41 @@ export function buildProviderAdapterRequest(input: {
     responseItemsKey: adapter.responseItemsKey,
     batchMode: 'batch',
   } satisfies ProviderAdapterRequest;
+}
+
+export function buildProviderPollRequest(input: {
+  provider: ProviderKind;
+  taskId?: string;
+  headers: Record<string, string>;
+  overrideUrl?: string;
+}) {
+  const providerProfile = getProviderRuntimeConfig(input.provider);
+  const adapter = getProviderAdapterConfig(input.provider);
+  if (!adapter.poll.enabled) return null;
+
+  const endpoint = buildPollEndpoint({
+    providerProfile,
+    adapter,
+    taskId: input.taskId,
+    overrideUrl: input.overrideUrl,
+  });
+
+  if (!endpoint) return null;
+
+  return {
+    endpoint,
+    method: adapter.poll.method,
+    requestHeaders: mergeRequestHeaders(input.headers, adapter.extraHeaders),
+    requestBody: adapter.poll.method === 'POST'
+      ? {
+          id: input.taskId || null,
+          taskId: input.taskId || null,
+          task_id: input.taskId || null,
+          jobId: input.taskId || null,
+          job_id: input.taskId || null,
+        }
+      : undefined,
+  } satisfies ProviderPollRequest;
 }
 
 export function normalizeAdapterResponse(responseBody: unknown, request: ProviderAdapterRequest) {
