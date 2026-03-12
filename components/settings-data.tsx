@@ -5,6 +5,7 @@ import { getLlmConfig } from '@/lib/llm';
 import { getGeneratedMediaEntries, summarizeGeneratedMediaCounts } from '@/features/media/service';
 import { buildProjectHref } from '@/lib/project-links';
 import { listProviderRuntimeConfigs } from '@/lib/provider-config';
+import { listProviderAdapterSnapshots, type AdapterValueSource } from '@/lib/provider-adapters';
 
 type RuntimeProbe = {
   state: 'not-configured' | 'reachable' | 'warn' | 'error';
@@ -26,6 +27,27 @@ function maskUrl(url: string) {
 function buildAuthHeaderValue(authScheme: string, apiKey: string) {
   if (!apiKey) return null;
   return /^(raw|none)$/i.test(authScheme) ? apiKey : `${authScheme} ${apiKey}`.trim();
+}
+
+function getProviderEnvPrefix(provider: 'image-sequence' | 'voice-synthesis' | 'video-assembly') {
+  if (provider === 'image-sequence') return 'STORYFLOW_IMAGE_PROVIDER';
+  if (provider === 'voice-synthesis') return 'STORYFLOW_VOICE_PROVIDER';
+  return 'STORYFLOW_VIDEO_PROVIDER';
+}
+
+function getSourceLabel(source: AdapterValueSource) {
+  if (source === 'env') return '环境覆盖';
+  if (source === 'preset') return '预设默认';
+  return '直接沿用';
+}
+
+function getBatchModeLabel(batchMode: 'single' | 'batch') {
+  return batchMode === 'single' ? '逐条提交' : '批量提交';
+}
+
+function formatKeyPreview(values: string[], limit: number) {
+  const picked = values.slice(0, limit);
+  return picked.length > 0 ? picked.join(' / ') : '无';
 }
 
 async function probeEndpoint(input: {
@@ -94,11 +116,27 @@ export async function SettingsData({ projectId }: { projectId?: string }) {
   const llm = getLlmConfig();
   const sharedAuthHeader = process.env.STORYFLOW_PROVIDER_AUTH_HEADER || 'Authorization';
   const sharedAuthScheme = process.env.STORYFLOW_PROVIDER_AUTH_SCHEME || 'Bearer';
-  const providers = listProviderRuntimeConfigs();
+  const adapterSnapshots = listProviderAdapterSnapshots();
+  const providers = listProviderRuntimeConfigs().map((provider) => ({
+    ...provider,
+    adapterSnapshot: adapterSnapshots.find((item) => item.provider === provider.provider) || null,
+  }));
   const enabledProviders = providers.filter((item) => item.executionModeHint === 'remote').length;
+  const pollingProviders = providers.filter((item) => item.adapterSnapshot?.poll.enabled).length;
   const providerSpecificKeyCount = providers.filter((item) => item.apiKeySource === 'provider').length;
   const namedProviders = providers.filter((item) => item.nameConfigured).length;
   const modeledProviders = providers.filter((item) => item.modelConfigured).length;
+  const adapterOverrideCount = providers.filter((item) => {
+    const adapter = item.adapterSnapshot;
+    if (!adapter) return false;
+    return adapter.requestPathSource === 'env'
+      || adapter.responseItemsKeySource === 'env'
+      || adapter.extraHeadersSource === 'env'
+      || adapter.extraBodySource === 'env'
+      || adapter.voiceIdSource === 'env'
+      || adapter.pollHasOverrides;
+  }).length;
+
   const latestProject = await (projectId
     ? prisma.project.findUnique({
         where: { id: projectId },
@@ -156,7 +194,7 @@ export async function SettingsData({ projectId }: { projectId?: string }) {
       <div className="snapshot-card">
         <p className="eyebrow">运行时设置</p>
         <h3>模型与 Provider 状态</h3>
-        <p>这里集中展示默认模型、真实 Provider、鉴权策略、模拟回退、超时和连通性体检，方便判断当前环境更适合演示、联调还是正式执行。</p>
+        <p>这里集中展示默认模型、真实 Provider、鉴权策略、适配预设、异步轮询和连通性体检，方便判断当前环境更适合演示、联调还是正式执行。</p>
         <div className="meta-list">
           <span>默认模型：{llm.model}</span>
           <span>LLM：{llm.enabled ? '已接通' : '未接通，回退模板输出'}</span>
@@ -164,6 +202,8 @@ export async function SettingsData({ projectId }: { projectId?: string }) {
           <span>已连通 Provider：{reachableProviders} / {providers.length}</span>
           <span>已命名供应商：{namedProviders} / {providers.length}</span>
           <span>已声明模型：{modeledProviders} / {providers.length}</span>
+          <span>轮询已启用：{pollingProviders} / {providers.length}</span>
+          <span>适配覆写：{adapterOverrideCount} / {providers.length}</span>
           <span>独立鉴权：{providerSpecificKeyCount} / {providers.length}</span>
           <span>共享鉴权：{sharedAuthHeader} / {sharedAuthScheme}</span>
         </div>
@@ -189,11 +229,13 @@ export async function SettingsData({ projectId }: { projectId?: string }) {
           <p>{llmProbe.detail}</p>
         </div>
         {providers.map((provider) => {
+          const adapter = provider.adapterSnapshot;
           const probe = providerProbes.find((item) => item.key === provider.provider)?.probe || {
             state: 'error',
             detail: '探测结果缺失。',
             checkedAt: new Date().toISOString(),
           } satisfies RuntimeProbe;
+          const providerEnvPrefix = getProviderEnvPrefix(provider.provider);
 
           return (
             <div key={provider.provider} className="asset-tile">
@@ -207,14 +249,27 @@ export async function SettingsData({ projectId }: { projectId?: string }) {
                 <span>鉴权头：{provider.authHeader}</span>
                 <span>鉴权方案：{provider.authScheme}</span>
                 <span>超时：{provider.timeoutMs} ms</span>
+                {adapter ? <span>预设：{adapter.presetLabel}</span> : null}
+                {adapter ? <span>请求：{getBatchModeLabel(adapter.batchMode)}</span> : null}
+                {adapter ? <span>轮询：{adapter.poll.enabled ? '已启用' : '未启用'}</span> : null}
                 <span>探测：{getProbeLabel(probe)}</span>
                 {typeof probe.httpStatus === 'number' ? <span>HTTP：{probe.httpStatus}</span> : null}
                 {typeof probe.latencyMs === 'number' ? <span>延迟：{probe.latencyMs} ms</span> : null}
                 <span>{provider.apiKeySourceLabel}</span>
               </div>
               <p>{probe.detail}</p>
+              {adapter ? (
+                <>
+                  <p>提交路径：<code>{adapter.requestPathPreview}</code>（{getSourceLabel(adapter.requestPathSource)}）；响应键：<code>{adapter.responseItemsKey}</code>（{getSourceLabel(adapter.responseItemsKeySource)}）。</p>
+                  <p>轮询策略：{adapter.pollSummary}；任务键：<code>{formatKeyPreview(adapter.poll.taskIdKeys, 4)}</code>；状态键：<code>{formatKeyPreview(adapter.poll.statusKeys, 4)}</code>；状态地址键：<code>{formatKeyPreview(adapter.poll.statusUrlKeys, 3)}</code>。</p>
+                  <p>{adapter.notes.join(' ')}</p>
+                </>
+              ) : null}
               {provider.executionModeHint === 'remote' && (!provider.nameConfigured || !provider.modelConfigured) ? (
                 <p>建议补齐环境变量：{!provider.nameConfigured ? '供应商名' : ''}{!provider.nameConfigured && !provider.modelConfigured ? ' + ' : ''}{!provider.modelConfigured ? '模型名' : ''}。</p>
+              ) : null}
+              {provider.executionModeHint === 'remote' && adapter?.poll.enabled && !adapter.poll.path && adapter.poll.appendTaskId ? (
+                <p>当前默认按 <code>{'{submitEndpoint}/{taskId}'}</code> 回查；若供应商状态接口不同，请显式填写 <code>{providerEnvPrefix}_POLL_PATH</code>。</p>
               ) : null}
             </div>
           );
@@ -225,17 +280,18 @@ export async function SettingsData({ projectId }: { projectId?: string }) {
         <div className="asset-tile">
           <span className="label">执行策略</span>
           <h4>真实执行与模拟执行</h4>
-          <p>{enabledProviders > 0 ? '当前至少已有一个真实 Provider 可用；未配置的 Provider 仍会自动回退到模拟执行。建议同时补齐供应商名与模型名，便于联调和诊断。' : '当前三个生成环节都还没有配置真实 Provider，系统会统一走模拟执行闭环。'}</p>
+          <p>{enabledProviders > 0 ? '当前至少已有一个真实 Provider 可用；未配置的 Provider 仍会自动回退到模拟执行。建议同时补齐供应商名、模型名和鉴权，便于联调和诊断。' : '当前三个生成环节都还没有配置真实 Provider，系统会统一走模拟执行闭环。'}</p>
         </div>
         <div className="asset-tile">
-          <span className="label">导出目录</span>
-          <h4>工件与交付包</h4>
-          <p><code>exports/render-runs</code> 保存执行请求 / 响应工件，交付包内还会带上 <code>generated-media-library.json</code> 媒体索引。</p>
+          <span className="label">适配预设</span>
+          <h4>默认预设与覆写</h4>
+          <p>{pollingProviders > 0 ? `当前已有 ${pollingProviders} 个 Provider 启用了异步轮询，适合真实视频生成任务。` : '当前尚未启用异步轮询预设；如接视频任务型接口，建议选择内置视频适配器。'}</p>
+          <p>{adapterOverrideCount > 0 ? `已有 ${adapterOverrideCount} 个 Provider 使用了环境变量覆写，便于适配你自己的网关。` : '当前主要依赖内置预设；若网关字段有差异，可继续用 *_REQUEST_PATH / *_POLL_* / *_EXTRA_* 覆写。'}</p>
         </div>
         <div className="asset-tile">
           <span className="label">下一步建议</span>
           <h4>环境补齐顺序</h4>
-          <p>{llm.enabled ? '优先继续补图像 / 语音 / 视频 Provider 的供应商名、模型名和独立鉴权。' : '先补 LLM endpoint，再补图像 / 语音 / 视频 Provider 的供应商、模型与鉴权，能最快形成真实主链。'}</p>
+          <p>{llm.enabled ? '优先继续补图像 / 语音 / 视频 Provider 的供应商名、模型名与独立鉴权；视频型接口优先确认轮询路径。' : '先补 LLM endpoint，再补图像 / 语音 / 视频 Provider 的供应商、模型与鉴权，能最快形成真实主链。'}</p>
         </div>
       </div>
 

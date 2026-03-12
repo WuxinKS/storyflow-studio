@@ -1,5 +1,6 @@
 import {
   getProviderRuntimeConfig,
+  type ProviderChannel,
   type ProviderKind,
   type ProviderRuntimeConfig,
 } from '@/lib/provider-config';
@@ -44,6 +45,38 @@ export type ProviderAdapterConfig = {
   poll: ProviderPollConfig;
 };
 
+export type ProviderAdapterPreset = {
+  label: string;
+  requestPath: string;
+  responseItemsKey: string;
+  batchMode: 'single' | 'batch';
+  notes: string[];
+  poll: ProviderPollConfig;
+};
+
+export type AdapterValueSource = 'env' | 'preset' | 'default';
+
+export type ProviderAdapterSnapshot = ProviderAdapterConfig & {
+  provider: ProviderKind;
+  channel: ProviderChannel;
+  title: string;
+  providerName: string;
+  providerModel: string;
+  presetLabel: string;
+  batchMode: 'single' | 'batch';
+  notes: string[];
+  requestPathSource: AdapterValueSource;
+  responseItemsKeySource: AdapterValueSource;
+  extraHeadersSource: AdapterValueSource;
+  extraBodySource: AdapterValueSource;
+  voiceIdSource: AdapterValueSource;
+  pollSource: AdapterValueSource;
+  pollHasOverrides: boolean;
+  usesAsyncPolling: boolean;
+  pollSummary: string;
+  requestPathPreview: string;
+};
+
 export type ProviderAdapterRequest = {
   endpoint: string;
   requestBody: unknown;
@@ -58,6 +91,15 @@ export type ProviderPollRequest = {
   requestHeaders: Record<string, string>;
   requestBody?: unknown;
 };
+
+const PROVIDER_ORDER: ProviderKind[] = ['image-sequence', 'voice-synthesis', 'video-assembly'];
+
+const COMMON_TASK_ID_KEYS = ['taskId', 'task_id', 'jobId', 'job_id', 'task', 'job', 'requestId', 'request_id', 'id', 'uuid'];
+const COMMON_STATUS_URL_KEYS = ['statusUrl', 'status_url', 'pollUrl', 'poll_url', 'retrieveUrl', 'retrieve_url', 'taskUrl', 'task_url', 'resultUrl', 'result_url'];
+const COMMON_STATUS_KEYS = ['status', 'state', 'phase', 'taskStatus', 'task_status', 'jobStatus', 'job_status'];
+const COMMON_PENDING_VALUES = ['queued', 'pending', 'running', 'processing', 'submitted', 'in_progress', 'starting', 'preparing'];
+const COMMON_SUCCESS_VALUES = ['succeeded', 'success', 'completed', 'done', 'finished', 'ready', 'generated'];
+const COMMON_FAILURE_VALUES = ['failed', 'error', 'cancelled', 'canceled', 'rejected', 'timed_out', 'timeout', 'expired', 'aborted'];
 
 function normalizeText(value: string | undefined) {
   return typeof value === 'string' ? value.trim() : '';
@@ -150,23 +192,188 @@ function buildGeminiEndpoint(baseUrl: string, requestPath: string, providerModel
   return `${normalizedBase}/v1beta/models/${providerModel || 'gemini-2.0-flash-preview-image-generation'}:generateContent`;
 }
 
-function inferAdapterMode(provider: ProviderRuntimeConfig): ProviderAdapterMode {
-  const providerName = provider.providerName.toLowerCase();
+function mergeUniqueStrings(...groups: string[][]) {
+  return Array.from(new Set(groups.flat().map((item) => item.trim()).filter(Boolean)));
+}
 
-  if (provider.channel === 'image' && providerName.includes('gemini')) return 'gemini-image';
-  if (provider.channel === 'image' && (providerName.includes('即梦') || providerName.includes('jimeng') || providerName.includes('seedream'))) return 'jimeng-image';
-  if (provider.channel === 'image' && providerName.includes('openai')) return 'openai-image';
-  if (provider.channel === 'voice' && providerName.includes('elevenlabs')) return 'elevenlabs-tts';
-  if (provider.channel === 'voice' && providerName.includes('openai')) return 'openai-speech';
-  if (provider.channel === 'video' && providerName.includes('runway')) return 'runway-video';
-  if (provider.channel === 'video' && providerName.includes('minimax')) return 'minimax-video';
-  if (provider.channel === 'video' && providerName.includes('kling')) return 'kling-video';
-  if (provider.channel === 'video' && providerName.includes('seedance')) return 'seedance-video';
+function createPollConfig(overrides: Partial<ProviderPollConfig> = {}): ProviderPollConfig {
+  return {
+    enabled: false,
+    path: '',
+    method: 'GET',
+    intervalMs: 4000,
+    maxAttempts: 12,
+    taskIdKeys: COMMON_TASK_ID_KEYS,
+    statusUrlKeys: COMMON_STATUS_URL_KEYS,
+    statusKeys: COMMON_STATUS_KEYS,
+    pendingValues: COMMON_PENDING_VALUES,
+    successValues: COMMON_SUCCESS_VALUES,
+    failureValues: COMMON_FAILURE_VALUES,
+    appendTaskId: false,
+    ...overrides,
+  };
+}
+
+function getProviderHints(provider: ProviderRuntimeConfig) {
+  return `${provider.providerName} ${provider.providerModel} ${provider.url}`.toLowerCase();
+}
+
+function inferAdapterMode(provider: ProviderRuntimeConfig): ProviderAdapterMode {
+  const hints = getProviderHints(provider);
+
+  if (provider.channel === 'image' && (hints.includes('gemini') || hints.includes('generativelanguage'))) return 'gemini-image';
+  if (provider.channel === 'image' && (hints.includes('即梦') || hints.includes('jimeng') || hints.includes('seedream') || hints.includes('dreamina'))) return 'jimeng-image';
+  if (provider.channel === 'image' && (hints.includes('openai') || hints.includes('gpt-image'))) return 'openai-image';
+  if (provider.channel === 'voice' && hints.includes('elevenlabs')) return 'elevenlabs-tts';
+  if (provider.channel === 'voice' && (hints.includes('openai') || hints.includes('tts'))) return 'openai-speech';
+  if (provider.channel === 'video' && hints.includes('runway')) return 'runway-video';
+  if (provider.channel === 'video' && hints.includes('minimax')) return 'minimax-video';
+  if (provider.channel === 'video' && hints.includes('kling')) return 'kling-video';
+  if (provider.channel === 'video' && hints.includes('seedance')) return 'seedance-video';
   return 'generic-batch';
 }
 
 function isAsyncVideoMode(mode: ProviderAdapterMode) {
   return mode === 'runway-video' || mode === 'minimax-video' || mode === 'kling-video' || mode === 'seedance-video';
+}
+
+export function getProviderAdapterPreset(mode: ProviderAdapterMode): ProviderAdapterPreset {
+  switch (mode) {
+    case 'single-item':
+      return {
+        label: '通用逐条提交',
+        requestPath: '',
+        responseItemsKey: 'items',
+        batchMode: 'single',
+        notes: ['会把每条素材拆成独立请求逐个发送，适合非批量接口。'],
+        poll: createPollConfig(),
+      };
+    case 'openai-image':
+      return {
+        label: 'OpenAI 图像',
+        requestPath: '/images/generations',
+        responseItemsKey: 'data',
+        batchMode: 'single',
+        notes: ['默认生成 model + prompt 请求体，适合兼容 OpenAI Images 的网关。'],
+        poll: createPollConfig(),
+      };
+    case 'gemini-image':
+      return {
+        label: 'Gemini 图像',
+        requestPath: '',
+        responseItemsKey: 'candidates',
+        batchMode: 'single',
+        notes: ['会自动拼出 models/<model>:generateContent，并兼容 inlineData 图片返回。'],
+        poll: createPollConfig(),
+      };
+    case 'jimeng-image':
+      return {
+        label: '即梦 / Seedream 图像',
+        requestPath: '',
+        responseItemsKey: 'data',
+        batchMode: 'single',
+        notes: ['适合常见即梦图像网关；若返回 taskId，可继续用 *_POLL_* 覆写为异步回查。'],
+        poll: createPollConfig({
+          taskIdKeys: mergeUniqueStrings(COMMON_TASK_ID_KEYS, ['generationId', 'generation_id']),
+          statusKeys: mergeUniqueStrings(COMMON_STATUS_KEYS, ['progressStatus', 'progress_status']),
+        }),
+      };
+    case 'openai-speech':
+      return {
+        label: 'OpenAI 语音',
+        requestPath: '/audio/speech',
+        responseItemsKey: 'data',
+        batchMode: 'single',
+        notes: ['默认生成 model + voice + input 请求体。'],
+        poll: createPollConfig(),
+      };
+    case 'elevenlabs-tts':
+      return {
+        label: 'ElevenLabs TTS',
+        requestPath: '',
+        responseItemsKey: 'audio',
+        batchMode: 'single',
+        notes: ['若服务端按 voice 路径区分接口，可通过 *_VOICE_ID 和 *_REQUEST_PATH 补齐。'],
+        poll: createPollConfig(),
+      };
+    case 'runway-video':
+      return {
+        label: 'Runway 视频',
+        requestPath: '',
+        responseItemsKey: 'data',
+        batchMode: 'single',
+        notes: ['默认按异步任务处理；若服务直接返回 statusUrl，会优先使用该回查地址。'],
+        poll: createPollConfig({
+          enabled: true,
+          intervalMs: 5000,
+          maxAttempts: 18,
+          appendTaskId: true,
+          taskIdKeys: mergeUniqueStrings(COMMON_TASK_ID_KEYS, ['generationId', 'generation_id']),
+          statusUrlKeys: mergeUniqueStrings(COMMON_STATUS_URL_KEYS, ['queryUrl', 'query_url']),
+          statusKeys: mergeUniqueStrings(COMMON_STATUS_KEYS, ['progressStatus', 'progress_status']),
+        }),
+      };
+    case 'minimax-video':
+      return {
+        label: 'MiniMax 视频',
+        requestPath: '',
+        responseItemsKey: 'data',
+        batchMode: 'single',
+        notes: ['适合 submit → poll 的视频接口；默认持续回查直到成功、失败或超时。'],
+        poll: createPollConfig({
+          enabled: true,
+          intervalMs: 5000,
+          maxAttempts: 18,
+          appendTaskId: true,
+          taskIdKeys: mergeUniqueStrings(COMMON_TASK_ID_KEYS, ['fileId', 'file_id', 'generationId', 'generation_id']),
+          statusUrlKeys: mergeUniqueStrings(COMMON_STATUS_URL_KEYS, ['queryUrl', 'query_url']),
+          statusKeys: mergeUniqueStrings(COMMON_STATUS_KEYS, ['fileStatus', 'file_status']),
+        }),
+      };
+    case 'kling-video':
+      return {
+        label: 'Kling 视频',
+        requestPath: '',
+        responseItemsKey: 'data',
+        batchMode: 'single',
+        notes: ['默认启用异步回查，适合视频任务型网关。'],
+        poll: createPollConfig({
+          enabled: true,
+          intervalMs: 5000,
+          maxAttempts: 18,
+          appendTaskId: true,
+          taskIdKeys: mergeUniqueStrings(COMMON_TASK_ID_KEYS, ['generationId', 'generation_id', 'taskUuid']),
+          statusKeys: mergeUniqueStrings(COMMON_STATUS_KEYS, ['resultStatus', 'result_status']),
+        }),
+      };
+    case 'seedance-video':
+      return {
+        label: 'Seedance 视频',
+        requestPath: '',
+        responseItemsKey: 'data',
+        batchMode: 'single',
+        notes: ['默认适配 submit → poll 视频链；若状态接口不是 submitEndpoint/{taskId}，请显式填写 *_POLL_PATH。'],
+        poll: createPollConfig({
+          enabled: true,
+          intervalMs: 5000,
+          maxAttempts: 18,
+          appendTaskId: true,
+          taskIdKeys: mergeUniqueStrings(COMMON_TASK_ID_KEYS, ['generationId', 'generation_id']),
+          statusUrlKeys: mergeUniqueStrings(COMMON_STATUS_URL_KEYS, ['queryUrl', 'query_url']),
+          statusKeys: mergeUniqueStrings(COMMON_STATUS_KEYS, ['progressStatus', 'progress_status']),
+        }),
+      };
+    case 'generic-batch':
+    default:
+      return {
+        label: '通用批量 JSON',
+        requestPath: '',
+        responseItemsKey: 'items',
+        batchMode: 'batch',
+        notes: ['适合已经兼容 StoryFlow 批量载荷格式的统一网关。'],
+        poll: createPollConfig(),
+      };
+  }
 }
 
 function buildPromptFromItem(item: JsonRecord, fallbackLabel: string) {
@@ -192,6 +399,26 @@ function getAdapterEnvPrefix(provider: ProviderKind) {
   if (provider === 'image-sequence') return 'STORYFLOW_IMAGE_PROVIDER';
   if (provider === 'voice-synthesis') return 'STORYFLOW_VOICE_PROVIDER';
   return 'STORYFLOW_VIDEO_PROVIDER';
+}
+
+function hasEnvValue(name: string) {
+  return normalizeText(process.env[name]).length > 0;
+}
+
+function hasAnyEnvValue(names: string[]) {
+  return names.some((name) => hasEnvValue(name));
+}
+
+function getValueSource(envName: string, presetValue: string): AdapterValueSource {
+  if (hasEnvValue(envName)) return 'env';
+  if (presetValue) return 'preset';
+  return 'default';
+}
+
+function buildPollSummary(config: ProviderPollConfig) {
+  if (!config.enabled) return '未启用';
+  const pathPreview = config.path || (config.appendTaskId ? '{submitEndpoint}/{taskId}' : '{submitEndpoint}');
+  return `${config.method} ${pathPreview} · ${config.intervalMs}ms × ${config.maxAttempts}`;
 }
 
 function buildProviderEndpoint(profile: ProviderRuntimeConfig, adapter: ProviderAdapterConfig) {
@@ -238,50 +465,77 @@ export function getProviderAdapterConfig(provider: ProviderKind): ProviderAdapte
   const runtime = getProviderRuntimeConfig(provider);
   const prefix = getAdapterEnvPrefix(provider);
   const mode = pickConfiguredValue(process.env[`${prefix}_ADAPTER`], inferAdapterMode(runtime)) as ProviderAdapterMode;
-  const defaultRequestPath = mode === 'openai-image'
-    ? '/images/generations'
-    : mode === 'gemini-image'
-      ? ''
-      : mode === 'openai-speech'
-        ? '/audio/speech'
-        : '';
-  const defaultResponseItemsKey = mode === 'openai-image'
-    ? 'data'
-    : mode === 'gemini-image'
-      ? 'candidates'
-      : mode === 'jimeng-image'
-        ? 'data'
-        : mode === 'openai-speech'
-          ? 'data'
-          : mode === 'elevenlabs-tts'
-            ? 'audio'
-            : isAsyncVideoMode(mode)
-              ? 'data'
-              : 'items';
-  const asyncByDefault = isAsyncVideoMode(mode);
+  const preset = getProviderAdapterPreset(mode);
 
   return {
     mode,
-    requestPath: pickConfiguredValue(process.env[`${prefix}_REQUEST_PATH`], defaultRequestPath),
-    responseItemsKey: pickConfiguredValue(process.env[`${prefix}_RESPONSE_ITEMS_KEY`], defaultResponseItemsKey),
+    requestPath: pickConfiguredValue(process.env[`${prefix}_REQUEST_PATH`], preset.requestPath),
+    responseItemsKey: pickConfiguredValue(process.env[`${prefix}_RESPONSE_ITEMS_KEY`], preset.responseItemsKey),
     extraHeaders: parseStringRecord(process.env[`${prefix}_EXTRA_HEADERS_JSON`]),
     extraBody: parseJsonRecord(process.env[`${prefix}_EXTRA_BODY_JSON`]),
     voiceId: normalizeText(process.env[`${prefix}_VOICE_ID`]),
     poll: {
-      enabled: parseBoolean(process.env[`${prefix}_POLL_ENABLED`], asyncByDefault),
-      path: normalizeText(process.env[`${prefix}_POLL_PATH`]),
-      method: pickConfiguredValue(process.env[`${prefix}_POLL_METHOD`], 'GET').toUpperCase() === 'POST' ? 'POST' : 'GET',
-      intervalMs: parsePositiveInteger(process.env[`${prefix}_POLL_INTERVAL_MS`], 4000),
-      maxAttempts: parsePositiveInteger(process.env[`${prefix}_POLL_MAX_ATTEMPTS`], 12),
-      taskIdKeys: parseStringList(process.env[`${prefix}_TASK_ID_KEYS`], ['taskId', 'task_id', 'jobId', 'job_id', 'task', 'id', 'uuid']),
-      statusUrlKeys: parseStringList(process.env[`${prefix}_STATUS_URL_KEYS`], ['statusUrl', 'status_url', 'pollUrl', 'poll_url', 'retrieveUrl', 'retrieve_url', 'taskUrl', 'task_url']),
-      statusKeys: parseStringList(process.env[`${prefix}_STATUS_KEYS`], ['status', 'state', 'phase', 'taskStatus', 'task_status']),
-      pendingValues: parseStringList(process.env[`${prefix}_PENDING_STATUS_VALUES`], ['queued', 'pending', 'running', 'processing', 'submitted', 'in_progress']),
-      successValues: parseStringList(process.env[`${prefix}_SUCCEEDED_STATUS_VALUES`], ['succeeded', 'success', 'completed', 'done', 'finished', 'ready']),
-      failureValues: parseStringList(process.env[`${prefix}_FAILED_STATUS_VALUES`], ['failed', 'error', 'cancelled', 'canceled']),
-      appendTaskId: parseBoolean(process.env[`${prefix}_POLL_APPEND_TASK_ID`], asyncByDefault),
+      enabled: parseBoolean(process.env[`${prefix}_POLL_ENABLED`], preset.poll.enabled),
+      path: pickConfiguredValue(process.env[`${prefix}_POLL_PATH`], preset.poll.path),
+      method: pickConfiguredValue(process.env[`${prefix}_POLL_METHOD`], preset.poll.method).toUpperCase() === 'POST' ? 'POST' : 'GET',
+      intervalMs: parsePositiveInteger(process.env[`${prefix}_POLL_INTERVAL_MS`], preset.poll.intervalMs),
+      maxAttempts: parsePositiveInteger(process.env[`${prefix}_POLL_MAX_ATTEMPTS`], preset.poll.maxAttempts),
+      taskIdKeys: parseStringList(process.env[`${prefix}_TASK_ID_KEYS`], preset.poll.taskIdKeys),
+      statusUrlKeys: parseStringList(process.env[`${prefix}_STATUS_URL_KEYS`], preset.poll.statusUrlKeys),
+      statusKeys: parseStringList(process.env[`${prefix}_STATUS_KEYS`], preset.poll.statusKeys),
+      pendingValues: parseStringList(process.env[`${prefix}_PENDING_STATUS_VALUES`], preset.poll.pendingValues),
+      successValues: parseStringList(process.env[`${prefix}_SUCCEEDED_STATUS_VALUES`], preset.poll.successValues),
+      failureValues: parseStringList(process.env[`${prefix}_FAILED_STATUS_VALUES`], preset.poll.failureValues),
+      appendTaskId: parseBoolean(process.env[`${prefix}_POLL_APPEND_TASK_ID`], preset.poll.appendTaskId),
     },
   };
+}
+
+export function getProviderAdapterSnapshot(provider: ProviderKind): ProviderAdapterSnapshot {
+  const runtime = getProviderRuntimeConfig(provider);
+  const prefix = getAdapterEnvPrefix(provider);
+  const adapter = getProviderAdapterConfig(provider);
+  const preset = getProviderAdapterPreset(adapter.mode);
+  const pollEnvNames = [
+    `${prefix}_POLL_ENABLED`,
+    `${prefix}_POLL_PATH`,
+    `${prefix}_POLL_METHOD`,
+    `${prefix}_POLL_INTERVAL_MS`,
+    `${prefix}_POLL_MAX_ATTEMPTS`,
+    `${prefix}_TASK_ID_KEYS`,
+    `${prefix}_STATUS_URL_KEYS`,
+    `${prefix}_STATUS_KEYS`,
+    `${prefix}_PENDING_STATUS_VALUES`,
+    `${prefix}_SUCCEEDED_STATUS_VALUES`,
+    `${prefix}_FAILED_STATUS_VALUES`,
+    `${prefix}_POLL_APPEND_TASK_ID`,
+  ];
+
+  return {
+    ...adapter,
+    provider,
+    channel: runtime.channel,
+    title: runtime.title,
+    providerName: runtime.providerName,
+    providerModel: runtime.providerModel,
+    presetLabel: preset.label,
+    batchMode: preset.batchMode,
+    notes: preset.notes,
+    requestPathSource: getValueSource(`${prefix}_REQUEST_PATH`, preset.requestPath),
+    responseItemsKeySource: getValueSource(`${prefix}_RESPONSE_ITEMS_KEY`, preset.responseItemsKey),
+    extraHeadersSource: hasEnvValue(`${prefix}_EXTRA_HEADERS_JSON`) ? 'env' : 'default',
+    extraBodySource: hasEnvValue(`${prefix}_EXTRA_BODY_JSON`) ? 'env' : 'default',
+    voiceIdSource: hasEnvValue(`${prefix}_VOICE_ID`) ? 'env' : 'default',
+    pollSource: hasAnyEnvValue(pollEnvNames) ? 'env' : 'preset',
+    pollHasOverrides: hasAnyEnvValue(pollEnvNames),
+    usesAsyncPolling: adapter.poll.enabled,
+    pollSummary: buildPollSummary(adapter.poll),
+    requestPathPreview: adapter.requestPath || '(直接使用 Provider URL)',
+  };
+}
+
+export function listProviderAdapterSnapshots() {
+  return PROVIDER_ORDER.map((provider) => getProviderAdapterSnapshot(provider));
 }
 
 function buildCommonEnvelope(input: {
@@ -395,7 +649,67 @@ export function buildProviderAdapterRequest(input: {
   const endpoint = buildProviderEndpoint(providerProfile, adapter);
   const headers = mergeRequestHeaders(input.headers, adapter.extraHeaders);
 
-  if (adapter.mode === 'single-item') {
+  if (getProviderAdapterPreset(adapter.mode).batchMode === 'single') {
+    if (adapter.mode === 'openai-image') {
+      return {
+        endpoint,
+        requestBody: items.map((item) => buildOpenAiImageBody(item, providerProfile, adapter)),
+        requestHeaders: headers,
+        responseItemsKey: adapter.responseItemsKey,
+        batchMode: 'single',
+      } satisfies ProviderAdapterRequest;
+    }
+
+    if (adapter.mode === 'gemini-image') {
+      return {
+        endpoint,
+        requestBody: items.map((item) => buildGeminiImageBody(item, providerProfile, adapter)),
+        requestHeaders: headers,
+        responseItemsKey: adapter.responseItemsKey,
+        batchMode: 'single',
+      } satisfies ProviderAdapterRequest;
+    }
+
+    if (adapter.mode === 'jimeng-image') {
+      return {
+        endpoint,
+        requestBody: items.map((item) => buildJimengImageBody(item, providerProfile, adapter)),
+        requestHeaders: headers,
+        responseItemsKey: adapter.responseItemsKey,
+        batchMode: 'single',
+      } satisfies ProviderAdapterRequest;
+    }
+
+    if (adapter.mode === 'openai-speech') {
+      return {
+        endpoint,
+        requestBody: items.map((item) => buildOpenAiSpeechBody(item, providerProfile, adapter)),
+        requestHeaders: headers,
+        responseItemsKey: adapter.responseItemsKey,
+        batchMode: 'single',
+      } satisfies ProviderAdapterRequest;
+    }
+
+    if (adapter.mode === 'elevenlabs-tts') {
+      return {
+        endpoint,
+        requestBody: items.map((item) => buildElevenLabsBody(item, providerProfile, adapter)),
+        requestHeaders: headers,
+        responseItemsKey: adapter.responseItemsKey,
+        batchMode: 'single',
+      } satisfies ProviderAdapterRequest;
+    }
+
+    if (isAsyncVideoMode(adapter.mode)) {
+      return {
+        endpoint,
+        requestBody: items.map((item) => buildVideoPromptBody(item, providerProfile, adapter, adapter.mode)),
+        requestHeaders: headers,
+        responseItemsKey: adapter.responseItemsKey,
+        batchMode: 'single',
+      } satisfies ProviderAdapterRequest;
+    }
+
     return {
       endpoint,
       requestBody: items.map((item, index) => ({
@@ -403,66 +717,6 @@ export function buildProviderAdapterRequest(input: {
         item,
         index,
       })),
-      requestHeaders: headers,
-      responseItemsKey: adapter.responseItemsKey,
-      batchMode: 'single',
-    } satisfies ProviderAdapterRequest;
-  }
-
-  if (adapter.mode === 'openai-image') {
-    return {
-      endpoint,
-      requestBody: items.map((item) => buildOpenAiImageBody(item, providerProfile, adapter)),
-      requestHeaders: headers,
-      responseItemsKey: adapter.responseItemsKey,
-      batchMode: 'single',
-    } satisfies ProviderAdapterRequest;
-  }
-
-  if (adapter.mode === 'gemini-image') {
-    return {
-      endpoint,
-      requestBody: items.map((item) => buildGeminiImageBody(item, providerProfile, adapter)),
-      requestHeaders: headers,
-      responseItemsKey: adapter.responseItemsKey,
-      batchMode: 'single',
-    } satisfies ProviderAdapterRequest;
-  }
-
-  if (adapter.mode === 'jimeng-image') {
-    return {
-      endpoint,
-      requestBody: items.map((item) => buildJimengImageBody(item, providerProfile, adapter)),
-      requestHeaders: headers,
-      responseItemsKey: adapter.responseItemsKey,
-      batchMode: 'single',
-    } satisfies ProviderAdapterRequest;
-  }
-
-  if (adapter.mode === 'openai-speech') {
-    return {
-      endpoint,
-      requestBody: items.map((item) => buildOpenAiSpeechBody(item, providerProfile, adapter)),
-      requestHeaders: headers,
-      responseItemsKey: adapter.responseItemsKey,
-      batchMode: 'single',
-    } satisfies ProviderAdapterRequest;
-  }
-
-  if (adapter.mode === 'elevenlabs-tts') {
-    return {
-      endpoint,
-      requestBody: items.map((item) => buildElevenLabsBody(item, providerProfile, adapter)),
-      requestHeaders: headers,
-      responseItemsKey: adapter.responseItemsKey,
-      batchMode: 'single',
-    } satisfies ProviderAdapterRequest;
-  }
-
-  if (isAsyncVideoMode(adapter.mode)) {
-    return {
-      endpoint,
-      requestBody: items.map((item) => buildVideoPromptBody(item, providerProfile, adapter, adapter.mode)),
       requestHeaders: headers,
       responseItemsKey: adapter.responseItemsKey,
       batchMode: 'single',

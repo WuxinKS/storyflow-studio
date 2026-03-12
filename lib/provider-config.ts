@@ -117,11 +117,11 @@ function inferProviderName(url: string) {
     if (host.includes('kling')) return 'Kling';
     if (host.includes('seedance')) return 'Seedance';
     if (host.includes('gemini') || host.includes('generativelanguage')) return 'Gemini';
-    if (host.includes('jimeng') || host.includes('seedream')) return '即梦';
+    if (host.includes('jimeng') || host.includes('seedream') || host.includes('dreamina')) return '即梦';
     if (host.includes('stability')) return 'Stability AI';
     if (host.includes('siliconflow')) return 'SiliconFlow';
     if (host.includes('aliyun') || host.includes('aliyuncs')) return '阿里云';
-    if (host.includes('volcengine') || host.includes('doubao') || host.includes('byteplus')) return '火山引擎';
+    if (host.includes('volcengine') || host.includes('doubao') || host.includes('byteplus') || host.includes('bytedance')) return '火山引擎';
     if (host.includes('baidu')) return '百度';
 
     const segments = host.replace(/^www\./, '').split('.').filter(Boolean);

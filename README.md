@@ -203,6 +203,27 @@ STORYFLOW_IMAGE_PROVIDER_MODEL="seedream-4.0"
 STORYFLOW_IMAGE_PROVIDER_ADAPTER="jimeng-image"
 STORYFLOW_IMAGE_PROVIDER_EXTRA_BODY_JSON='{"response_format":"url","size":"1536x864"}'
 
+# 视频：Runway（将 URL 替换为你的真实网关）
+STORYFLOW_VIDEO_PROVIDER_URL="https://your-runway-endpoint.example.com/v1/video/generations"
+STORYFLOW_VIDEO_PROVIDER_NAME="Runway"
+STORYFLOW_VIDEO_PROVIDER_MODEL="gen4_turbo"
+STORYFLOW_VIDEO_PROVIDER_ADAPTER="runway-video"
+STORYFLOW_VIDEO_PROVIDER_EXTRA_BODY_JSON='{"duration":5,"ratio":"16:9"}'
+
+# 视频：MiniMax（将 URL 替换为你的真实网关）
+STORYFLOW_VIDEO_PROVIDER_URL="https://your-minimax-endpoint.example.com/v1/video/generations"
+STORYFLOW_VIDEO_PROVIDER_NAME="MiniMax"
+STORYFLOW_VIDEO_PROVIDER_MODEL="video-01"
+STORYFLOW_VIDEO_PROVIDER_ADAPTER="minimax-video"
+STORYFLOW_VIDEO_PROVIDER_EXTRA_BODY_JSON='{"duration":5,"ratio":"16:9"}'
+
+# 视频：Kling（将 URL 替换为你的真实网关）
+STORYFLOW_VIDEO_PROVIDER_URL="https://your-kling-endpoint.example.com/v1/video/generations"
+STORYFLOW_VIDEO_PROVIDER_NAME="Kling"
+STORYFLOW_VIDEO_PROVIDER_MODEL="kling-v1"
+STORYFLOW_VIDEO_PROVIDER_ADAPTER="kling-video"
+STORYFLOW_VIDEO_PROVIDER_EXTRA_BODY_JSON='{"duration":5,"aspect_ratio":"16:9"}'
+
 # 视频：Seedance（将 URL 替换为你的真实网关）
 STORYFLOW_VIDEO_PROVIDER_URL="https://your-seedance-endpoint.example.com/v1/video/generations"
 STORYFLOW_VIDEO_PROVIDER_NAME="Seedance"
@@ -213,16 +234,18 @@ STORYFLOW_VIDEO_PROVIDER_EXTRA_BODY_JSON='{"duration":5,"aspect_ratio":"16:9"}'
 
 说明：
 - `gemini-image` 会自动把基础 URL 组装为 `.../models/<model>:generateContent`，并兼容 Gemini 返回的 `inlineData` 图片结果。
-- `jimeng-image` 当前按单条任务逐个调用，适合接常见的图片生成网关；如你的服务字段不同，可通过 `*_EXTRA_BODY_JSON` 和 `*_REQUEST_PATH` 继续覆写。
-- `seedance-video` 已接入通用异步任务轮询层；如供应商返回 `taskId` / `statusUrl`，系统会自动回查，否则可通过 `*_POLL_*` 环境变量显式声明回查策略。
+- `jimeng-image` 会结合供应商名、模型名与 URL 自动识别；如果你的 URL 是 `dreamina` / `seedream` 一类，也能直接推断为即梦图像适配器。
+- `runway-video`、`minimax-video`、`kling-video`、`seedance-video` 都会默认启用异步轮询，并自动带上常见的 `taskId` / `status` / `statusUrl` 字段名。
+- 若视频网关的状态接口就是提交接口加 `/{taskId}`，可以只配置 URL + NAME + MODEL + ADAPTER；若状态接口不同，再补 `*_POLL_PATH` 即可。
+- 设置页现在会直接展示每个 Provider 的适配预设、请求路径来源、轮询策略、任务键与状态键，便于快速排查真实模型接入问题。
 - `*_POLL_*` 适用于图像 / 语音 / 视频三类 Provider；页面中的“推进执行中任务”会继续回查并在产物 ready 后自动写入媒体索引。
-- 建议同时配置 `STORYFLOW_*_PROVIDER_NAME` 与 `STORYFLOW_*_PROVIDER_MODEL`，设置页、QA、生成工作台和运行诊断会直接显示供应商与模型
-- 若供应商接口不是通用批量 JSON，可继续配置 `STORYFLOW_*_PROVIDER_ADAPTER`、`*_REQUEST_PATH`、`*_RESPONSE_ITEMS_KEY`、`*_EXTRA_BODY_JSON` 与 `*_EXTRA_HEADERS_JSON` 进入适配模式
-- 目前内置适配模式包括 `generic-batch`、`single-item`、`openai-image`、`gemini-image`、`jimeng-image`、`openai-speech`、`elevenlabs-tts`、`runway-video`、`minimax-video`、`kling-video`、`seedance-video`
-- `STORYFLOW_PROVIDER_AUTH_HEADER` / `STORYFLOW_PROVIDER_AUTH_SCHEME` / `STORYFLOW_PROVIDER_TIMEOUT_MS` 是共享默认值
-- 若某个 Provider 需要独立鉴权或独立超时，可单独配置 `STORYFLOW_IMAGE_*` / `STORYFLOW_VOICE_*` / `STORYFLOW_VIDEO_*`
-- `*_AUTH_SCHEME` 默认为 `Bearer`；若希望直接发送原始 key，可填 `raw`
-- `STORYFLOW_LLM_TIMEOUT_MS` 默认 180000；各类 Provider 默认超时 300000，可按 Provider 单独覆盖
+- 建议同时配置 `STORYFLOW_*_PROVIDER_NAME` 与 `STORYFLOW_*_PROVIDER_MODEL`，设置页、QA、生成工作台和运行诊断会直接显示供应商与模型。
+- 若供应商接口不是通用批量 JSON，可继续配置 `STORYFLOW_*_PROVIDER_ADAPTER`、`*_REQUEST_PATH`、`*_RESPONSE_ITEMS_KEY`、`*_EXTRA_BODY_JSON` 与 `*_EXTRA_HEADERS_JSON` 进入适配模式。
+- 目前内置适配模式包括 `generic-batch`、`single-item`、`openai-image`、`gemini-image`、`jimeng-image`、`openai-speech`、`elevenlabs-tts`、`runway-video`、`minimax-video`、`kling-video`、`seedance-video`。
+- `STORYFLOW_PROVIDER_AUTH_HEADER` / `STORYFLOW_PROVIDER_AUTH_SCHEME` / `STORYFLOW_PROVIDER_TIMEOUT_MS` 是共享默认值。
+- 若某个 Provider 需要独立鉴权或独立超时，可单独配置 `STORYFLOW_IMAGE_*` / `STORYFLOW_VOICE_*` / `STORYFLOW_VIDEO_*`。
+- `*_AUTH_SCHEME` 默认为 `Bearer`；若希望直接发送原始 key，可填 `raw`。
+- `STORYFLOW_LLM_TIMEOUT_MS` 默认 180000；各类 Provider 默认超时 300000，可按 Provider 单独覆盖。
 
 ## 后续优先级
 

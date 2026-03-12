@@ -6,8 +6,10 @@ import { parseVisualBibleDraft } from '@/features/visual/service';
 import { exportProductionBundle, exportProviderPayloads, exportRenderPresets } from '@/features/render/service';
 import { buildReferenceBindingSnapshot } from '@/features/reference/service';
 import { getSyncStatus } from '@/features/sync/service';
+import { getFinalCutPlan } from '@/features/final-cut/service';
 import { getLatestOutlineByTitle } from '@/lib/outline-store';
 import { getRenderProviderLabel } from '@/lib/display';
+import { listProviderAdapterSnapshots } from '@/lib/provider-adapters';
 import { listProviderProfileSnapshots } from '@/lib/provider-config';
 
 const TARGET_SCENE_COUNT = 5;
@@ -65,6 +67,10 @@ function getMaturityLevel(input: { blockers: number; failed: number }) {
   return '草稿可用';
 }
 
+function isAsyncAdapterMode(mode: string) {
+  return mode === 'runway-video' || mode === 'minimax-video' || mode === 'kling-video' || mode === 'seedance-video';
+}
+
 export async function getQaReport(projectId?: string, options?: { bundleExport?: Awaited<ReturnType<typeof exportProductionBundle>> | null }) {
   const project = await getQaProject(projectId);
   if (!project) return null;
@@ -77,6 +83,7 @@ export async function getQaReport(projectId?: string, options?: { bundleExport?:
   const generatedMedia = getGeneratedMediaEntries(project);
   const mediaCounts = summarizeGeneratedMediaCounts(generatedMedia);
   const providerProfiles = listProviderProfileSnapshots();
+  const providerAdapters = listProviderAdapterSnapshots();
 
   const shotKinds = project.shots.map((shot) => getShotKindFromTitle(shot.title));
   const invalidShotKinds = shotKinds.filter((kind) => !ALLOWED_SHOT_TITLES.includes(kind));
@@ -97,11 +104,15 @@ export async function getQaReport(projectId?: string, options?: { bundleExport?:
       : exportProductionBundle(project.id)
           .then((data) => ({ ok: true as const, data }))
           .catch((error) => ({ ok: false as const, error: error instanceof Error ? error.message : 'Unknown error' }))),
+    getFinalCutPlan(project.id)
+      .then((data) => data ? ({ ok: true as const, data }) : ({ ok: false as const, error: '当前还没有可导出的成片计划' }))
+      .catch((error) => ({ ok: false as const, error: error instanceof Error ? error.message : 'Unknown error' })),
   ]);
 
-  const [presetExport, providerExport, bundleExport] = exportChecks;
+  const [presetExport, providerExport, bundleExport, finalCutExport] = exportChecks;
   const failedRenderJobs = project.renderJobs.filter((job) => job.status === 'failed');
   const doneRenderJobs = project.renderJobs.filter((job) => job.status === 'done');
+  const runningRenderJobs = project.renderJobs.filter((job) => job.status === 'running');
   const staleLabels = syncStatus?.staleChecks || [];
   const referenceCount = project.references.length;
   const flavoredShots = project.shots.filter((shot) => hasReferenceFlavor(shot.prompt)).length;
@@ -115,6 +126,7 @@ export async function getQaReport(projectId?: string, options?: { bundleExport?:
       ].filter((item) => Array.isArray((item as { boundReferenceTitles?: unknown[] }).boundReferenceTitles) && ((item as { boundReferenceTitles?: unknown[] }).boundReferenceTitles?.length || 0) > 0).length
     : 0;
   const providerProfileWarnings = providerProfiles.filter((profile) => profile.executionModeHint === 'remote' && (!profile.nameConfigured || !profile.modelConfigured));
+  const providerAuthWarnings = providerProfiles.filter((profile) => profile.executionModeHint === 'remote' && !profile.apiKeyConfigured);
   const configuredProviderCount = providerProfiles.filter((profile) => profile.executionModeHint === 'remote').length;
   const providerProfileDetail = providerProfiles.map((profile) => {
     const missing: string[] = [];
@@ -129,6 +141,28 @@ export async function getQaReport(projectId?: string, options?: { bundleExport?:
 
     return `${getRenderProviderLabel(profile.provider)}: ${profile.providerName} / ${profile.providerModel || 'mock'} / ${profile.adapter || 'auto'}`;
   }).join(' / ');
+  const providerAuthDetail = configuredProviderCount === 0
+    ? '当前仍以 mock fallback 为主，允许先继续演示闭环。'
+    : providerProfiles
+        .filter((profile) => profile.executionModeHint === 'remote')
+        .map((profile) => `${getRenderProviderLabel(profile.provider)}: ${profile.apiKeyConfigured ? profile.apiKeySourceLabel : '未配置 Key'}`)
+        .join(' / ');
+  const asyncRemoteAdapters = providerAdapters.filter((adapter) => {
+    const profile = providerProfiles.find((item) => item.provider === adapter.provider);
+    return profile?.executionModeHint === 'remote' && isAsyncAdapterMode(adapter.mode);
+  });
+  const asyncPollingWarnings = asyncRemoteAdapters.filter((adapter) => !adapter.poll.enabled);
+  const providerPollingDetail = asyncRemoteAdapters.length === 0
+    ? '当前没有启用异步视频 Provider，允许跳过。'
+    : asyncRemoteAdapters
+        .map((adapter) => `${getRenderProviderLabel(adapter.provider)}: ${adapter.pollSummary}`)
+        .join(' / ');
+  const finalCutDetail = finalCutExport.ok
+    ? `状态:${finalCutExport.data.summary.assemblyState} / 视频覆盖:${finalCutExport.data.summary.videoCoverageRate}% / 音频覆盖:${finalCutExport.data.summary.audioCoverageRate}% / 预演:${finalCutExport.data.summary.readyForAssembly ? 'ready' : 'not-ready'}`
+    : finalCutExport.error;
+  const finalCutRecommendation = finalCutExport.ok && finalCutExport.data.recommendedActions.length > 0
+    ? ` / 建议:${finalCutExport.data.recommendedActions.slice(0, 2).join(' / ')}`
+    : '';
 
   const checks: QaCheck[] = [
     {
@@ -236,6 +270,24 @@ export async function getQaReport(projectId?: string, options?: { bundleExport?:
       blocksDelivery: false,
     },
     {
+      key: 'provider-auth',
+      label: '真实 Provider 已配置鉴权',
+      passed: configuredProviderCount === 0 || providerAuthWarnings.length === 0,
+      detail: providerAuthDetail,
+      group: 'render',
+      severity: configuredProviderCount > 0 ? 'warning' : 'info',
+      blocksDelivery: false,
+    },
+    {
+      key: 'provider-polling',
+      label: '异步 Provider 已声明轮询策略',
+      passed: asyncPollingWarnings.length === 0,
+      detail: providerPollingDetail,
+      group: 'render',
+      severity: asyncRemoteAdapters.length > 0 ? 'warning' : 'info',
+      blocksDelivery: false,
+    },
+    {
       key: 'sync-stale',
       label: '上下游链路没有过期',
       passed: staleLabels.length === 0,
@@ -254,6 +306,17 @@ export async function getQaReport(projectId?: string, options?: { bundleExport?:
       group: 'render',
       severity: project.renderJobs.length === 0 ? 'blocker' : 'warning',
       blocksDelivery: project.renderJobs.length === 0,
+    },
+    {
+      key: 'render-running',
+      label: '没有悬挂中的异步渲染任务',
+      passed: runningRenderJobs.length === 0,
+      detail: runningRenderJobs.length === 0
+        ? '当前没有 running 状态任务。'
+        : runningRenderJobs.map((job) => `${job.provider || 'unknown'}:running`).join(' / '),
+      group: 'render',
+      severity: runningRenderJobs.length > 0 ? 'blocker' : 'info',
+      blocksDelivery: runningRenderJobs.length > 0,
     },
     {
       key: 'render-completed',
@@ -289,6 +352,15 @@ export async function getQaReport(projectId?: string, options?: { bundleExport?:
       blocksDelivery: false,
     },
     {
+      key: 'final-cut-preview',
+      label: 'Final Cut 已达到可预演状态',
+      passed: finalCutExport.ok && finalCutExport.data.summary.readyForAssembly,
+      detail: `${finalCutDetail}${finalCutRecommendation}`,
+      group: 'render',
+      severity: 'warning',
+      blocksDelivery: false,
+    },
+    {
       key: 'export-presets',
       label: 'Render Presets 可成功导出',
       passed: presetExport.ok,
@@ -309,6 +381,15 @@ export async function getQaReport(projectId?: string, options?: { bundleExport?:
       group: 'export',
       severity: 'warning',
       blocksDelivery: false,
+    },
+    {
+      key: 'export-final-cut-plan',
+      label: 'Final Cut 计划可成功导出',
+      passed: finalCutExport.ok,
+      detail: finalCutDetail,
+      group: 'export',
+      severity: 'blocker',
+      blocksDelivery: !finalCutExport.ok,
     },
     {
       key: 'export-production-bundle',
