@@ -33,8 +33,9 @@ StoryFlow Studio 是一个面向内容创作者的 **AI 导演级创作工作台
 - QA v1：成熟度等级、阻断项、sync stale 检查
 - Render 执行链：真实 provider endpoint 接口 + mock fallback + 导出包
 - 镜头级参考绑定：参考素材可直接绑定到分场 / 镜头并进入分镜、渲染与导出链
-- 交付中心：集中回看 bundle、manifest、payload 与 zip 归档
+- 交付中心：集中回看 bundle、manifest、payload、Final Cut 装配包与 zip 归档
 - 运行诊断台：集中查看 Provider request / response 工件、媒体索引与定向参考注入情况
+- Final Cut 装配包：自动导出镜头段清单、场次音轨清单与 `assemble-final-cut.sh`，可继续用 FFmpeg 生成预演成片
 - 生成工作台载荷预检：直接在页面上预览 image / voice / video payload 中的定向参考、情绪与时长字段
 
 当前仍可继续深化 provider 接入与产品打磨，但核心工作台已经可以演示、验证和交付。
@@ -239,6 +240,7 @@ STORYFLOW_VIDEO_PROVIDER_EXTRA_BODY_JSON='{"duration":5,"aspect_ratio":"16:9"}'
 - 若视频网关的状态接口就是提交接口加 `/{taskId}`，可以只配置 URL + NAME + MODEL + ADAPTER；若状态接口不同，再补 `*_POLL_PATH` 即可。
 - 设置页现在会直接展示每个 Provider 的适配预设、请求路径来源、轮询策略、任务键与状态键，便于快速排查真实模型接入问题。
 - `*_POLL_*` 适用于图像 / 语音 / 视频三类 Provider；页面中的“推进执行中任务”会继续回查并在产物 ready 后自动写入媒体索引。
+- 交付包现在还会额外写出 `final-cut-assembly.json`、`final-cut-segments.txt`、`final-cut-audio-segments.txt` 与 `assemble-final-cut.sh`，方便把最终镜头顺序继续推进为本地 FFmpeg 预演成片。
 - 建议同时配置 `STORYFLOW_*_PROVIDER_NAME` 与 `STORYFLOW_*_PROVIDER_MODEL`，设置页、QA、生成工作台和运行诊断会直接显示供应商与模型。
 - 若供应商接口不是通用批量 JSON，可继续配置 `STORYFLOW_*_PROVIDER_ADAPTER`、`*_REQUEST_PATH`、`*_RESPONSE_ITEMS_KEY`、`*_EXTRA_BODY_JSON` 与 `*_EXTRA_HEADERS_JSON` 进入适配模式。
 - 目前内置适配模式包括 `generic-batch`、`single-item`、`openai-image`、`gemini-image`、`jimeng-image`、`openai-speech`、`elevenlabs-tts`、`runway-video`、`minimax-video`、`kling-video`、`seedance-video`。

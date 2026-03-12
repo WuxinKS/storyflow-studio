@@ -9,7 +9,7 @@ import {
   retryFailedRenderJobs,
   runRenderJobs,
 } from '@/features/render/service';
-import { getFinalCutPlan } from '@/features/final-cut/service';
+import { exportFinalCutAssemblyPackage, getFinalCutPlan } from '@/features/final-cut/service';
 
 export async function GET(request: Request) {
   try {
@@ -49,6 +49,14 @@ export async function GET(request: Request) {
       if (!data) {
         return NextResponse.json({ ok: false, error: '当前还没有可导出的成片计划' }, { status: 404 });
       }
+      return NextResponse.json({ ok: true, data });
+    }
+
+    if (action === 'export-final-cut-assembly') {
+      if (!projectId) {
+        return NextResponse.json({ ok: false, error: '缺少 projectId' }, { status: 400 });
+      }
+      const data = await exportFinalCutAssemblyPackage(projectId);
       return NextResponse.json({ ok: true, data });
     }
 

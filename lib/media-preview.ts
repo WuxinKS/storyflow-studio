@@ -47,13 +47,20 @@ export function resolvePreviewSource(input: {
 }) {
   const sourceUrl = normalizeText(input.sourceUrl);
   const localPath = normalizeText(input.localPath);
+  const expectedKind = input.kind || null;
 
   if (sourceUrl && isLikelyRemoteSource(sourceUrl)) {
-    return sourceUrl;
+    const sourceKind = getPreviewKindFromExtension(sourceUrl);
+    if (!expectedKind || !sourceKind || sourceKind === expectedKind || sourceUrl.startsWith('data:')) {
+      return sourceUrl;
+    }
   }
 
   if (localPath && isWorkspaceExportPath(localPath)) {
-    return buildLocalMediaPreviewHref(localPath);
+    const localKind = getPreviewKindFromExtension(localPath);
+    if (!expectedKind || localKind === expectedKind) {
+      return buildLocalMediaPreviewHref(localPath);
+    }
   }
 
   return null;

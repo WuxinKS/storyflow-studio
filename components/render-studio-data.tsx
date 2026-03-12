@@ -132,6 +132,7 @@ export async function RenderStudioData({ projectId }: { projectId?: string }) {
     presets: `/api/render?action=export-presets&projectId=${project.id}`,
     providerPayloads: `/api/render?action=export-provider-payloads&projectId=${project.id}`,
     finalCut: `/api/render?action=export-final-cut-plan&projectId=${project.id}`,
+    finalCutAssembly: `/api/render?action=export-final-cut-assembly&projectId=${project.id}`,
     productionBundle: `/api/render?action=export-production-bundle&projectId=${project.id}`,
   };
 
@@ -358,9 +359,14 @@ export async function RenderStudioData({ projectId }: { projectId?: string }) {
           <p>导出当前镜头顺序、视觉来源、音轨覆盖和拼装建议，方便进入成片阶段。</p><a className="button-ghost" href={exportLinks.finalCut} target="_blank" rel="noreferrer">打开 Final Cut JSON</a>
         </div>
         <div className="asset-tile">
+          <span className="label">装配包导出</span>
+          <h4>FFmpeg 预演装配包</h4>
+          <p>直接导出成片装配 JSON、镜头段清单、音轨段清单和 <code>assemble-final-cut.sh</code>，更接近真正的一键成片。</p><a className="button-ghost" href={exportLinks.finalCutAssembly} target="_blank" rel="noreferrer">打开装配包 JSON</a>
+        </div>
+        <div className="asset-tile">
           <span className="label">交付包导出</span>
           <h4>生产交付包</h4>
-          <p>交付包会带上媒体索引、成片计划、结构数据和 production bundle，方便直接归档交付。</p><a className="button-ghost" href={exportLinks.productionBundle} target="_blank" rel="noreferrer">生成并查看交付包</a>
+          <p>交付包会带上媒体索引、成片计划、成片装配包、结构数据和 production bundle，方便直接归档交付。</p><a className="button-ghost" href={exportLinks.productionBundle} target="_blank" rel="noreferrer">生成并查看交付包</a>
         </div>
       </div>
 

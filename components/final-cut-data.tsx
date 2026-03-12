@@ -46,6 +46,7 @@ export async function FinalCutData({ projectId }: { projectId?: string }) {
         <div className="action-row wrap-row">
           <Link href={buildProjectHref('/render-studio', plan.projectId)} className="button-secondary">返回生成工作台</Link>
           <a className="button-ghost" href={`/api/render?action=export-final-cut-plan&projectId=${plan.projectId}`} target="_blank" rel="noreferrer">导出 Final Cut JSON</a>
+          <a className="button-ghost" href={`/api/render?action=export-final-cut-assembly&projectId=${plan.projectId}`} target="_blank" rel="noreferrer">导出装配包 JSON</a>
           <Link href={buildProjectHref('/render-runs', plan.projectId)} className="button-ghost">查看运行诊断</Link>
           <Link href={buildProjectHref('/delivery-center', plan.projectId)} className="button-ghost">查看交付中心</Link>
         </div>
@@ -77,6 +78,11 @@ export async function FinalCutData({ projectId }: { projectId?: string }) {
           <span className="label">装配状态</span>
           <h4>{plan.summary.assemblyState === 'ready-full-video' ? '完整视频版' : plan.summary.assemblyState === 'ready-preview' ? '预演拼装版' : '仍被阻塞'}</h4>
           <p>{plan.recommendedActions[0] || '当前没有额外动作建议。'}</p>
+        </div>
+        <div className="asset-tile">
+          <span className="label">装配导出</span>
+          <h4>FFmpeg 预演包</h4>
+          <p>导出后会生成镜头片段清单、场次音轨清单和 <code>assemble-final-cut.sh</code>，可在本机直接继续拼装预演成片。</p>
         </div>
       </div>
 

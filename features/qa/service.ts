@@ -163,6 +163,10 @@ export async function getQaReport(projectId?: string, options?: { bundleExport?:
   const finalCutRecommendation = finalCutExport.ok && finalCutExport.data.recommendedActions.length > 0
     ? ` / 建议:${finalCutExport.data.recommendedActions.slice(0, 2).join(' / ')}`
     : '';
+  const assemblyBundleReady = bundleExport.ok && Boolean(bundleExport.data.files.finalCutAssemblyPath && bundleExport.data.files.finalCutScriptPath);
+  const assemblyBundleDetail = bundleExport.ok
+    ? `装配 JSON:${bundleExport.data.files.finalCutAssemblyPath ? 'ok' : 'missing'} / 脚本:${bundleExport.data.files.finalCutScriptPath ? 'ok' : 'missing'} / 镜头清单:${bundleExport.data.files.finalCutSegmentsPath ? 'ok' : 'missing'} / 音轨清单:${bundleExport.data.files.finalCutAudioSegmentsPath ? 'ok' : 'missing'}`
+    : '需先成功导出 Production Bundle。';
 
   const checks: QaCheck[] = [
     {
@@ -390,6 +394,15 @@ export async function getQaReport(projectId?: string, options?: { bundleExport?:
       group: 'export',
       severity: 'blocker',
       blocksDelivery: !finalCutExport.ok,
+    },
+    {
+      key: 'export-final-cut-assembly',
+      label: 'Final Cut 装配包可成功导出',
+      passed: assemblyBundleReady,
+      detail: assemblyBundleDetail,
+      group: 'export',
+      severity: 'warning',
+      blocksDelivery: false,
     },
     {
       key: 'export-production-bundle',

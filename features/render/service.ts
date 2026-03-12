@@ -8,7 +8,11 @@ import { parseCharacterDrafts, type CharacterDraft } from '@/features/characters
 import { buildReferenceBindingSnapshot, buildReferenceProfile, getReferenceInsights } from '@/features/reference/service';
 import { getShotKindFromTitle } from '@/lib/shot-taxonomy';
 import { getTimelineBundle } from '@/features/timeline/service';
-import { getFinalCutPlan } from '@/features/final-cut/service';
+import {
+  exportFinalCutAssemblyPackage,
+  getFinalCutPlan,
+  type FinalCutAssemblyPackage,
+} from '@/features/final-cut/service';
 import { getLatestOutlineByTitle } from '@/lib/outline-store';
 import {
   getGeneratedMediaEntries,
@@ -1029,6 +1033,7 @@ export async function exportProductionBundle(projectId: string) {
     })),
     generatedMedia,
     finalCut: finalCutPlan,
+    finalCutAssembly: null as FinalCutAssemblyPackage | null,
     presets: presetsData.presets,
     providerProfiles: providerData.providerProfiles,
     providerPayloads: providerData.providers,
@@ -1051,6 +1056,8 @@ export async function exportProductionBundle(projectId: string) {
   await writeFile(providersPath, JSON.stringify(providerData, null, 2), 'utf8');
   await writeFile(generatedMediaPath, JSON.stringify({ version: 1, items: generatedMedia }, null, 2), 'utf8');
   await writeFile(finalCutPath, JSON.stringify({ version: 1, exportedAt: bundle.exportedAt, plan: finalCutPlan }, null, 2), 'utf8');
+  const finalCutAssembly = await exportFinalCutAssemblyPackage(projectId, { outputDir: bundleDir });
+  bundle.finalCutAssembly = finalCutAssembly.package;
   await writeFile(bundlePath, JSON.stringify(bundle, null, 2), 'utf8');
 
   const manifest = {
@@ -1066,6 +1073,10 @@ export async function exportProductionBundle(projectId: string) {
       'provider-payloads.json',
       'generated-media-library.json',
       'final-cut-plan.json',
+      'final-cut-assembly.json',
+      'final-cut-segments.txt',
+      'final-cut-audio-segments.txt',
+      'assemble-final-cut.sh',
       'production-bundle.json',
     ],
     usage: [
@@ -1073,6 +1084,7 @@ export async function exportProductionBundle(projectId: string) {
       'provider-payloads.json 直接用于对接 image / voice / video provider',
       'generated-media-library.json 可查看本次沉淀出的媒体资产索引',
       'final-cut-plan.json 可直接用于成片预演、镜头拼装顺序与缺口复核',
+      'final-cut-assembly.json + assemble-final-cut.sh 可直接进入 FFmpeg 预演装配阶段',
       'render-presets.json 用于单镜头渲染预设调试与复核',
     ],
   };
@@ -1089,6 +1101,10 @@ export async function exportProductionBundle(projectId: string) {
       providersPath,
       generatedMediaPath,
       finalCutPath,
+      finalCutAssemblyPath: finalCutAssembly.files.assemblyPath,
+      finalCutSegmentsPath: finalCutAssembly.files.visualSegmentManifestPath,
+      finalCutAudioSegmentsPath: finalCutAssembly.files.audioSegmentManifestPath,
+      finalCutScriptPath: finalCutAssembly.files.previewScriptPath,
       bundlePath,
     },
   };
@@ -1697,7 +1713,7 @@ async function syncGeneratedMediaArtifacts(input: {
     const shotId = typeof payloadRecord.shotId === 'string' ? payloadRecord.shotId : undefined;
     const sceneId = typeof payloadRecord.sceneId === 'string' ? payloadRecord.sceneId : undefined;
     const sourceUrl = resolveSourceUrl(responseRecord);
-    const localPath = resolveLocalPath(responseRecord) || artifactPath;
+    const localPath = resolveLocalPath(responseRecord) || null;
 
     entries.push({
       id: `media-${input.provider}-${shotId || sceneId || 'item'}-${index + 1}`,

@@ -28,6 +28,9 @@ export type DeliveryBundleRecord = {
     voice: number;
     video: number;
   };
+  assemblyState: string | null;
+  readyForAssembly: boolean;
+  readyForFullVideo: boolean;
   sizes: {
     bundleBytes: number | null;
     zipBytes: number | null;
@@ -38,6 +41,10 @@ export type DeliveryBundleRecord = {
     providersPath: string;
     generatedMediaPath: string;
     finalCutPath: string;
+    finalCutAssemblyPath: string | null;
+    finalCutSegmentsPath: string | null;
+    finalCutAudioSegmentsPath: string | null;
+    finalCutScriptPath: string | null;
     bundlePath: string;
     zipPath: string | null;
   };
@@ -143,6 +150,16 @@ type BundleManifest = {
   exportedAt?: string;
   visualBibleStyle?: string | null;
   characterSummary?: string | null;
+};
+
+type FinalCutPlanExport = {
+  plan?: {
+    summary?: {
+      assemblyState?: string;
+      readyForAssembly?: boolean;
+      readyForFullVideo?: boolean;
+    };
+  };
 };
 
 type ProviderPayloadExport = {
@@ -257,6 +274,10 @@ async function loadBundleRecord(bundleDir: string) {
   const providersPath = path.join(bundleDir, 'provider-payloads.json');
   const generatedMediaPath = path.join(bundleDir, 'generated-media-library.json');
   const finalCutPath = path.join(bundleDir, 'final-cut-plan.json');
+  const finalCutAssemblyPath = path.join(bundleDir, 'final-cut-assembly.json');
+  const finalCutSegmentsPath = path.join(bundleDir, 'final-cut-segments.txt');
+  const finalCutAudioSegmentsPath = path.join(bundleDir, 'final-cut-audio-segments.txt');
+  const finalCutScriptPath = path.join(bundleDir, 'assemble-final-cut.sh');
   const bundlePath = path.join(bundleDir, 'production-bundle.json');
   const bundleName = path.basename(bundleDir);
   const zipPath = path.join(path.dirname(bundleDir), `${bundleName}.zip`);
@@ -266,13 +287,18 @@ async function loadBundleRecord(bundleDir: string) {
 
   const providerPayloads = await readJsonFile<ProviderPayloadExport>(providersPath);
   const generatedMediaJson = await readJsonFile(generatedMediaPath);
+  const finalCutJson = await readJsonFile<FinalCutPlanExport>(finalCutPath);
   const mediaCounts = generatedMediaJson
     ? summarizeGeneratedMediaCounts(parseGeneratedMediaLibrary(JSON.stringify(generatedMediaJson)))
     : EMPTY_MEDIA_COUNTS;
 
-  const [bundleBytes, zipBytes, directoryStat] = await Promise.all([
+  const [bundleBytes, zipBytes, assemblyBytes, segmentsBytes, audioSegmentsBytes, scriptBytes, directoryStat] = await Promise.all([
     getFileSize(bundlePath),
     getFileSize(zipPath),
+    getFileSize(finalCutAssemblyPath),
+    getFileSize(finalCutSegmentsPath),
+    getFileSize(finalCutAudioSegmentsPath),
+    getFileSize(finalCutScriptPath),
     stat(bundleDir).catch(() => null),
   ]);
 
@@ -318,6 +344,9 @@ async function loadBundleRecord(bundleDir: string) {
       voice: Array.isArray(providerPayloads?.providers?.voiceSynthesis) ? providerPayloads.providers.voiceSynthesis.length : 0,
       video: Array.isArray(providerPayloads?.providers?.videoAssembly) ? providerPayloads.providers.videoAssembly.length : 0,
     },
+    assemblyState: pickString(finalCutJson?.plan?.summary ? finalCutJson.plan.summary as Record<string, unknown> : null, ['assemblyState']),
+    readyForAssembly: Boolean(finalCutJson?.plan?.summary?.readyForAssembly),
+    readyForFullVideo: Boolean(finalCutJson?.plan?.summary?.readyForFullVideo),
     sizes: {
       bundleBytes,
       zipBytes,
@@ -328,6 +357,10 @@ async function loadBundleRecord(bundleDir: string) {
       providersPath,
       generatedMediaPath,
       finalCutPath,
+      finalCutAssemblyPath: assemblyBytes ? finalCutAssemblyPath : null,
+      finalCutSegmentsPath: segmentsBytes ? finalCutSegmentsPath : null,
+      finalCutAudioSegmentsPath: audioSegmentsBytes ? finalCutAudioSegmentsPath : null,
+      finalCutScriptPath: scriptBytes ? finalCutScriptPath : null,
       bundlePath,
       zipPath: zipBytes ? zipPath : null,
     },
