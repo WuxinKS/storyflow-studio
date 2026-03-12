@@ -37,6 +37,7 @@ export type DeliveryBundleRecord = {
     presetsPath: string;
     providersPath: string;
     generatedMediaPath: string;
+    finalCutPath: string;
     bundlePath: string;
     zipPath: string | null;
   };
@@ -255,6 +256,7 @@ async function loadBundleRecord(bundleDir: string) {
   const presetsPath = path.join(bundleDir, 'render-presets.json');
   const providersPath = path.join(bundleDir, 'provider-payloads.json');
   const generatedMediaPath = path.join(bundleDir, 'generated-media-library.json');
+  const finalCutPath = path.join(bundleDir, 'final-cut-plan.json');
   const bundlePath = path.join(bundleDir, 'production-bundle.json');
   const bundleName = path.basename(bundleDir);
   const zipPath = path.join(path.dirname(bundleDir), `${bundleName}.zip`);
@@ -325,6 +327,7 @@ async function loadBundleRecord(bundleDir: string) {
       presetsPath,
       providersPath,
       generatedMediaPath,
+      finalCutPath,
       bundlePath,
       zipPath: zipBytes ? zipPath : null,
     },

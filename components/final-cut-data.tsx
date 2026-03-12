@@ -45,6 +45,7 @@ export async function FinalCutData({ projectId }: { projectId?: string }) {
         </div>
         <div className="action-row wrap-row">
           <Link href={buildProjectHref('/render-studio', plan.projectId)} className="button-secondary">返回生成工作台</Link>
+          <a className="button-ghost" href={`/api/render?action=export-final-cut-plan&projectId=${plan.projectId}`} target="_blank" rel="noreferrer">导出 Final Cut JSON</a>
           <Link href={buildProjectHref('/render-runs', plan.projectId)} className="button-ghost">查看运行诊断</Link>
           <Link href={buildProjectHref('/delivery-center', plan.projectId)} className="button-ghost">查看交付中心</Link>
         </div>
@@ -72,6 +73,11 @@ export async function FinalCutData({ projectId }: { projectId?: string }) {
           <h4>{plan.summary.scenesWithAudio} / {plan.summary.sceneCount}</h4>
           <p>当前仍有 {plan.summary.scenesWithoutAudio} 个场次缺少配音 / 音轨，会影响最终成片拼装的完整性。</p>
         </div>
+        <div className="asset-tile">
+          <span className="label">装配状态</span>
+          <h4>{plan.summary.assemblyState === 'ready-full-video' ? '完整视频版' : plan.summary.assemblyState === 'ready-preview' ? '预演拼装版' : '仍被阻塞'}</h4>
+          <p>{plan.recommendedActions[0] || '当前没有额外动作建议。'}</p>
+        </div>
       </div>
 
       <div className="asset-grid">
@@ -90,6 +96,13 @@ export async function FinalCutData({ projectId }: { projectId?: string }) {
             </div>
           ))
         )}
+        {plan.recommendedActions.map((action) => (
+          <div key={action} className="asset-tile">
+            <span className="label">建议</span>
+            <h4>下一步动作</h4>
+            <p>{action}</p>
+          </div>
+        ))}
       </div>
 
       <div className="page-stack">

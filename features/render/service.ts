@@ -8,6 +8,7 @@ import { parseCharacterDrafts, type CharacterDraft } from '@/features/characters
 import { buildReferenceBindingSnapshot, buildReferenceProfile, getReferenceInsights } from '@/features/reference/service';
 import { getShotKindFromTitle } from '@/lib/shot-taxonomy';
 import { getTimelineBundle } from '@/features/timeline/service';
+import { getFinalCutPlan } from '@/features/final-cut/service';
 import { getLatestOutlineByTitle } from '@/lib/outline-store';
 import {
   getGeneratedMediaEntries,
@@ -977,6 +978,7 @@ export async function exportProductionBundle(projectId: string) {
 
   const presetsData = await exportRenderPresets(projectId);
   const providerData = await exportProviderPayloads(projectId);
+  const finalCutPlan = await getFinalCutPlan(projectId).catch(() => null);
   const generatedMedia = getGeneratedMediaEntries(project);
   const referenceInsights = getReferenceInsights(project.references);
   const referenceBindings = buildReferenceBindingSnapshot(project);
@@ -1026,6 +1028,7 @@ export async function exportProductionBundle(projectId: string) {
       output: parseRenderJobOutput(job.outputUrl),
     })),
     generatedMedia,
+    finalCut: finalCutPlan,
     presets: presetsData.presets,
     providerProfiles: providerData.providerProfiles,
     providerPayloads: providerData.providers,
@@ -1039,6 +1042,7 @@ export async function exportProductionBundle(projectId: string) {
   const presetsPath = path.join(bundleDir, 'render-presets.json');
   const providersPath = path.join(bundleDir, 'provider-payloads.json');
   const generatedMediaPath = path.join(bundleDir, 'generated-media-library.json');
+  const finalCutPath = path.join(bundleDir, 'final-cut-plan.json');
   const bundlePath = path.join(bundleDir, 'production-bundle.json');
   const manifestPath = path.join(bundleDir, 'manifest.json');
   const zipPath = path.join(baseDir, `${bundleName}.zip`);
@@ -1046,6 +1050,7 @@ export async function exportProductionBundle(projectId: string) {
   await writeFile(presetsPath, JSON.stringify(presetsData, null, 2), 'utf8');
   await writeFile(providersPath, JSON.stringify(providerData, null, 2), 'utf8');
   await writeFile(generatedMediaPath, JSON.stringify({ version: 1, items: generatedMedia }, null, 2), 'utf8');
+  await writeFile(finalCutPath, JSON.stringify({ version: 1, exportedAt: bundle.exportedAt, plan: finalCutPlan }, null, 2), 'utf8');
   await writeFile(bundlePath, JSON.stringify(bundle, null, 2), 'utf8');
 
   const manifest = {
@@ -1060,12 +1065,14 @@ export async function exportProductionBundle(projectId: string) {
       'render-presets.json',
       'provider-payloads.json',
       'generated-media-library.json',
+      'final-cut-plan.json',
       'production-bundle.json',
     ],
     usage: [
       '先看 production-bundle.json 获取全量总览',
       'provider-payloads.json 直接用于对接 image / voice / video provider',
       'generated-media-library.json 可查看本次沉淀出的媒体资产索引',
+      'final-cut-plan.json 可直接用于成片预演、镜头拼装顺序与缺口复核',
       'render-presets.json 用于单镜头渲染预设调试与复核',
     ],
   };
@@ -1081,6 +1088,7 @@ export async function exportProductionBundle(projectId: string) {
       presetsPath,
       providersPath,
       generatedMediaPath,
+      finalCutPath,
       bundlePath,
     },
   };

@@ -102,6 +102,7 @@ export async function DeliveryCenterData({
               <a className="button-ghost" href={buildLocalMediaPreviewHref(bundle.files.bundlePath)} target="_blank" rel="noreferrer">Production Bundle</a>
               <a className="button-ghost" href={buildLocalMediaPreviewHref(bundle.files.providersPath)} target="_blank" rel="noreferrer">Provider Payload</a>
               <a className="button-ghost" href={buildLocalMediaPreviewHref(bundle.files.generatedMediaPath)} target="_blank" rel="noreferrer">媒体索引</a>
+              <a className="button-ghost" href={buildLocalMediaPreviewHref(bundle.files.finalCutPath)} target="_blank" rel="noreferrer">Final Cut JSON</a>
               <a className="button-ghost" href={buildLocalMediaPreviewHref(bundle.files.presetsPath)} target="_blank" rel="noreferrer">Preset JSON</a>
               {bundle.files.zipPath ? (
                 <a className="button-secondary" href={buildLocalMediaPreviewHref(bundle.files.zipPath)} target="_blank" rel="noreferrer">下载 Zip</a>
@@ -109,6 +110,7 @@ export async function DeliveryCenterData({
               {bundle.projectId ? (
                 <>
                   <Link href={buildProjectHref('/render-studio', bundle.projectId)} className="button-ghost">返回生成</Link>
+                  <Link href={buildProjectHref('/final-cut', bundle.projectId)} className="button-ghost">成片预演</Link>
                   <Link href={buildProjectHref('/render-runs', bundle.projectId)} className="button-ghost">运行诊断</Link>
                   <Link href={buildProjectHref('/qa-panel', bundle.projectId)} className="button-ghost">查看 QA</Link>
                 </>
