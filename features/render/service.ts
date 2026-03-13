@@ -1671,6 +1671,251 @@ function getGeneratedMediaTags(provider: ProviderKind, payloadRecord: RenderPayl
   return tags;
 }
 
+type MockMediaAssetResult = {
+  localPath: string | null;
+  sourceUrl: string | null;
+  note: string | null;
+};
+
+const MOCK_MEDIA_COLORS = ['#1d4ed8', '#7c3aed', '#0f766e', '#b45309', '#be185d', '#334155'];
+
+let ffmpegAvailablePromise: Promise<boolean> | null = null;
+
+function hashText(value: string) {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
+  }
+  return hash;
+}
+
+function escapeXml(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+function pickMockColor(seed: string) {
+  return MOCK_MEDIA_COLORS[hashText(seed) % MOCK_MEDIA_COLORS.length] || MOCK_MEDIA_COLORS[0];
+}
+
+function pickNumberFromPayload(record: RenderPayloadRecord, keys: string[]) {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string' && value.trim()) {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+  }
+  return null;
+}
+
+function getMockAssetDuration(provider: ProviderKind, payloadRecord: RenderPayloadRecord) {
+  const plannedDuration = pickNumberFromPayload(payloadRecord, ['plannedDuration', 'duration']);
+  const sceneDuration = pickNumberFromPayload(payloadRecord, ['sceneDuration']);
+
+  if (provider === 'voice-synthesis') {
+    return Math.max(2, Math.min(90, Math.round(sceneDuration || plannedDuration || 6)));
+  }
+
+  if (provider === 'video-assembly') {
+    return Math.max(2, Math.min(20, Math.round(plannedDuration || 4)));
+  }
+
+  return null;
+}
+
+function buildMockAssetLabel(provider: ProviderKind, payloadRecord: RenderPayloadRecord, fallbackTitle: string) {
+  const shotTitle = typeof payloadRecord.shotTitle === 'string' && payloadRecord.shotTitle.trim() ? payloadRecord.shotTitle.trim() : null;
+  const sceneTitle = typeof payloadRecord.sceneTitle === 'string' && payloadRecord.sceneTitle.trim() ? payloadRecord.sceneTitle.trim() : null;
+
+  if (provider === 'voice-synthesis') return sceneTitle || fallbackTitle;
+  if (provider === 'video-assembly') return shotTitle || fallbackTitle;
+  return shotTitle || fallbackTitle;
+}
+
+async function isFfmpegAvailable() {
+  if (!ffmpegAvailablePromise) {
+    ffmpegAvailablePromise = execFileAsync('ffmpeg', ['-version'])
+      .then(() => true)
+      .catch(() => false);
+  }
+  return ffmpegAvailablePromise;
+}
+
+function createMockWaveBuffer(durationSeconds: number) {
+  const sampleRate = 24000;
+  const channelCount = 1;
+  const bitsPerSample = 16;
+  const bytesPerSample = bitsPerSample / 8;
+  const frameCount = Math.max(1, Math.round(durationSeconds * sampleRate));
+  const dataSize = frameCount * channelCount * bytesPerSample;
+  const buffer = Buffer.alloc(44 + dataSize);
+  let offset = 0;
+
+  buffer.write('RIFF', offset); offset += 4;
+  buffer.writeUInt32LE(36 + dataSize, offset); offset += 4;
+  buffer.write('WAVE', offset); offset += 4;
+  buffer.write('fmt ', offset); offset += 4;
+  buffer.writeUInt32LE(16, offset); offset += 4;
+  buffer.writeUInt16LE(1, offset); offset += 2;
+  buffer.writeUInt16LE(channelCount, offset); offset += 2;
+  buffer.writeUInt32LE(sampleRate, offset); offset += 4;
+  buffer.writeUInt32LE(sampleRate * channelCount * bytesPerSample, offset); offset += 4;
+  buffer.writeUInt16LE(channelCount * bytesPerSample, offset); offset += 2;
+  buffer.writeUInt16LE(bitsPerSample, offset); offset += 2;
+  buffer.write('data', offset); offset += 4;
+  buffer.writeUInt32LE(dataSize, offset); offset += 4;
+
+  for (let frame = 0; frame < frameCount; frame += 1) {
+    const time = frame / sampleRate;
+    const base = Math.sin(2 * Math.PI * 220 * time);
+    const pulse = (frame % sampleRate) < sampleRate * 0.18 ? 0.12 : 0.04;
+    const sample = Math.round(base * pulse * 32767);
+    buffer.writeInt16LE(sample, offset);
+    offset += 2;
+  }
+
+  return buffer;
+}
+
+async function createMockImageAsset(input: {
+  assetDir: string;
+  title: string;
+  provider: ProviderKind;
+  projectId: string;
+  index: number;
+}) : Promise<MockMediaAssetResult> {
+  await mkdir(input.assetDir, { recursive: true });
+  const filePath = path.join(input.assetDir, `${String(input.index + 1).padStart(2, '0')}-${slugifyProjectTitle(input.title)}.svg`);
+  const accent = pickMockColor(`${input.provider}:${input.title}`);
+  const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+  <rect width="1280" height="720" fill="#0f172a" />
+  <rect x="48" y="48" width="1184" height="624" rx="28" fill="#111827" stroke="${accent}" stroke-width="6" />
+  <rect x="72" y="72" width="1136" height="180" rx="20" fill="${accent}" opacity="0.18" />
+  <text x="96" y="160" fill="#f8fafc" font-size="56" font-family="Arial, Helvetica, sans-serif" font-weight="700">${escapeXml(input.title)}</text>
+  <text x="96" y="250" fill="#cbd5e1" font-size="28" font-family="Arial, Helvetica, sans-serif">StoryFlow Studio Mock ${escapeXml(input.provider)}</text>
+  <text x="96" y="320" fill="#94a3b8" font-size="24" font-family="Arial, Helvetica, sans-serif">项目：${escapeXml(input.projectId)}</text>
+  <text x="96" y="612" fill="#94a3b8" font-size="24" font-family="Arial, Helvetica, sans-serif">该文件为本地 mock 图像占位，可直接用于预览、分镜回看与装配回退。</text>
+</svg>`;
+  await writeFile(filePath, svg, 'utf8');
+  return {
+    localPath: filePath,
+    sourceUrl: null,
+    note: '已生成 mock 图片占位文件。',
+  } satisfies MockMediaAssetResult;
+}
+
+async function createMockAudioAsset(input: {
+  assetDir: string;
+  title: string;
+  duration: number;
+  index: number;
+}) : Promise<MockMediaAssetResult> {
+  await mkdir(input.assetDir, { recursive: true });
+  const filePath = path.join(input.assetDir, `${String(input.index + 1).padStart(2, '0')}-${slugifyProjectTitle(input.title)}.wav`);
+  await writeFile(filePath, createMockWaveBuffer(input.duration));
+  return {
+    localPath: filePath,
+    sourceUrl: null,
+    note: `已生成 ${input.duration} 秒 mock 音轨占位文件。`,
+  } satisfies MockMediaAssetResult;
+}
+
+async function createMockVideoAsset(input: {
+  assetDir: string;
+  title: string;
+  duration: number;
+  provider: ProviderKind;
+  index: number;
+}) : Promise<MockMediaAssetResult> {
+  await mkdir(input.assetDir, { recursive: true });
+  if (!(await isFfmpegAvailable())) {
+    return {
+      localPath: null,
+      sourceUrl: null,
+      note: '当前环境缺少 ffmpeg，无法生成 mock 视频占位文件。',
+    } satisfies MockMediaAssetResult;
+  }
+
+  const filePath = path.join(input.assetDir, `${String(input.index + 1).padStart(2, '0')}-${slugifyProjectTitle(input.title)}.mp4`);
+  const accent = pickMockColor(`${input.provider}:${input.title}`).replace('#', '0x');
+
+  try {
+    await execFileAsync('ffmpeg', [
+      '-y',
+      '-f', 'lavfi',
+      '-i', `color=c=${accent}:s=1280x720:r=24:d=${input.duration}`,
+      '-f', 'lavfi',
+      '-i', 'anullsrc=channel_layout=stereo:sample_rate=48000',
+      '-shortest',
+      '-c:v', 'libx264',
+      '-preset', 'ultrafast',
+      '-pix_fmt', 'yuv420p',
+      '-c:a', 'aac',
+      '-b:a', '128k',
+      '-movflags', '+faststart',
+      filePath,
+    ]);
+  } catch (error) {
+    return {
+      localPath: null,
+      sourceUrl: null,
+      note: error instanceof Error ? `mock 视频生成失败：${error.message}` : 'mock 视频生成失败。',
+    } satisfies MockMediaAssetResult;
+  }
+
+  return {
+    localPath: filePath,
+    sourceUrl: null,
+    note: `已生成 ${input.duration} 秒 mock 视频占位文件。`,
+  } satisfies MockMediaAssetResult;
+}
+
+async function synthesizeMockMediaAsset(input: {
+  provider: ProviderKind;
+  projectId: string;
+  outputDir: string;
+  payloadRecord: RenderPayloadRecord;
+  title: string;
+  index: number;
+}) : Promise<MockMediaAssetResult> {
+  const assetDir = path.join(input.outputDir, 'mock-media', input.provider);
+  const label = buildMockAssetLabel(input.provider, input.payloadRecord, input.title);
+
+  if (input.provider === 'image-sequence') {
+    return createMockImageAsset({
+      assetDir,
+      title: label,
+      provider: input.provider,
+      projectId: input.projectId,
+      index: input.index,
+    });
+  }
+
+  if (input.provider === 'voice-synthesis') {
+    return createMockAudioAsset({
+      assetDir,
+      title: label,
+      duration: getMockAssetDuration(input.provider, input.payloadRecord) || 6,
+      index: input.index,
+    });
+  }
+
+  return createMockVideoAsset({
+    assetDir,
+    title: label,
+    duration: getMockAssetDuration(input.provider, input.payloadRecord) || 4,
+    provider: input.provider,
+    index: input.index,
+  });
+}
+
 async function syncGeneratedMediaArtifacts(input: {
   projectId: string;
   provider: ProviderKind;
@@ -1695,9 +1940,31 @@ async function syncGeneratedMediaArtifacts(input: {
   for (let index = 0; index < loopCount; index += 1) {
     const payloadItem = input.payload[reuseSinglePayload ? 0 : index] ?? input.payload[0] ?? {};
     const payloadRecord = toRecord(payloadItem) as RenderPayloadRecord;
-    const responseRecord = responseItems[index] || fallbackResponseRecord;
+    const baseResponseRecord = responseItems[index] || fallbackResponseRecord;
     const baseTitle = getGeneratedMediaTitle(input.provider, payloadRecord, reuseSinglePayload ? 0 : index);
     const title = reuseSinglePayload && index > 0 ? `${baseTitle}（变体 ${index + 1}）` : baseTitle;
+    const mockAsset = input.mode === 'mock' && !resolveSourceUrl(baseResponseRecord) && !resolveLocalPath(baseResponseRecord)
+      ? await synthesizeMockMediaAsset({
+          provider: input.provider,
+          projectId: input.projectId,
+          outputDir,
+          payloadRecord,
+          title,
+          index,
+        })
+      : null;
+    const responseRecord = mockAsset
+      ? {
+          ...baseResponseRecord,
+          ...(mockAsset.localPath ? { localPath: mockAsset.localPath, outputPath: mockAsset.localPath } : {}),
+          ...(mockAsset.sourceUrl ? { sourceUrl: mockAsset.sourceUrl, outputUrl: mockAsset.sourceUrl } : {}),
+          mockAsset: {
+            note: mockAsset.note,
+            localPath: mockAsset.localPath,
+            sourceUrl: mockAsset.sourceUrl,
+          },
+        } satisfies ProviderResponseRecord
+      : baseResponseRecord;
     const artifactName = `${String(index + 1).padStart(2, '0')}-${slugifyProjectTitle(title)}.json`;
     const artifactPath = path.join(outputDir, artifactName);
     await writeFile(artifactPath, JSON.stringify({

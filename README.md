@@ -185,7 +185,7 @@ STORYFLOW_VIDEO_PROVIDER_TIMEOUT_MS=""
 
 说明：
 - 未配置 `STORYFLOW_LLM_*` 时，故事 / 角色 / 视觉链路会优先走内置 fallback 模板
-- 未配置 `STORYFLOW_*_PROVIDER_URL` 时，Render 执行链会自动回退为 mock，并继续生成请求 / 响应工件与交付包
+- 未配置 `STORYFLOW_*_PROVIDER_URL` 时，Render 执行链会自动回退为 mock，并继续生成请求 / 响应工件、可预览的本地图片 / 音轨 / 视频占位素材与交付包
 
 ### 推荐 Provider 预设
 
