@@ -28,6 +28,7 @@ const MIME_BY_EXTENSION: Record<string, string> = {
   '.m4v': 'video/x-m4v',
   '.json': 'application/json; charset=utf-8',
   '.txt': 'text/plain; charset=utf-8',
+  '.log': 'text/plain; charset=utf-8',
   '.md': 'text/markdown; charset=utf-8',
   '.sh': 'text/x-shellscript; charset=utf-8',
   '.zip': 'application/zip',

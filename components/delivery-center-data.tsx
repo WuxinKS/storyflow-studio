@@ -124,6 +124,14 @@ export async function DeliveryCenterData({
               ) : null}
               {bundle.projectId ? (
                 <>
+                  <a
+                    className="button-ghost"
+                    href={`/api/render?action=assemble-final-cut-preview&projectId=${bundle.projectId}&open=1`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    一键拼装成片
+                  </a>
                   <Link href={buildProjectHref('/render-studio', bundle.projectId)} className="button-ghost">返回生成</Link>
                   <Link href={buildProjectHref('/final-cut', bundle.projectId)} className="button-ghost">成片预演</Link>
                   <Link href={buildProjectHref('/render-runs', bundle.projectId)} className="button-ghost">运行诊断</Link>

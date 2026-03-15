@@ -9,7 +9,7 @@ import {
   retryFailedRenderJobs,
   runRenderJobs,
 } from '@/features/render/service';
-import { exportFinalCutAssemblyPackage, getFinalCutPlan } from '@/features/final-cut/service';
+import { exportFinalCutAssemblyPackage, getFinalCutPlan, runFinalCutPreviewAssembly } from '@/features/final-cut/service';
 
 export async function GET(request: Request) {
   try {
@@ -57,6 +57,18 @@ export async function GET(request: Request) {
         return NextResponse.json({ ok: false, error: '缺少 projectId' }, { status: 400 });
       }
       const data = await exportFinalCutAssemblyPackage(projectId);
+      return NextResponse.json({ ok: true, data });
+    }
+
+    if (action === 'assemble-final-cut-preview') {
+      if (!projectId) {
+        return NextResponse.json({ ok: false, error: '缺少 projectId' }, { status: 400 });
+      }
+      const data = await runFinalCutPreviewAssembly(projectId);
+      if (searchParams.get('open') === '1') {
+        const redirectUrl = new URL(`/api/media/file?path=${encodeURIComponent(data.files.previewMuxedPath)}`, request.url);
+        return NextResponse.redirect(redirectUrl);
+      }
       return NextResponse.json({ ok: true, data });
     }
 

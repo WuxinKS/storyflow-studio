@@ -133,6 +133,8 @@ export async function RenderStudioData({ projectId }: { projectId?: string }) {
     providerPayloads: `/api/render?action=export-provider-payloads&projectId=${project.id}`,
     finalCut: `/api/render?action=export-final-cut-plan&projectId=${project.id}`,
     finalCutAssembly: `/api/render?action=export-final-cut-assembly&projectId=${project.id}`,
+    finalCutAssemblePreview: `/api/render?action=assemble-final-cut-preview&projectId=${project.id}`,
+    finalCutAssemblePreviewOpen: `/api/render?action=assemble-final-cut-preview&projectId=${project.id}&open=1`,
     productionBundle: `/api/render?action=export-production-bundle&projectId=${project.id}`,
   };
 
@@ -361,7 +363,12 @@ export async function RenderStudioData({ projectId }: { projectId?: string }) {
         <div className="asset-tile">
           <span className="label">装配包导出</span>
           <h4>FFmpeg 预演装配包</h4>
-          <p>直接导出成片装配 JSON、镜头段清单、音轨段清单和 <code>assemble-final-cut.sh</code>，更接近真正的一键成片。</p><a className="button-ghost" href={exportLinks.finalCutAssembly} target="_blank" rel="noreferrer">打开装配包 JSON</a>
+          <p>直接导出成片装配 JSON、镜头段清单、音轨段清单和 <code>assemble-final-cut.sh</code>，并支持一键执行拼装。</p>
+          <div className="action-row wrap-row compact-row">
+            <a className="button-ghost" href={exportLinks.finalCutAssembly} target="_blank" rel="noreferrer">打开装配包 JSON</a>
+            <a className="button-ghost" href={exportLinks.finalCutAssemblePreview} target="_blank" rel="noreferrer">执行预演拼装</a>
+            <a className="button-ghost" href={exportLinks.finalCutAssemblePreviewOpen} target="_blank" rel="noreferrer">拼装并打开成片</a>
+          </div>
         </div>
         <div className="asset-tile">
           <span className="label">交付包导出</span>

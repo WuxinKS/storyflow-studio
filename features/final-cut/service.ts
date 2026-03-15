@@ -1,5 +1,7 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, stat, writeFile } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
 import path from 'node:path';
+import { promisify } from 'node:util';
 import { prisma } from '@/lib/prisma';
 import {
   buildGeneratedMediaLookup,
@@ -160,10 +162,37 @@ export type FinalCutAssemblyExport = {
   };
 };
 
+export type FinalCutPreviewAssemblyRun = {
+  bundleDir: string;
+  package: FinalCutAssemblyPackage;
+  command: string;
+  files: {
+    assemblyPath: string;
+    previewScriptPath: string;
+    visualSegmentManifestPath: string;
+    audioSegmentManifestPath: string;
+    previewVideoPath: string;
+    previewAudioPath: string;
+    previewMuxedPath: string;
+    logPath: string;
+  };
+  output: {
+    success: boolean;
+    stdoutPreview: string;
+    stderrPreview: string;
+  };
+  sizes: {
+    previewVideoBytes: number | null;
+    previewAudioBytes: number | null;
+    previewMuxedBytes: number | null;
+  };
+};
+
 const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp', '.svg', '.avif']);
 const AUDIO_EXTENSIONS = new Set(['.mp3', '.wav', '.m4a', '.ogg', '.flac', '.aac']);
 const VIDEO_EXTENSIONS = new Set(['.mp4', '.webm', '.mov', '.mkv', '.m4v']);
 const DATA_URL_PATTERN = /^data:([^;,]+)?(;base64)?,(.*)$/s;
+const execFileAsync = promisify(execFile);
 
 function normalizeText(value: string | null | undefined) {
   return String(value || '').trim();
@@ -439,6 +468,15 @@ ffmpeg -y -i "$VISUAL_OUTPUT" -i "$AUDIO_OUTPUT" -c:v copy -c:a aac -shortest "$
 
 echo "预演成片已生成：$FINAL_OUTPUT"
 `;
+}
+
+async function getFileSize(filePath: string) {
+  try {
+    const fileStat = await stat(filePath);
+    return fileStat.isFile() ? fileStat.size : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function getFinalCutPlan(projectId?: string): Promise<FinalCutPlan | null> {
@@ -730,4 +768,79 @@ export async function exportFinalCutAssemblyPackage(projectId: string, options?:
       audioSegmentManifestPath,
     },
   } satisfies FinalCutAssemblyExport;
+}
+
+export async function runFinalCutPreviewAssembly(projectId: string, options?: { outputDir?: string }): Promise<FinalCutPreviewAssemblyRun> {
+  const assembly = await exportFinalCutAssemblyPackage(projectId, options);
+  const previewVideoPath = path.join(assembly.bundleDir, assembly.package.commands.previewVideoOutputFile);
+  const previewAudioPath = path.join(assembly.bundleDir, assembly.package.commands.previewAudioOutputFile);
+  const previewMuxedPath = path.join(assembly.bundleDir, assembly.package.commands.previewMuxedOutputFile);
+  const logPath = path.join(assembly.bundleDir, 'assemble-final-cut.log');
+  const command = `bash ${assembly.files.previewScriptPath}`;
+  const startedAt = new Date().toISOString();
+
+  let success = false;
+  let stdout = '';
+  let stderr = '';
+
+  try {
+    await execFileAsync('ffmpeg', ['-version']);
+    const result = await execFileAsync('bash', [assembly.files.previewScriptPath], {
+      cwd: assembly.bundleDir,
+      maxBuffer: 20 * 1024 * 1024,
+    });
+    stdout = result.stdout || '';
+    stderr = result.stderr || '';
+    success = true;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    const output = error && typeof error === 'object' ? error as { stdout?: string; stderr?: string } : {};
+    stdout = output.stdout || '';
+    stderr = [output.stderr || '', message].filter(Boolean).join('\n');
+  }
+
+  const finishedAt = new Date().toISOString();
+  await writeFile(logPath, [
+    `startedAt=${startedAt}`,
+    `finishedAt=${finishedAt}`,
+    `success=${success ? 'true' : 'false'}`,
+    `command=${command}`,
+    '',
+    '--- stdout ---',
+    stdout,
+    '',
+    '--- stderr ---',
+    stderr,
+    '',
+  ].join('\n'), 'utf8');
+
+  if (!success) {
+    throw new Error(`预演拼装失败，请查看日志：${logPath}`);
+  }
+
+  return {
+    bundleDir: assembly.bundleDir,
+    package: assembly.package,
+    command,
+    files: {
+      assemblyPath: assembly.files.assemblyPath,
+      previewScriptPath: assembly.files.previewScriptPath,
+      visualSegmentManifestPath: assembly.files.visualSegmentManifestPath,
+      audioSegmentManifestPath: assembly.files.audioSegmentManifestPath,
+      previewVideoPath,
+      previewAudioPath,
+      previewMuxedPath,
+      logPath,
+    },
+    output: {
+      success,
+      stdoutPreview: stdout.slice(0, 3000),
+      stderrPreview: stderr.slice(0, 3000),
+    },
+    sizes: {
+      previewVideoBytes: await getFileSize(previewVideoPath),
+      previewAudioBytes: await getFileSize(previewAudioPath),
+      previewMuxedBytes: await getFileSize(previewMuxedPath),
+    },
+  } satisfies FinalCutPreviewAssemblyRun;
 }
