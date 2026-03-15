@@ -7,10 +7,16 @@ export function PipelineRunButton({ projectId }: { projectId: string }) {
   const router = useRouter();
   const [loadingMode, setLoadingMode] = useState<string | null>(null);
   const [message, setMessage] = useState('');
+  const [previewPath, setPreviewPath] = useState<string | null>(null);
+  const [previewLogPath, setPreviewLogPath] = useState<string | null>(null);
+
+  const toPreviewHref = (filePath: string) => `/api/media/file?path=${encodeURIComponent(filePath)}`;
 
   const runPipeline = async (mode: 'prepare' | 'full') => {
     setLoadingMode(mode);
     setMessage('');
+    setPreviewPath(null);
+    setPreviewLogPath(null);
     try {
       const response = await fetch('/api/pipeline', {
         method: 'POST',
@@ -20,7 +26,18 @@ export function PipelineRunButton({ projectId }: { projectId: string }) {
       const data = await response.json();
       if (!response.ok || !data.ok) throw new Error(data.error || '流水线执行失败');
       const completedSteps = data.run.steps.filter((step: { status: string }) => step.status === 'completed').length;
-      setMessage(mode === 'full' ? `已完成一键主链（含异步推进），共执行 ${completedSteps} 个步骤` : `已把主链推进到渲染任务阶段，共执行 ${completedSteps} 个步骤`);
+      const resolvedPreviewPath = typeof data.artifacts?.previewPath === 'string' ? data.artifacts.previewPath : null;
+      const resolvedPreviewLogPath = typeof data.artifacts?.previewLogPath === 'string' ? data.artifacts.previewLogPath : null;
+      const previewReady = Boolean(data.artifacts?.previewReady && resolvedPreviewPath);
+      setPreviewPath(resolvedPreviewPath);
+      setPreviewLogPath(resolvedPreviewLogPath);
+      setMessage(
+        mode === 'full'
+          ? previewReady
+            ? `已完成一键主链（含异步推进），共执行 ${completedSteps} 个步骤，预演成片已生成。`
+            : `已完成一键主链（含异步推进），共执行 ${completedSteps} 个步骤。`
+          : `已把主链推进到渲染任务阶段，共执行 ${completedSteps} 个步骤`,
+      );
       router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '执行失败');
@@ -37,6 +54,12 @@ export function PipelineRunButton({ projectId }: { projectId: string }) {
       <button type="button" className="button-secondary" disabled={Boolean(loadingMode)} onClick={() => runPipeline('prepare')}>
         {loadingMode === 'prepare' ? '准备中…' : '一键生成到渲染任务'}
       </button>
+      {previewPath ? (
+        <a className="button-ghost" href={toPreviewHref(previewPath)} target="_blank" rel="noreferrer">打开预演成片</a>
+      ) : null}
+      {previewLogPath ? (
+        <a className="button-ghost" href={toPreviewHref(previewLogPath)} target="_blank" rel="noreferrer">查看拼装日志</a>
+      ) : null}
       {message ? <span className="success-text">{message}</span> : null}
     </div>
   );

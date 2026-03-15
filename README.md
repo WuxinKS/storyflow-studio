@@ -38,6 +38,7 @@ StoryFlow Studio 是一个面向内容创作者的 **AI 导演级创作工作台
 - Final Cut 装配包：自动导出镜头段清单、场次音轨清单与 `assemble-final-cut.sh`，可继续用 FFmpeg 生成预演成片
 - Final Cut 自动拼装：支持从工作台一键触发预演拼装并直接打开 `final-cut-preview.mp4`
 - 主链全量执行：`/api/pipeline` 的 `full` 模式会在导出交付包后自动尝试预演拼装（失败不阻断主链）
+- 主链返回工件：`/api/pipeline` 与 `/api/projects` 在全量模式下会返回 `artifacts.previewPath / previewLogPath`，便于前端直接跳转成片复验
 - 生成工作台载荷预检：直接在页面上预览 image / voice / video payload 中的定向参考、情绪与时长字段
 
 当前仍可继续深化 provider 接入与产品打磨，但核心工作台已经可以演示、验证和交付。

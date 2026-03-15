@@ -55,8 +55,13 @@ export function IdeaLabForm() {
         const completedSteps = Array.isArray(data.run?.steps)
           ? data.run.steps.filter((step: { status: string }) => step.status === 'completed').length
           : 0;
-        setMessage(`已创建项目并跑完整主链：${data.project.title}（完成 ${completedSteps} 个步骤）`);
-        router.push(buildProjectHref('/render-studio', data.project.id));
+        const previewReady = Boolean(data.artifacts?.previewReady);
+        setMessage(
+          previewReady
+            ? `已创建项目并跑完整主链：${data.project.title}（完成 ${completedSteps} 个步骤，预演成片已生成）`
+            : `已创建项目并跑完整主链：${data.project.title}（完成 ${completedSteps} 个步骤）`,
+        );
+        router.push(buildProjectHref('/final-cut', data.project.id));
         router.refresh();
         return;
       }

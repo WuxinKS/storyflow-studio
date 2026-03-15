@@ -34,6 +34,14 @@ export type PipelineRunLog = {
   error?: string;
 };
 
+export type PipelineRunArtifacts = {
+  bundleDir: string | null;
+  zipPath: string | null;
+  previewPath: string | null;
+  previewLogPath: string | null;
+  previewReady: boolean;
+};
+
 function nowIso() {
   return new Date().toISOString();
 }
@@ -111,6 +119,13 @@ export async function runProjectPipeline(projectId: string, options?: { mode?: P
   const steps: PipelineStep[] = [];
   const startedAt = nowIso();
   let finalError: string | undefined;
+  const artifacts: PipelineRunArtifacts = {
+    bundleDir: null,
+    zipPath: null,
+    previewPath: null,
+    previewLogPath: null,
+    previewReady: false,
+  };
 
   const runStep = async <T>(key: string, label: string, work: () => Promise<T>, describe: (result: T) => string) => {
     const stepStartedAt = nowIso();
@@ -196,10 +211,17 @@ export async function runProjectPipeline(projectId: string, options?: { mode?: P
       const bundle = await runStep('production-bundle', '导出交付包', () => exportProductionBundle(projectId), (result) => {
         return `已生成交付包 ${path.basename(result.zipPath)}，目录 ${result.bundleDir}。`;
       });
+      artifacts.bundleDir = bundle.bundleDir;
+      artifacts.zipPath = bundle.zipPath;
+      artifacts.previewPath = path.join(bundle.bundleDir, 'final-cut-preview.mp4');
+      artifacts.previewLogPath = path.join(bundle.bundleDir, 'assemble-final-cut.log');
 
       const finalCutAssembleStartedAt = nowIso();
       try {
         const preview = await runFinalCutPreviewAssembly(projectId, { outputDir: bundle.bundleDir });
+        artifacts.previewPath = preview.files.previewMuxedPath;
+        artifacts.previewLogPath = preview.files.logPath;
+        artifacts.previewReady = Boolean(preview.sizes.previewMuxedBytes && preview.sizes.previewMuxedBytes > 0);
         steps.push(createStep({
           key: 'final-cut-assemble',
           label: '最终预演拼装',
@@ -276,5 +298,5 @@ export async function runProjectPipeline(projectId: string, options?: { mode?: P
     throw new Error(finalError);
   }
 
-  return { project, run };
+  return { project, run, artifacts };
 }

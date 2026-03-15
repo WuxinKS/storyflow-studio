@@ -7,6 +7,8 @@ import {
 } from '@/features/story/service';
 import { PipelineRunButton } from '@/components/pipeline-run-button';
 import { buildProjectHref } from '@/lib/project-links';
+import { buildLocalMediaPreviewHref } from '@/lib/media-preview';
+import { getDeliveryCenterData } from '@/features/delivery/service';
 import Link from 'next/link';
 
 export async function PipelineCommandCenter({ projectId }: { projectId?: string }) {
@@ -50,6 +52,8 @@ export async function PipelineCommandCenter({ projectId }: { projectId?: string 
   const latestRun = parsePipelineRunLog(latestRunOutline?.summary);
   const completedSteps = latestRun?.steps.filter((step) => step.status === 'completed').length || 0;
   const failedSteps = latestRun?.steps.filter((step) => step.status === 'failed').length || 0;
+  const deliveryData = await getDeliveryCenterData(project.id, 1).catch(() => null);
+  const latestBundle = deliveryData?.bundles[0] || null;
 
   return (
     <div className="page-stack">
@@ -91,6 +95,22 @@ export async function PipelineCommandCenter({ projectId }: { projectId?: string 
                 <span className="label">失败原因</span>
                 <h4>需要处理</h4>
                 <p>{latestRun.error}</p>
+              </div>
+            ) : null}
+            {latestBundle ? (
+              <div className="asset-tile">
+                <span className="label">最近成片工件</span>
+                <h4>{latestBundle.files.finalCutPreviewPath ? '预演成片已就绪' : '预演成片未就绪'}</h4>
+                <p>最近导出：{latestBundle.exportedAt || '未知'}；可直接打开成片、日志或跳转交付中心继续复验。</p>
+                <div className="action-row wrap-row compact-row">
+                  {latestBundle.files.finalCutPreviewPath ? (
+                    <a className="button-ghost" href={buildLocalMediaPreviewHref(latestBundle.files.finalCutPreviewPath)} target="_blank" rel="noreferrer">打开预演成片</a>
+                  ) : null}
+                  {latestBundle.files.finalCutPreviewLogPath ? (
+                    <a className="button-ghost" href={buildLocalMediaPreviewHref(latestBundle.files.finalCutPreviewLogPath)} target="_blank" rel="noreferrer">查看拼装日志</a>
+                  ) : null}
+                  <Link href={buildProjectHref('/delivery-center', project.id)} className="button-ghost">打开交付中心</Link>
+                </div>
               </div>
             ) : null}
           </div>

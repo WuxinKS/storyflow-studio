@@ -21,7 +21,7 @@ export async function POST(request: Request) {
 
     if (body.runPipelineMode === 'prepare' || body.runPipelineMode === 'full') {
       const pipeline = await runProjectPipeline(project.id, { mode: body.runPipelineMode });
-      return NextResponse.json({ ok: true, project: pipeline.project, run: pipeline.run }, { status: 201 });
+      return NextResponse.json({ ok: true, project: pipeline.project, run: pipeline.run, artifacts: pipeline.artifacts }, { status: 201 });
     }
 
     return NextResponse.json({ ok: true, project }, { status: 201 });
