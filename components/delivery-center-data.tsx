@@ -88,8 +88,12 @@ export async function DeliveryCenterData({
               <span>视频载荷：{bundle.providerCounts.video}</span>
               <span>媒体：{bundle.mediaCounts.total}</span>
               <span>装配：{bundle.assemblyState || '未标记'}</span>
+              <span>预演成片：{bundle.files.finalCutPreviewPath ? 'ready' : 'not-yet'}</span>
               <span>bundle：{formatBytes(bundle.sizes.bundleBytes)}</span>
               <span>zip：{formatBytes(bundle.sizes.zipBytes)}</span>
+              <span>预演视频：{formatBytes(bundle.sizes.finalCutPreviewBytes)}</span>
+              <span>预演音轨：{formatBytes(bundle.sizes.finalCutPreviewAudioBytes)}</span>
+              <span>拼装日志：{formatBytes(bundle.sizes.finalCutPreviewLogBytes)}</span>
             </div>
             <div className="tag-list">
               <span className="tag-chip">图片 {bundle.mediaCounts.images}</span>
@@ -117,6 +121,18 @@ export async function DeliveryCenterData({
               ) : null}
               {bundle.files.finalCutScriptPath ? (
                 <a className="button-ghost" href={buildLocalMediaPreviewHref(bundle.files.finalCutScriptPath)} target="_blank" rel="noreferrer">装配脚本</a>
+              ) : null}
+              {bundle.files.finalCutPreviewPath ? (
+                <a className="button-ghost" href={buildLocalMediaPreviewHref(bundle.files.finalCutPreviewPath)} target="_blank" rel="noreferrer">预演成片</a>
+              ) : null}
+              {bundle.files.finalCutPreviewVisualPath ? (
+                <a className="button-ghost" href={buildLocalMediaPreviewHref(bundle.files.finalCutPreviewVisualPath)} target="_blank" rel="noreferrer">预演视频轨</a>
+              ) : null}
+              {bundle.files.finalCutPreviewAudioPath ? (
+                <a className="button-ghost" href={buildLocalMediaPreviewHref(bundle.files.finalCutPreviewAudioPath)} target="_blank" rel="noreferrer">预演音轨</a>
+              ) : null}
+              {bundle.files.finalCutPreviewLogPath ? (
+                <a className="button-ghost" href={buildLocalMediaPreviewHref(bundle.files.finalCutPreviewLogPath)} target="_blank" rel="noreferrer">拼装日志</a>
               ) : null}
               <a className="button-ghost" href={buildLocalMediaPreviewHref(bundle.files.presetsPath)} target="_blank" rel="noreferrer">Preset JSON</a>
               {bundle.files.zipPath ? (

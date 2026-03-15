@@ -7,6 +7,7 @@ import { generateVisualBible } from '@/features/visual/service';
 import { generateAdaptationFromLatestChapter } from '@/features/adaptation/service';
 import { getQaReport } from '@/features/qa/service';
 import { advanceRenderJobs, createRenderJobsForLatestProject, exportProductionBundle, runRenderJobs } from '@/features/render/service';
+import { runFinalCutPreviewAssembly } from '@/features/final-cut/service';
 
 export const PIPELINE_RUN_LOG_TITLE = 'Pipeline Run Log';
 
@@ -196,6 +197,29 @@ export async function runProjectPipeline(projectId: string, options?: { mode?: P
         return `已生成交付包 ${path.basename(result.zipPath)}，目录 ${result.bundleDir}。`;
       });
 
+      const finalCutAssembleStartedAt = nowIso();
+      try {
+        const preview = await runFinalCutPreviewAssembly(projectId, { outputDir: bundle.bundleDir });
+        steps.push(createStep({
+          key: 'final-cut-assemble',
+          label: '最终预演拼装',
+          status: 'completed',
+          detail: `已生成预演成片 ${path.basename(preview.files.previewMuxedPath)}，日志 ${path.basename(preview.files.logPath)}。`,
+          startedAt: finalCutAssembleStartedAt,
+          endedAt: nowIso(),
+        }));
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        steps.push(createStep({
+          key: 'final-cut-assemble',
+          label: '最终预演拼装',
+          status: 'skipped',
+          detail: `未自动拼装预演成片（不阻断主链）：${message}`,
+          startedAt: finalCutAssembleStartedAt,
+          endedAt: nowIso(),
+        }));
+      }
+
       await runStep('qa-summary', '质量结论', () => getQaReport(projectId, { bundleExport: bundle }), (report) => {
         if (!report) return '当前还没有可用 QA 数据。';
         const blockerText = report.summary.blockerLabels.join(' / ') || '无阻断项';
@@ -219,6 +243,12 @@ export async function runProjectPipeline(projectId: string, options?: { mode?: P
         label: '质量结论',
         status: 'skipped',
         detail: '当前模式只准备到渲染任务，不自动生成 QA 结论。',
+      }));
+      steps.push(createStep({
+        key: 'final-cut-assemble',
+        label: '最终预演拼装',
+        status: 'skipped',
+        detail: '当前模式只准备到渲染任务，不自动执行成片预演拼装。',
       }));
     }
 

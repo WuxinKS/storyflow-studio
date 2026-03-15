@@ -91,7 +91,7 @@ export type FinalCutPlan = {
 
 export type FinalCutAssemblyAsset = {
   source: string | null;
-  sourceType: 'local' | 'remote' | 'inline-exported' | 'missing';
+  sourceType: 'local' | 'remote' | 'downloaded-remote' | 'inline-exported' | 'missing';
   originalSource: string | null;
 };
 
@@ -192,6 +192,7 @@ const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif', '.bm
 const AUDIO_EXTENSIONS = new Set(['.mp3', '.wav', '.m4a', '.ogg', '.flac', '.aac']);
 const VIDEO_EXTENSIONS = new Set(['.mp4', '.webm', '.mov', '.mkv', '.m4v']);
 const DATA_URL_PATTERN = /^data:([^;,]+)?(;base64)?,(.*)$/s;
+const FINAL_CUT_REMOTE_FETCH_TIMEOUT_MS = Math.max(5000, Number(process.env.STORYFLOW_FINAL_CUT_REMOTE_FETCH_TIMEOUT_MS || '45000'));
 const execFileAsync = promisify(execFile);
 
 function normalizeText(value: string | null | undefined) {
@@ -344,6 +345,87 @@ function getExtensionFromMime(mime: string, fallbackKind: 'image' | 'audio' | 'v
   return fallbackKind === 'audio' ? '.m4a' : fallbackKind === 'video' ? '.mp4' : '.png';
 }
 
+function getExtensionFromUrl(url: string) {
+  try {
+    const parsed = new URL(url);
+    const ext = path.extname(parsed.pathname || '').toLowerCase();
+    return ext || null;
+  } catch {
+    return null;
+  }
+}
+
+async function resolveLocalSourcePath(source: string, expectedKind: 'image' | 'audio' | 'video') {
+  const normalized = normalizeText(source);
+  if (!normalized) return null;
+
+  let candidate = '';
+  if (normalized.startsWith('file://')) {
+    try {
+      candidate = decodeURIComponent(new URL(normalized).pathname);
+    } catch {
+      candidate = '';
+    }
+  } else if (path.isAbsolute(normalized)) {
+    candidate = normalized;
+  }
+
+  if (!candidate || getPathKind(candidate) !== expectedKind) return null;
+
+  try {
+    const fileStat = await stat(candidate);
+    if (!fileStat.isFile()) return null;
+    return candidate;
+  } catch {
+    return null;
+  }
+}
+
+async function downloadRemoteSource(input: {
+  url: string;
+  expectedKind: 'image' | 'audio' | 'video';
+  inlineMediaDir: string;
+  fileStem: string;
+}) {
+  if (!/^https?:\/\//i.test(input.url)) return null;
+
+  const controller = new AbortController();
+  const timeoutHandle = setTimeout(() => controller.abort(), FINAL_CUT_REMOTE_FETCH_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(input.url, {
+      method: 'GET',
+      redirect: 'follow',
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'StoryFlowStudio/FinalCutAssembler',
+      },
+    });
+
+    if (!response.ok) return null;
+
+    const mime = normalizeText(response.headers.get('content-type')).split(';')[0];
+    const mimeKind = getMimeKind(mime);
+    if (mimeKind && mimeKind !== input.expectedKind) return null;
+
+    const bytes = Buffer.from(await response.arrayBuffer());
+    if (bytes.length === 0) return null;
+
+    await mkdir(input.inlineMediaDir, { recursive: true });
+    const urlExt = getExtensionFromUrl(input.url);
+    const extension = urlExt && getPathKind(`x${urlExt}`) === input.expectedKind
+      ? urlExt
+      : getExtensionFromMime(mime || '', input.expectedKind);
+    const localPath = path.join(input.inlineMediaDir, `${input.fileStem}-remote${extension}`);
+    await writeFile(localPath, bytes);
+    return localPath;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeoutHandle);
+  }
+}
+
 async function resolveAssemblyAsset(input: {
   entry: GeneratedMediaEntry | null;
   expectedKind: 'image' | 'audio' | 'video';
@@ -380,6 +462,31 @@ async function resolveAssemblyAsset(input: {
       return {
         source: inlinePath,
         sourceType: 'inline-exported',
+        originalSource: sourceUrl,
+      } satisfies FinalCutAssemblyAsset;
+    }
+  }
+
+  const sourceAsLocalPath = sourceUrl ? await resolveLocalSourcePath(sourceUrl, input.expectedKind) : null;
+  if (sourceAsLocalPath) {
+    return {
+      source: sourceAsLocalPath,
+      sourceType: 'local',
+      originalSource: sourceUrl,
+    } satisfies FinalCutAssemblyAsset;
+  }
+
+  if (sourceUrl) {
+    const downloadedPath = await downloadRemoteSource({
+      url: sourceUrl,
+      expectedKind: input.expectedKind,
+      inlineMediaDir: input.inlineMediaDir,
+      fileStem: input.fileStem,
+    });
+    if (downloadedPath) {
+      return {
+        source: downloadedPath,
+        sourceType: 'downloaded-remote',
         originalSource: sourceUrl,
       } satisfies FinalCutAssemblyAsset;
     }
@@ -739,6 +846,7 @@ export async function exportFinalCutAssemblyPackage(projectId: string, options?:
     usage: [
       '先看 final-cut-assembly.json，确认每个镜头最终采用的视频 / 图片回退与场次音轨来源。',
       '执行 assemble-final-cut.sh 需要本机安装 ffmpeg；脚本会自动生成镜头片段、场次音轨段并合成预演成片。',
+      '若镜头或音轨只有远程 URL，导出阶段会先尝试下载并本地化，尽量避免外链失效影响拼装。',
       '如果脚本提示缺少视觉产物，请先回生成工作台补跑图像或视频任务，再重新导出装配包。',
     ],
     commands: {

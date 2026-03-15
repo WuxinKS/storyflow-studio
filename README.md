@@ -37,6 +37,7 @@ StoryFlow Studio 是一个面向内容创作者的 **AI 导演级创作工作台
 - 运行诊断台：集中查看 Provider request / response 工件、媒体索引与定向参考注入情况
 - Final Cut 装配包：自动导出镜头段清单、场次音轨清单与 `assemble-final-cut.sh`，可继续用 FFmpeg 生成预演成片
 - Final Cut 自动拼装：支持从工作台一键触发预演拼装并直接打开 `final-cut-preview.mp4`
+- 主链全量执行：`/api/pipeline` 的 `full` 模式会在导出交付包后自动尝试预演拼装（失败不阻断主链）
 - 生成工作台载荷预检：直接在页面上预览 image / voice / video payload 中的定向参考、情绪与时长字段
 
 当前仍可继续深化 provider 接入与产品打磨，但核心工作台已经可以演示、验证和交付。
@@ -182,6 +183,7 @@ STORYFLOW_VIDEO_PROVIDER_API_KEY=""
 STORYFLOW_VIDEO_PROVIDER_AUTH_HEADER=""
 STORYFLOW_VIDEO_PROVIDER_AUTH_SCHEME=""
 STORYFLOW_VIDEO_PROVIDER_TIMEOUT_MS=""
+STORYFLOW_FINAL_CUT_REMOTE_FETCH_TIMEOUT_MS="45000"
 ```
 
 说明：
@@ -238,6 +240,7 @@ STORYFLOW_VIDEO_PROVIDER_EXTRA_BODY_JSON='{"duration":5,"aspect_ratio":"16:9"}'
 - `gemini-image` 会自动把基础 URL 组装为 `.../models/<model>:generateContent`，并兼容 Gemini 返回的 `inlineData` 图片结果。
 - `jimeng-image` 会结合供应商名、模型名与 URL 自动识别；如果你的 URL 是 `dreamina` / `seedream` 一类，也能直接推断为即梦图像适配器。
 - `runway-video`、`minimax-video`、`kling-video`、`seedance-video` 都会默认启用异步轮询，并自动带上常见的 `taskId` / `status` / `statusUrl` 字段名。
+- Final Cut 装配阶段会优先使用本地工件；若只拿到远程 URL，会先尝试下载到本地再交给 FFmpeg，降低外链过期导致的拼装失败概率。
 - 若视频网关的状态接口就是提交接口加 `/{taskId}`，可以只配置 URL + NAME + MODEL + ADAPTER；若状态接口不同，再补 `*_POLL_PATH` 即可。
 - 设置页现在会直接展示每个 Provider 的适配预设、请求路径来源、轮询策略、任务键与状态键，便于快速排查真实模型接入问题。
 - `*_POLL_*` 适用于图像 / 语音 / 视频三类 Provider；页面中的“推进执行中任务”会继续回查并在产物 ready 后自动写入媒体索引。

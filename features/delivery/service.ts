@@ -34,6 +34,10 @@ export type DeliveryBundleRecord = {
   sizes: {
     bundleBytes: number | null;
     zipBytes: number | null;
+    finalCutPreviewBytes: number | null;
+    finalCutPreviewVisualBytes: number | null;
+    finalCutPreviewAudioBytes: number | null;
+    finalCutPreviewLogBytes: number | null;
   };
   files: {
     manifestPath: string;
@@ -45,6 +49,10 @@ export type DeliveryBundleRecord = {
     finalCutSegmentsPath: string | null;
     finalCutAudioSegmentsPath: string | null;
     finalCutScriptPath: string | null;
+    finalCutPreviewPath: string | null;
+    finalCutPreviewVisualPath: string | null;
+    finalCutPreviewAudioPath: string | null;
+    finalCutPreviewLogPath: string | null;
     bundlePath: string;
     zipPath: string | null;
   };
@@ -278,6 +286,10 @@ async function loadBundleRecord(bundleDir: string) {
   const finalCutSegmentsPath = path.join(bundleDir, 'final-cut-segments.txt');
   const finalCutAudioSegmentsPath = path.join(bundleDir, 'final-cut-audio-segments.txt');
   const finalCutScriptPath = path.join(bundleDir, 'assemble-final-cut.sh');
+  const finalCutPreviewPath = path.join(bundleDir, 'final-cut-preview.mp4');
+  const finalCutPreviewVisualPath = path.join(bundleDir, 'final-cut-preview-visual.mp4');
+  const finalCutPreviewAudioPath = path.join(bundleDir, 'final-cut-preview-audio.m4a');
+  const finalCutPreviewLogPath = path.join(bundleDir, 'assemble-final-cut.log');
   const bundlePath = path.join(bundleDir, 'production-bundle.json');
   const bundleName = path.basename(bundleDir);
   const zipPath = path.join(path.dirname(bundleDir), `${bundleName}.zip`);
@@ -292,13 +304,29 @@ async function loadBundleRecord(bundleDir: string) {
     ? summarizeGeneratedMediaCounts(parseGeneratedMediaLibrary(JSON.stringify(generatedMediaJson)))
     : EMPTY_MEDIA_COUNTS;
 
-  const [bundleBytes, zipBytes, assemblyBytes, segmentsBytes, audioSegmentsBytes, scriptBytes, directoryStat] = await Promise.all([
+  const [
+    bundleBytes,
+    zipBytes,
+    assemblyBytes,
+    segmentsBytes,
+    audioSegmentsBytes,
+    scriptBytes,
+    previewBytes,
+    previewVisualBytes,
+    previewAudioBytes,
+    previewLogBytes,
+    directoryStat,
+  ] = await Promise.all([
     getFileSize(bundlePath),
     getFileSize(zipPath),
     getFileSize(finalCutAssemblyPath),
     getFileSize(finalCutSegmentsPath),
     getFileSize(finalCutAudioSegmentsPath),
     getFileSize(finalCutScriptPath),
+    getFileSize(finalCutPreviewPath),
+    getFileSize(finalCutPreviewVisualPath),
+    getFileSize(finalCutPreviewAudioPath),
+    getFileSize(finalCutPreviewLogPath),
     stat(bundleDir).catch(() => null),
   ]);
 
@@ -350,6 +378,10 @@ async function loadBundleRecord(bundleDir: string) {
     sizes: {
       bundleBytes,
       zipBytes,
+      finalCutPreviewBytes: previewBytes,
+      finalCutPreviewVisualBytes: previewVisualBytes,
+      finalCutPreviewAudioBytes: previewAudioBytes,
+      finalCutPreviewLogBytes: previewLogBytes,
     },
     files: {
       manifestPath,
@@ -361,6 +393,10 @@ async function loadBundleRecord(bundleDir: string) {
       finalCutSegmentsPath: segmentsBytes ? finalCutSegmentsPath : null,
       finalCutAudioSegmentsPath: audioSegmentsBytes ? finalCutAudioSegmentsPath : null,
       finalCutScriptPath: scriptBytes ? finalCutScriptPath : null,
+      finalCutPreviewPath: previewBytes ? finalCutPreviewPath : null,
+      finalCutPreviewVisualPath: previewVisualBytes ? finalCutPreviewVisualPath : null,
+      finalCutPreviewAudioPath: previewAudioBytes ? finalCutPreviewAudioPath : null,
+      finalCutPreviewLogPath: previewLogBytes ? finalCutPreviewLogPath : null,
       bundlePath,
       zipPath: zipBytes ? zipPath : null,
     },
