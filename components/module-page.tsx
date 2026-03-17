@@ -1,6 +1,8 @@
+import Link from 'next/link';
 import { ReactNode } from 'react';
 import { ProjectContextBar } from '@/components/project-context-bar';
-import { SectionCard } from '@/components/section-card';
+import { getAdjacentNavigation, getNavigationGroup, getNavigationItem } from '@/lib/app-meta';
+import { buildProjectHref } from '@/lib/project-links';
 
 export function ModulePage({
   title,
@@ -17,17 +19,53 @@ export function ModulePage({
   projectId?: string;
   children?: ReactNode;
 }) {
+  const currentItem = currentPath ? getNavigationItem(currentPath) : null;
+  const currentGroup = currentItem ? getNavigationGroup(currentItem.group) : null;
+  const adjacent = currentPath ? getAdjacentNavigation(currentPath) : { previous: null, next: null };
+
   return (
-    <div className="page-stack">
-      <SectionCard title={title} description={lead}>
-        <ul className="bullet-list">
-          {bullets.map((item) => (
-            <li key={item}>{item}</li>
-          ))}
-        </ul>
-        {currentPath ? <ProjectContextBar currentPath={currentPath} projectId={projectId} /> : null}
+    <div className="page-stack module-page">
+      <section className="module-hero">
+        <div className="module-hero-copy">
+          <div className="module-hero-meta">
+            <span className="shell-route-chip">{currentGroup?.label || '模块'}</span>
+            <span className="shell-route-meta">
+              {currentItem?.step ? `第 ${String(currentItem.step).padStart(2, '0')} 站` : '全局视图'}
+            </span>
+          </div>
+          <h1>{title}</h1>
+          <p className="module-lead">{lead}</p>
+        </div>
+
+        <div className="module-hero-side">
+          <div className="module-checklist">
+            {bullets.map((item, index) => (
+              <div key={item} className="module-check-item">
+                <span>{String(index + 1).padStart(2, '0')}</span>
+                <p>{item}</p>
+              </div>
+            ))}
+          </div>
+          <div className="action-row wrap-row">
+            {adjacent.previous ? (
+              <Link href={buildProjectHref(adjacent.previous.href, projectId)} className="button-ghost">
+                上一步：{adjacent.previous.label}
+              </Link>
+            ) : null}
+            {adjacent.next ? (
+              <Link href={buildProjectHref(adjacent.next.href, projectId)} className="button-secondary">
+                下一步：{adjacent.next.label}
+              </Link>
+            ) : null}
+          </div>
+        </div>
+      </section>
+
+      {currentPath ? <ProjectContextBar currentPath={currentPath} projectId={projectId} /> : null}
+
+      <div className="module-content">
         {children}
-      </SectionCard>
+      </div>
     </div>
   );
 }

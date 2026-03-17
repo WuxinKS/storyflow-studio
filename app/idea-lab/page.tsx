@@ -1,15 +1,19 @@
 import { IdeaLabForm } from '@/components/idea-lab-form';
-import { SectionCard } from '@/components/section-card';
+import { ModulePage } from '@/components/module-page';
 
 export default function IdeaLabPage() {
   return (
-    <div className="page-stack">
-      <SectionCard
-        title="创意工坊"
-        description="输入一句创意、关键词、题材和输出目标；既可以只创建项目，也可以直接一键跑完整主链。"
-      >
+    <ModulePage
+      title="创意工坊"
+      lead="先把一句话创意说清楚，再决定是只创建项目，还是直接触发完整主链。"
+      bullets={[
+        '先定义项目标题、题材、风格和目标输出',
+        '如果方向明确，直接一键跑完整主链',
+        '如果还在探索阶段，就先保存项目再继续迭代',
+      ]}
+      currentPath="/idea-lab"
+    >
         <IdeaLabForm />
-      </SectionCard>
-    </div>
+    </ModulePage>
   );
 }

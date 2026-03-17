@@ -1,24 +1,8 @@
 import Link from 'next/link';
 import { listProjects } from '@/features/project/service';
 import { getProjectStageLabel } from '@/lib/display';
+import { getAdjacentNavigation, getNavigationItem } from '@/lib/app-meta';
 import { buildProjectHref, normalizeProjectId } from '@/lib/project-links';
-
-const WORKSPACE_LINKS = [
-  { href: '/story-setup', label: '故事' },
-  { href: '/chapter-studio', label: '小说' },
-  { href: '/character-studio', label: '角色' },
-  { href: '/visual-bible', label: '视觉' },
-  { href: '/reference-lab', label: '参考' },
-  { href: '/adaptation-lab', label: '改编' },
-  { href: '/storyboard', label: '分镜' },
-  { href: '/timeline', label: '时间线' },
-  { href: '/assets', label: '资产' },
-  { href: '/render-studio', label: '生成' },
-  { href: '/render-runs', label: '诊断' },
-  { href: '/qa-panel', label: 'QA' },
-  { href: '/delivery-center', label: '交付' },
-  { href: '/settings', label: '设置' },
-] as const;
 
 export async function ProjectContextBar({
   currentPath,
@@ -34,46 +18,59 @@ export async function ProjectContextBar({
   const currentProject = normalizedProjectId ? projects.find((project) => project.id === normalizedProjectId) || null : null;
   const fallbackProject = projects[0] || null;
   const effectiveProject = currentProject || fallbackProject;
+  const currentItem = getNavigationItem(currentPath);
+  const adjacent = getAdjacentNavigation(currentPath);
 
   return (
-    <div className="snapshot-card">
-      <div className="snapshot-header">
+    <section className="project-context-card">
+      <div className="project-context-head">
         <div>
-          <p className="eyebrow">项目上下文</p>
-          <h3>{currentProject?.title || fallbackProject?.title || '暂无项目'}</h3>
+          <p className="eyebrow">当前项目</p>
+          <h3>{effectiveProject?.title || '暂无项目'}</h3>
+          <p className="project-context-copy">
+            {effectiveProject?.premise
+              || effectiveProject?.description
+              || '先固定当前项目，再沿着同一条主链推进故事、生成和交付。'}
+          </p>
         </div>
-        <span className="status-pill status-pill-subtle">
-          {currentProject
-            ? getProjectStageLabel(currentProject.stage)
-            : normalizedProjectId
-              ? '指定项目不存在'
-              : '默认最新项目'}
-        </span>
+        <div className="project-context-status">
+          <span className="status-pill status-pill-subtle">
+            {effectiveProject ? getProjectStageLabel(effectiveProject.stage) : '未锁定项目'}
+          </span>
+          <span className="context-inline-note">{currentItem.label}</span>
+        </div>
       </div>
-      <p>
-        {currentProject?.premise
-          || currentProject?.description
-          || (normalizedProjectId ? '当前 projectId 未命中任何项目，可直接点下方项目切换。' : fallbackProject?.premise || fallbackProject?.description)
-          || '可直接在这里切换项目并保持整条工作流上下文一致。'}
-      </p>
-      <div className="action-row wrap-row">
-        {WORKSPACE_LINKS.map((item) => (
-          <Link
-            key={item.href}
-            href={buildProjectHref(item.href, effectiveProject?.id)}
-            className={item.href === currentPath ? 'button-secondary' : 'button-ghost'}
-          >
-            {item.label}
+
+      <div className="project-context-actions">
+        {adjacent.previous ? (
+          <Link href={buildProjectHref(adjacent.previous.href, effectiveProject?.id)} className="button-ghost">
+            上一步：{adjacent.previous.label}
           </Link>
-        ))}
+        ) : null}
+        {adjacent.next ? (
+          <Link href={buildProjectHref(adjacent.next.href, effectiveProject?.id)} className="button-secondary">
+            下一步：{adjacent.next.label}
+          </Link>
+        ) : null}
+        <Link href={buildProjectHref('/render-studio', effectiveProject?.id)} className="button-ghost">
+          去生成工作台
+        </Link>
+        <Link href={buildProjectHref('/delivery-center', effectiveProject?.id)} className="button-ghost">
+          看交付中心
+        </Link>
       </div>
-      <div className="tag-list">
+
+      <div className="project-chip-row">
         {projects.slice(0, 8).map((project) => (
-          <Link key={project.id} href={buildProjectHref(currentPath, project.id)} className="tag-chip">
-            {project.id === effectiveProject?.id ? `当前：${project.title}` : project.title}
+          <Link
+            key={project.id}
+            href={buildProjectHref(currentPath, project.id)}
+            className={project.id === effectiveProject?.id ? 'tag-chip tag-chip-active' : 'tag-chip'}
+          >
+            {project.title}
           </Link>
         ))}
       </div>
-    </div>
+    </section>
   );
 }
