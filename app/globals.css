@@ -944,6 +944,323 @@ textarea {
   background: var(--accent);
 }
 
+.progress-strip {
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(35, 65, 95, 0.1);
+  border: 1px solid rgba(35, 65, 95, 0.08);
+}
+
+.progress-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), #c7794c);
+}
+
+.progress-fill-accent-2 {
+  background: linear-gradient(90deg, var(--accent-2), #1b9a91);
+}
+
+.progress-fill-accent-3 {
+  background: linear-gradient(90deg, var(--accent-3), #3e6287);
+}
+
+.kickoff-grid,
+.story-control-grid,
+.render-command-grid,
+.finalcut-command-grid {
+  display: grid;
+  gap: 18px;
+}
+
+.kickoff-grid,
+.render-command-grid,
+.finalcut-command-grid {
+  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+}
+
+.story-control-grid {
+  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+}
+
+.kickoff-form-panel,
+.story-command-card,
+.render-command-card,
+.finalcut-command-card,
+.kickoff-side-card,
+.render-highlight-card,
+.finalcut-alert-card,
+.finalcut-list-panel,
+.finalcut-scene-audio {
+  display: grid;
+  gap: 14px;
+}
+
+.kickoff-panel-head,
+.render-panel-head,
+.finalcut-panel-head,
+.render-job-card-head,
+.story-layer-head,
+.finalcut-shot-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.kickoff-action-bar,
+.kickoff-side-panel,
+.kickoff-mode-grid,
+.story-health-grid,
+.story-layer-grid,
+.scene-seed-grid,
+.render-kpi-grid,
+.render-stage-list,
+.render-ops-grid,
+.render-input-grid,
+.render-strategy-grid,
+.render-preset-grid,
+.render-media-grid,
+.render-job-grid,
+.render-export-grid,
+.finalcut-kpi-grid,
+.finalcut-alert-grid,
+.finalcut-scene-stack,
+.finalcut-shot-grid,
+.finalcut-list {
+  display: grid;
+  gap: 18px;
+}
+
+.kickoff-action-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.kickoff-side-panel {
+  align-content: start;
+}
+
+.kickoff-side-card,
+.kickoff-mode-card,
+.story-layer-card,
+.story-beat-item,
+.story-seed-preview-item,
+.scene-seed-card,
+.render-kpi-card,
+.render-stage-item,
+.render-highlight-card,
+.render-strategy-card,
+.render-preset-card,
+.render-media-card,
+.render-job-card,
+.finalcut-kpi-card,
+.finalcut-alert-card,
+.finalcut-list-panel,
+.finalcut-scene-audio {
+  background: rgba(255, 255, 255, 0.48);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 18px;
+}
+
+.kickoff-mode-grid,
+.story-health-grid,
+.render-kpi-grid,
+.finalcut-kpi-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.kickoff-mode-card,
+.render-stage-item,
+.render-kpi-card,
+.finalcut-kpi-card {
+  align-content: start;
+}
+
+.render-kpi-card h4,
+.finalcut-kpi-card h4 {
+  font-size: 1.5rem;
+  line-height: 1.1;
+}
+
+.story-layer-grid,
+.render-export-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.scene-seed-grid,
+.render-input-grid,
+.render-preset-grid,
+.render-job-grid,
+.finalcut-shot-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.render-stage-list {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.render-ops-grid,
+.render-strategy-grid,
+.render-media-grid,
+.finalcut-alert-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.kickoff-side-card p,
+.story-layer-card p,
+.story-beat-item span,
+.story-seed-preview-item span,
+.story-seed-preview-item small,
+.scene-seed-card p,
+.render-kpi-card p,
+.render-stage-item p,
+.render-highlight-card p,
+.render-strategy-card p,
+.render-preset-card p,
+.render-media-card p,
+.render-job-card p,
+.finalcut-kpi-card p,
+.finalcut-alert-card p,
+.finalcut-list-item span,
+.finalcut-scene-copy p,
+.finalcut-scene-audio p,
+.finalcut-shot-card p {
+  line-height: 1.7;
+  color: var(--muted);
+}
+
+.story-layer-index {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: rgba(18, 110, 104, 0.1);
+  color: var(--accent-2);
+  font-weight: 800;
+}
+
+.story-beat-list,
+.story-seed-preview-list {
+  display: grid;
+  gap: 12px;
+}
+
+.story-beat-item strong,
+.story-seed-preview-item strong,
+.finalcut-list-item strong {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.story-seed-preview-item small {
+  font-size: 13px;
+}
+
+.render-highlight-card .meta-list,
+.render-preset-card .meta-list,
+.finalcut-scene-side .meta-list {
+  margin-top: 0;
+}
+
+.render-stage-item strong {
+  font-size: 2rem;
+  font-family: var(--font-display);
+}
+
+.render-job-card,
+.finalcut-shot-card {
+  align-content: start;
+}
+
+.finalcut-command-side,
+.render-command-side {
+  display: grid;
+  gap: 18px;
+  align-content: start;
+}
+
+.finalcut-list {
+  gap: 12px;
+}
+
+.finalcut-list-item {
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.finalcut-scene-card {
+  display: grid;
+  gap: 18px;
+}
+
+.finalcut-scene-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 0.8fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.finalcut-scene-copy {
+  display: grid;
+  gap: 10px;
+}
+
+.finalcut-scene-side {
+  display: grid;
+  gap: 12px;
+  justify-items: end;
+}
+
+.finalcut-scene-audio {
+  align-items: center;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.finalcut-scene-audio-missing {
+  border-color: rgba(161, 77, 44, 0.24);
+  background: rgba(255, 248, 242, 0.72);
+}
+
+.finalcut-source-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.finalcut-source-video {
+  background: rgba(46, 125, 50, 0.12);
+  color: var(--success);
+  border: 1px solid rgba(46, 125, 50, 0.18);
+}
+
+.finalcut-source-image {
+  background: rgba(18, 110, 104, 0.12);
+  color: var(--accent-2);
+  border: 1px solid rgba(18, 110, 104, 0.18);
+}
+
+.finalcut-source-missing {
+  background: rgba(161, 77, 44, 0.1);
+  color: var(--accent);
+  border: 1px solid rgba(161, 77, 44, 0.16);
+}
+
 @keyframes riseFade {
   from {
     opacity: 0;
@@ -972,7 +1289,16 @@ textarea {
   }
 
   .asset-grid.three-up,
-  .dashboard-split {
+  .dashboard-split,
+  .story-layer-grid,
+  .render-ops-grid,
+  .render-strategy-grid,
+  .render-export-grid,
+  .finalcut-alert-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .render-stage-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -1001,7 +1327,13 @@ textarea {
   .dashboard-split,
   .snapshot-grid,
   .form-grid,
-  .hero-grid {
+  .hero-grid,
+  .kickoff-grid,
+  .story-control-grid,
+  .render-command-grid,
+  .finalcut-command-grid,
+  .finalcut-scene-head,
+  .finalcut-scene-audio {
     grid-template-columns: 1fr;
   }
 
@@ -1009,6 +1341,15 @@ textarea {
   .project-context-status {
     justify-items: start;
     justify-content: flex-start;
+  }
+
+  .scene-seed-grid,
+  .render-input-grid,
+  .render-preset-grid,
+  .render-media-grid,
+  .render-job-grid,
+  .finalcut-shot-grid {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -1030,7 +1371,23 @@ textarea {
   }
 
   .asset-grid.three-up,
-  .asset-grid.two-up {
+  .asset-grid.two-up,
+  .kickoff-mode-grid,
+  .story-health-grid,
+  .render-kpi-grid,
+  .render-stage-list,
+  .render-ops-grid,
+  .render-input-grid,
+  .render-strategy-grid,
+  .render-preset-grid,
+  .render-media-grid,
+  .render-job-grid,
+  .render-export-grid,
+  .finalcut-kpi-grid,
+  .finalcut-alert-grid,
+  .scene-seed-grid,
+  .story-layer-grid,
+  .finalcut-shot-grid {
     grid-template-columns: 1fr;
   }
 
