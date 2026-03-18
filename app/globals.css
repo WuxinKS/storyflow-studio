@@ -1261,6 +1261,7 @@ textarea {
   border: 1px solid rgba(161, 77, 44, 0.16);
 }
 
+.ops-command-grid,
 .visual-command-grid,
 .reference-command-grid,
 .adapt-command-grid,
@@ -1271,6 +1272,12 @@ textarea {
   gap: 18px;
 }
 
+.ops-command-card,
+.ops-kpi-card,
+.ops-detail-card,
+.ops-provider-card,
+.ops-check-card,
+.ops-run-card,
 .visual-command-card,
 .visual-kpi-card,
 .visual-highlight-card,
@@ -1307,6 +1314,8 @@ textarea {
   gap: 14px;
 }
 
+.ops-command-head,
+.ops-provider-head,
 .visual-panel-head,
 .visual-editor-head,
 .reference-panel-head,
@@ -1327,6 +1336,12 @@ textarea {
   flex-wrap: wrap;
 }
 
+.ops-command-side,
+.ops-kpi-grid,
+.ops-overview-grid,
+.ops-provider-grid,
+.ops-check-grid,
+.ops-run-stack,
 .visual-command-side,
 .reference-command-side,
 .visual-kpi-grid,
@@ -1370,6 +1385,7 @@ textarea {
   gap: 18px;
 }
 
+.ops-command-side,
 .visual-command-side,
 .reference-command-side,
 .adapt-command-side,
@@ -1378,6 +1394,7 @@ textarea {
   align-content: start;
 }
 
+.ops-kpi-grid,
 .visual-kpi-grid,
 .visual-lock-grid,
 .reference-kpi-grid,
@@ -1386,6 +1403,15 @@ textarea {
 .board-kpi-grid,
 .timeline-kpi-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.ops-overview-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.ops-provider-grid,
+.ops-check-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .visual-health-grid,
@@ -1412,6 +1438,7 @@ textarea {
 .timeline-scene-stack,
 .timeline-edit-scene-stack,
 .reference-binding-stack,
+.ops-run-stack,
 .visual-editor-stack {
   grid-template-columns: 1fr;
 }
@@ -1423,6 +1450,12 @@ textarea {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.ops-command-card,
+.ops-kpi-card,
+.ops-detail-card,
+.ops-provider-card,
+.ops-check-card,
+.ops-run-card,
 .visual-command-card,
 .visual-kpi-card,
 .visual-highlight-card,
@@ -1454,6 +1487,7 @@ textarea {
   padding: 18px;
 }
 
+.ops-kpi-card h4,
 .visual-kpi-card h4,
 .reference-kpi-card h4,
 .adapt-kpi-card h4,
@@ -1463,6 +1497,11 @@ textarea {
   line-height: 1.1;
 }
 
+.ops-kpi-card p,
+.ops-detail-card p,
+.ops-provider-card p,
+.ops-check-card p,
+.ops-run-card p,
 .visual-kpi-card p,
 .reference-kpi-card p,
 .visual-highlight-card p,
@@ -1494,6 +1533,10 @@ textarea {
 .reference-card-head,
 .reference-binding-detail-head {
   align-items: flex-start;
+}
+
+.ops-run-card {
+  padding: 24px;
 }
 
 .visual-editor-command {
@@ -1644,6 +1687,9 @@ textarea {
 
   .asset-grid.three-up,
   .dashboard-split,
+  .ops-overview-grid,
+  .ops-provider-grid,
+  .ops-check-grid,
   .visual-health-grid,
   .reference-profile-grid,
   .story-layer-grid,
@@ -1690,6 +1736,7 @@ textarea {
   .hero-grid,
   .kickoff-grid,
   .story-control-grid,
+  .ops-command-grid,
   .visual-command-grid,
   .reference-command-grid,
   .adapt-command-grid,
@@ -1709,6 +1756,8 @@ textarea {
   }
 
   .scene-seed-grid,
+  .ops-provider-grid,
+  .ops-check-grid,
   .visual-system-grid,
   .visual-editor-grid,
   .adapt-shot-grid,
@@ -1746,6 +1795,10 @@ textarea {
   .asset-grid.three-up,
   .asset-grid.two-up,
   .kickoff-mode-grid,
+  .ops-kpi-grid,
+  .ops-overview-grid,
+  .ops-provider-grid,
+  .ops-check-grid,
   .visual-kpi-grid,
   .visual-health-grid,
   .visual-system-grid,
