@@ -1,131 +1,170 @@
-import { prisma } from '@/lib/prisma';
-import { getProjectStageLabel } from '@/lib/display';
-import { PIPELINE_RUN_LOG_TITLE, parsePipelineRunLog } from '@/features/pipeline/service';
-import {
-  isGeneratedNovelChapterTitle,
-  isStoryEngineChapterTitle,
-} from '@/features/story/service';
-import { PipelineRunButton } from '@/components/pipeline-run-button';
-import { buildProjectHref } from '@/lib/project-links';
-import { buildLocalMediaPreviewHref } from '@/lib/media-preview';
-import { getDeliveryCenterData } from '@/features/delivery/service';
 import Link from 'next/link';
+import { PipelineRunButton } from '@/components/pipeline-run-button';
+import { SectionCard } from '@/components/section-card';
+import { getStageToneLabel, getWorkflowGuide } from '@/features/workflow/service';
+import { buildProjectHref } from '@/lib/project-links';
 
 export async function PipelineCommandCenter({ projectId }: { projectId?: string }) {
-  const project = await (projectId
-    ? prisma.project.findUnique({
-        where: { id: projectId },
-        include: {
-          chapters: { orderBy: { orderIndex: 'asc' } },
-          scenes: { orderBy: { orderIndex: 'asc' } },
-          shots: { orderBy: [{ sceneId: 'asc' }, { orderIndex: 'asc' }] },
-          renderJobs: { orderBy: { createdAt: 'desc' } },
-          references: { orderBy: { createdAt: 'desc' } },
-          outlines: { orderBy: { createdAt: 'desc' } },
-        },
-      })
-    : prisma.project.findFirst({
-        orderBy: { updatedAt: 'desc' },
-        include: {
-          chapters: { orderBy: { orderIndex: 'asc' } },
-          scenes: { orderBy: { orderIndex: 'asc' } },
-          shots: { orderBy: [{ sceneId: 'asc' }, { orderIndex: 'asc' }] },
-          renderJobs: { orderBy: { createdAt: 'desc' } },
-          references: { orderBy: { createdAt: 'desc' } },
-          outlines: { orderBy: { createdAt: 'desc' } },
-        },
-      })).catch(() => null);
+  const guide = await getWorkflowGuide(projectId).catch(() => null);
 
-  if (!project) {
+  if (!guide) {
     return (
       <div className="snapshot-card">
-        <p className="eyebrow">主链控制台</p>
-        <h3>还没有可执行项目</h3>
-        <p>先去创意工坊创建项目；创建后，这里会直接提供一句话到渲染任务的一键主链入口。</p>
+        <p className="eyebrow">主流程</p>
+        <h3>先创建项目，再按主流程推进</h3>
+        <p>这里会只保留一句话到成片真正需要的主流程步骤，先让人知道从哪里开始，而不是先看到一堆功能入口。</p>
+        <div className="action-row wrap-row">
+          <Link href="/idea-lab" className="button-primary">去创建项目</Link>
+        </div>
       </div>
     );
   }
 
-  const visibleChapters = project.chapters.filter((chapter) => !isStoryEngineChapterTitle(chapter.title));
-  const aiChapterCount = visibleChapters.filter((chapter) => isGeneratedNovelChapterTitle(chapter.title)).length;
-  const latestRunOutline = project.outlines.find((outline) => outline.title === PIPELINE_RUN_LOG_TITLE) || null;
-  const latestRun = parsePipelineRunLog(latestRunOutline?.summary);
-  const completedSteps = latestRun?.steps.filter((step) => step.status === 'completed').length || 0;
-  const failedSteps = latestRun?.steps.filter((step) => step.status === 'failed').length || 0;
-  const deliveryData = await getDeliveryCenterData(project.id, 1).catch(() => null);
-  const latestBundle = deliveryData?.bundles[0] || null;
+  const nextHref = buildProjectHref(guide.nextAction.href, guide.project.id);
 
   return (
     <div className="page-stack">
-      <div className="snapshot-card">
-        <p className="eyebrow">主链控制台</p>
-        <h3>{project.title}</h3>
-        <p>从一句话出发，自动串起故事骨架、小说章节、角色、视觉、自动分镜、渲染执行、交付包导出和 QA 结论。若已配置真实 Provider，就能更接近真正的一键成片闭环。</p>
-        <div className="meta-list">
-          <span>当前阶段：{getProjectStageLabel(project.stage)}</span>
-          <span>可用章节：{visibleChapters.length}</span>
-          <span>AI 小说：{aiChapterCount}</span>
-          <span>分场：{project.scenes.length}</span>
-          <span>镜头：{project.shots.length}</span>
-          <span>渲染任务：{project.renderJobs.length}</span>
-        </div>
-        <PipelineRunButton projectId={project.id} />
-        <div className="action-row wrap-row">
-          <Link href={buildProjectHref('/story-setup', project.id)} className="button-ghost">查看故事设定</Link>
-          <Link href={buildProjectHref('/render-studio', project.id)} className="button-secondary">查看生成工作台</Link>
-          <Link href={buildProjectHref('/qa-panel', project.id)} className="button-secondary">查看 QA</Link>
-        </div>
+      <div className="workflow-command-grid">
+        <section className="snapshot-card workflow-command-card">
+          <div className="workflow-command-head">
+            <div>
+              <p className="eyebrow">主流程控制台</p>
+              <h3>{guide.project.title}</h3>
+            </div>
+            <span className="status-pill status-pill-subtle">{guide.progress.label}</span>
+          </div>
+
+          <p>
+            现在首页只保留一个核心问题：<strong>下一步先做什么。</strong>
+            先沿着主流程把项目推到下一个阶段，辅助工具只在真的需要时再打开。
+          </p>
+
+          <div className="meta-list">
+            <span>正文 {guide.counts.chapters}</span>
+            <span>AI 正文 {guide.counts.aiChapters}</span>
+            <span>分场 {guide.counts.scenes}</span>
+            <span>镜头 {guide.counts.shots}</span>
+            <span>任务 {guide.counts.renderJobs}</span>
+            <span>产物 {guide.counts.generatedMedia}</span>
+          </div>
+
+          <div className="asset-tile workflow-next-card">
+            <span className="label">当前建议</span>
+            <h4>{guide.nextAction.title}</h4>
+            <p>{guide.nextAction.description}</p>
+            <div className="action-row wrap-row">
+              <Link href={nextHref} className="button-primary">{guide.nextAction.buttonLabel}</Link>
+              <Link href={buildProjectHref('/final-cut', guide.project.id)} className="button-ghost">查看成片预演</Link>
+            </div>
+          </div>
+
+          <div className="workflow-run-panel">
+            <span className="label">自动推进</span>
+            <h4>方向清楚时，可以直接一键推进</h4>
+            <p>如果你已经确认要走完整链路，可以直接跑自动流程；如果还在调整素材，就按上面的“当前建议”一步步推进。</p>
+            <PipelineRunButton projectId={guide.project.id} />
+          </div>
+        </section>
+
+        <aside className="workflow-command-side">
+          <div className="workflow-kpi-grid">
+            <div className="asset-tile workflow-kpi-card">
+              <span className="label">主流程进度</span>
+              <h4>{guide.progress.ratio}%</h4>
+              <div className="progress-strip">
+                <span className="progress-fill" style={{ width: `${guide.progress.ratio}%` }} />
+              </div>
+              <p>已完成 {guide.progress.completedStages} / {guide.progress.totalStages} 个主流程阶段。</p>
+            </div>
+
+            <div className="asset-tile workflow-kpi-card">
+              <span className="label">故事基础</span>
+              <h4>{guide.counts.chapters}</h4>
+              <p>当前已经有 {guide.counts.chapters} 章可用正文，可继续支撑自动分镜。</p>
+            </div>
+
+            <div className="asset-tile workflow-kpi-card">
+              <span className="label">镜头结构</span>
+              <h4>{guide.counts.shots}</h4>
+              <p>镜头越完整，后面的图片、语音和视频生成越不需要反复返工。</p>
+            </div>
+
+            <div className="asset-tile workflow-kpi-card">
+              <span className="label">最近自动流程</span>
+              <h4>{guide.latestRun.status === 'completed' ? '已完成' : guide.latestRun.status === 'failed' ? '有失败' : '尚未运行'}</h4>
+              <p>
+                {guide.latestRun.status
+                  ? `最近一次 ${guide.latestRun.mode === 'full' ? '完整链' : '准备链'} 执行完成 ${guide.latestRun.completedSteps} 步。`
+                  : '还没有自动流程记录，适合先按主流程手动推进。'}
+              </p>
+            </div>
+          </div>
+        </aside>
       </div>
 
-      {latestRun ? (
-        <>
-          <div className="asset-grid three-up">
-            <div className="asset-tile">
-              <span className="label">最近一次运行</span>
-              <h4>{latestRun.status === 'completed' ? '已完成' : '执行失败'}</h4>
-              <p>模式：{latestRun.mode === 'full' ? '完整主链' : '准备到渲染任务'}，结束时间：{latestRun.finishedAt || '未知'}。</p>
-              <div className="meta-list">
-                <span>完成步骤：{completedSteps}</span>
-                <span>失败步骤：{failedSteps}</span>
-                <span>总步骤：{latestRun.steps.length}</span>
+      <SectionCard
+        eyebrow="Main Flow"
+        title="先按这 7 步推进"
+        description="每次只盯住一个主阶段。真正会让人迷路的辅助页，都被放到后面按需打开。"
+      >
+        <div className="workflow-stage-grid">
+          {guide.stages.map((stage) => (
+            <article key={stage.key} className={`asset-tile workflow-stage-card workflow-stage-${stage.status}`}>
+              <div className="workflow-stage-head">
+                <div>
+                  <span className="label">{getStageToneLabel(stage.status)}</span>
+                  <h4>{stage.title}</h4>
+                </div>
+                <span className="status-pill status-pill-subtle">{stage.badges[0] || '主流程'}</span>
+              </div>
+
+              <p>{stage.summary}</p>
+              <p className="muted-copy">{stage.detail}</p>
+
+              {stage.badges.length > 0 ? (
+                <div className="tag-list">
+                  {stage.badges.map((badge) => (
+                    <span key={`${stage.key}-${badge}`} className="tag-chip">{badge}</span>
+                  ))}
+                </div>
+              ) : null}
+
+              <div className="action-row wrap-row compact-row">
+                <Link href={buildProjectHref(stage.href, guide.project.id)} className="button-secondary">进入这一阶段</Link>
+                {stage.supportLinks.map((item) => (
+                  <Link key={`${stage.key}-${item.href}`} href={buildProjectHref(item.href, guide.project.id)} className="button-ghost">
+                    {item.label}
+                  </Link>
+                ))}
+              </div>
+            </article>
+          ))}
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        eyebrow="Support"
+        title="这些工具只在需要时打开"
+        description="当你已经知道自己在主流程的哪一步，再打开这些工具会顺很多。"
+      >
+        <div className="workflow-support-grid">
+          {guide.supportTools.map((tool) => (
+            <div key={tool.href} className="asset-tile workflow-support-card">
+              <div className="workflow-stage-head">
+                <div>
+                  <span className="label">辅助工具</span>
+                  <h4>{tool.label}</h4>
+                </div>
+                <span className="status-pill status-pill-subtle">{tool.badge}</span>
+              </div>
+              <p>{tool.summary}</p>
+              <div className="action-row wrap-row compact-row">
+                <Link href={buildProjectHref(tool.href, guide.project.id)} className="button-ghost">按需打开</Link>
               </div>
             </div>
-            {latestRun.error ? (
-              <div className="asset-tile">
-                <span className="label">失败原因</span>
-                <h4>需要处理</h4>
-                <p>{latestRun.error}</p>
-              </div>
-            ) : null}
-            {latestBundle ? (
-              <div className="asset-tile">
-                <span className="label">最近成片工件</span>
-                <h4>{latestBundle.files.finalCutPreviewPath ? '预演成片已就绪' : '预演成片未就绪'}</h4>
-                <p>最近导出：{latestBundle.exportedAt || '未知'}；可直接打开成片、日志或跳转交付中心继续复验。</p>
-                <div className="action-row wrap-row compact-row">
-                  {latestBundle.files.finalCutPreviewPath ? (
-                    <a className="button-ghost" href={buildLocalMediaPreviewHref(latestBundle.files.finalCutPreviewPath)} target="_blank" rel="noreferrer">打开预演成片</a>
-                  ) : null}
-                  {latestBundle.files.finalCutPreviewLogPath ? (
-                    <a className="button-ghost" href={buildLocalMediaPreviewHref(latestBundle.files.finalCutPreviewLogPath)} target="_blank" rel="noreferrer">查看拼装日志</a>
-                  ) : null}
-                  <Link href={buildProjectHref('/delivery-center', project.id)} className="button-ghost">打开交付中心</Link>
-                </div>
-              </div>
-            ) : null}
-          </div>
-
-          <div className="asset-grid three-up">
-            {latestRun.steps.map((step) => (
-              <div key={step.key} className="asset-tile">
-                <span className="label">{step.status === 'completed' ? '已完成' : step.status === 'skipped' ? '已跳过' : '失败'}</span>
-                <h4>{step.label}</h4>
-                <p>{step.detail}</p>
-              </div>
-            ))}
-          </div>
-        </>
-      ) : null}
+          ))}
+        </div>
+      </SectionCard>
     </div>
   );
 }

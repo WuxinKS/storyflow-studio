@@ -34,9 +34,9 @@ export function PipelineRunButton({ projectId }: { projectId: string }) {
       setMessage(
         mode === 'full'
           ? previewReady
-            ? `已完成一键主链（含异步推进），共执行 ${completedSteps} 个步骤，预演成片已生成。`
-            : `已完成一键主链（含异步推进），共执行 ${completedSteps} 个步骤。`
-          : `已把主链推进到渲染任务阶段，共执行 ${completedSteps} 个步骤`,
+            ? `已跑完整样片链，共完成 ${completedSteps} 个步骤，预演成片已生成。`
+            : `已跑完整样片链，共完成 ${completedSteps} 个步骤。`
+          : `已把流程推进到待执行任务阶段，共完成 ${completedSteps} 个步骤。`,
       );
       router.refresh();
     } catch (error) {
@@ -49,10 +49,10 @@ export function PipelineRunButton({ projectId }: { projectId: string }) {
   return (
     <div className="action-row wrap-row">
       <button type="button" className="button-primary" disabled={Boolean(loadingMode)} onClick={() => runPipeline('full')}>
-        {loadingMode === 'full' ? '一键主链执行中…' : '一键跑完整主链（含异步推进）'}
+        {loadingMode === 'full' ? '完整样片链执行中…' : '直接生成完整样片链'}
       </button>
       <button type="button" className="button-secondary" disabled={Boolean(loadingMode)} onClick={() => runPipeline('prepare')}>
-        {loadingMode === 'prepare' ? '准备中…' : '一键生成到渲染任务'}
+        {loadingMode === 'prepare' ? '准备中…' : '只推进到待执行任务'}
       </button>
       {previewPath ? (
         <a className="button-ghost" href={toPreviewHref(previewPath)} target="_blank" rel="noreferrer">打开预演成片</a>

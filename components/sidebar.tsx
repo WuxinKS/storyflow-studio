@@ -24,8 +24,8 @@ export function Sidebar() {
         </div>
 
         <div className="sidebar-status-card">
-          <span className="status-pill">第一轮前端重构</span>
-          <p>先把流程、导航和页面层级做清楚，再继续打磨局部交互。</p>
+          <span className="status-pill">主流程优先</span>
+          <p>先沿着主流程推进项目；只有需要精修、诊断或导出时，再打开辅助工具。</p>
         </div>
 
         <nav className="nav-list" aria-label="主要导航">
@@ -48,7 +48,7 @@ export function Sidebar() {
                       <div className="nav-link-copy">
                         <div className="nav-link-title-row">
                           <span>{item.label}</span>
-                          {item.step ? <small>#{String(item.step).padStart(2, '0')}</small> : <small>{item.section}</small>}
+                          {item.step ? <small>#{String(item.step).padStart(2, '0')}</small> : <small>按需</small>}
                         </div>
                         <p>{item.summary}</p>
                       </div>
@@ -65,7 +65,7 @@ export function Sidebar() {
           <p>{projectId ? `projectId: ${projectId}` : '未锁定项目，可先去创意工坊创建或从总览切换项目。'}</p>
           <div className="action-row wrap-row compact-row">
             <Link href={buildProjectHref('/idea-lab', projectId) as never} className="button-primary">新建项目</Link>
-            <Link href={buildProjectHref('/final-cut', projectId) as never} className="button-ghost">看成片</Link>
+            <Link href={buildProjectHref('/', projectId) as never} className="button-ghost">看下一步</Link>
           </div>
         </div>
       </div>

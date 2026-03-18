@@ -515,6 +515,108 @@ code {
   line-height: 1.65;
 }
 
+.workflow-command-grid,
+.workflow-context-grid,
+.workflow-kpi-grid,
+.workflow-stage-grid,
+.workflow-support-grid {
+  display: grid;
+  gap: 18px;
+}
+
+.workflow-command-grid {
+  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+}
+
+.workflow-context-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.workflow-command-card,
+.workflow-next-card,
+.workflow-run-panel,
+.workflow-kpi-card,
+.workflow-stage-card,
+.workflow-support-card,
+.workflow-context-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.workflow-command-head,
+.workflow-stage-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.workflow-command-side {
+  display: grid;
+  gap: 18px;
+  align-content: start;
+}
+
+.workflow-kpi-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.workflow-stage-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.workflow-support-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.workflow-next-card,
+.workflow-run-panel,
+.workflow-kpi-card,
+.workflow-stage-card,
+.workflow-support-card,
+.workflow-context-panel {
+  background: rgba(255, 255, 255, 0.48);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 18px;
+}
+
+.workflow-kpi-card h4,
+.workflow-stage-card h4,
+.workflow-support-card h4,
+.workflow-context-panel h4 {
+  font-size: 1.2rem;
+  line-height: 1.3;
+}
+
+.workflow-kpi-card p,
+.workflow-stage-card p,
+.workflow-support-card p,
+.workflow-context-panel p,
+.workflow-run-panel p {
+  line-height: 1.72;
+  color: var(--muted);
+}
+
+.workflow-stage-completed {
+  border-color: rgba(46, 125, 50, 0.18);
+}
+
+.workflow-stage-active {
+  border-color: rgba(18, 110, 104, 0.18);
+}
+
+.workflow-stage-attention {
+  border-color: rgba(161, 77, 44, 0.24);
+  background: rgba(255, 248, 242, 0.72);
+}
+
+.workflow-context-card {
+  display: grid;
+  gap: 18px;
+}
+
 .module-hero-meta {
   display: flex;
   flex-wrap: wrap;
@@ -1876,6 +1978,8 @@ textarea {
 
   .asset-grid.three-up,
   .dashboard-split,
+  .workflow-stage-grid,
+  .workflow-support-grid,
   .character-health-grid,
   .library-health-grid,
   .ops-overview-grid,
@@ -1928,6 +2032,8 @@ textarea {
   .module-hero,
   .section-header,
   .project-context-head,
+  .workflow-command-grid,
+  .workflow-context-grid,
   .dashboard-split,
   .snapshot-grid,
   .form-grid,
@@ -1956,6 +2062,9 @@ textarea {
   }
 
   .scene-seed-grid,
+  .workflow-kpi-grid,
+  .workflow-stage-grid,
+  .workflow-support-grid,
   .character-card-grid,
   .character-editor-grid,
   .library-card-grid,
@@ -2006,6 +2115,9 @@ textarea {
 
   .asset-grid.three-up,
   .asset-grid.two-up,
+  .workflow-kpi-grid,
+  .workflow-stage-grid,
+  .workflow-support-grid,
   .kickoff-mode-grid,
   .character-kpi-grid,
   .character-health-grid,

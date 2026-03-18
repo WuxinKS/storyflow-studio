@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { ReactNode } from 'react';
 import { ProjectContextBar } from '@/components/project-context-bar';
-import { getAdjacentNavigation, getNavigationGroup, getNavigationItem } from '@/lib/app-meta';
+import { getAdjacentNavigation, getNavigationGroup, getNavigationItem, getRelatedPrimaryNavigation } from '@/lib/app-meta';
 import { buildProjectHref } from '@/lib/project-links';
 
 export function ModulePage({
@@ -22,6 +22,8 @@ export function ModulePage({
   const currentItem = currentPath ? getNavigationItem(currentPath) : null;
   const currentGroup = currentItem ? getNavigationGroup(currentItem.group) : null;
   const adjacent = currentPath ? getAdjacentNavigation(currentPath) : { previous: null, next: null };
+  const relatedPrimary = currentPath ? getRelatedPrimaryNavigation(currentPath) : null;
+  const showWorkflowAdjacent = currentItem?.priority === 'core' || currentItem?.priority === 'overview';
 
   return (
     <div className="page-stack module-page">
@@ -30,7 +32,11 @@ export function ModulePage({
           <div className="module-hero-meta">
             <span className="shell-route-chip">{currentGroup?.label || '模块'}</span>
             <span className="shell-route-meta">
-              {currentItem?.step ? `第 ${String(currentItem.step).padStart(2, '0')} 站` : '全局视图'}
+              {currentItem?.priority === 'core'
+                ? `第 ${String(currentItem.step || 0).padStart(2, '0')} 步`
+                : currentItem?.priority === 'support'
+                  ? '辅助工具'
+                  : '全局视图'}
             </span>
           </div>
           <h1>{title}</h1>
@@ -47,14 +53,19 @@ export function ModulePage({
             ))}
           </div>
           <div className="action-row wrap-row">
-            {adjacent.previous ? (
+            {showWorkflowAdjacent && adjacent.previous ? (
               <Link href={buildProjectHref(adjacent.previous.href, projectId)} className="button-ghost">
                 上一步：{adjacent.previous.label}
               </Link>
             ) : null}
-            {adjacent.next ? (
+            {showWorkflowAdjacent && adjacent.next ? (
               <Link href={buildProjectHref(adjacent.next.href, projectId)} className="button-secondary">
                 下一步：{adjacent.next.label}
+              </Link>
+            ) : null}
+            {currentItem?.priority === 'support' && relatedPrimary ? (
+              <Link href={buildProjectHref(relatedPrimary.href, projectId)} className="button-ghost">
+                返回主流程：{relatedPrimary.label}
               </Link>
             ) : null}
           </div>

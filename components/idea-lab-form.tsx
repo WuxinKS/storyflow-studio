@@ -5,8 +5,6 @@ import { useRouter } from 'next/navigation';
 import { FormEvent, useState } from 'react';
 import { defaultProjectDraft, ProjectDraft } from '@/features/project/draft';
 import { useProjectDraft } from '@/features/project/use-project-draft';
-import { buildProjectHref } from '@/lib/project-links';
-
 type SubmitMode = 'create' | 'pipeline-full';
 
 const OUTPUT_LABELS: Record<ProjectDraft['output'], string> = {
@@ -75,12 +73,17 @@ export function IdeaLabForm() {
             ? `已创建项目并跑完整主链：${data.project.title}（完成 ${completedSteps} 个步骤，预演成片已生成）`
             : `已创建项目并跑完整主链：${data.project.title}（完成 ${completedSteps} 个步骤）`,
         );
-        router.push(buildProjectHref('/final-cut', data.project.id));
+        router.push(typeof data.nextActionHref === 'string' ? data.nextActionHref : `/final-cut?projectId=${data.project.id}`);
         router.refresh();
         return;
       }
 
       setMessage(`已创建项目：${data.project.title}`);
+      if (typeof data.nextActionHref === 'string') {
+        router.push(data.nextActionHref);
+        router.refresh();
+        return;
+      }
       router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '保存失败');
@@ -130,16 +133,16 @@ export function IdeaLabForm() {
 
         <div className="kickoff-action-bar">
           <button type="submit" name="submit-mode" value="pipeline-full" className="button-primary" disabled={Boolean(submittingMode)}>
-            {submittingMode === 'pipeline-full' ? '主链执行中…' : '创建并一键跑完整主链'}
+            {submittingMode === 'pipeline-full' ? '正在直接生成样片链…' : '创建并直接生成完整样片链'}
           </button>
           <button type="submit" name="submit-mode" value="create" className="button-secondary" disabled={Boolean(submittingMode)}>
-            {submittingMode === 'create' ? '正在创建项目…' : '仅保存并创建项目'}
+            {submittingMode === 'create' ? '正在创建项目…' : '先创建项目，再逐步推进'}
           </button>
           <Link href="/story-setup" className="button-ghost">查看最新故事设定</Link>
           {saved ? <span className="success-text">已保存到本地草稿</span> : null}
         </div>
 
-        <p className="feedback-text">如果你的目标是“一句话直出小说 / 分镜 / 视频”，直接运行完整主链即可。</p>
+        <p className="feedback-text">如果目标就是“一句话走到小说、分镜、图片、视频”，直接运行完整样片链即可。</p>
         {message ? <p className="feedback-text">{message}</p> : null}
       </section>
 
@@ -172,12 +175,12 @@ export function IdeaLabForm() {
           <span className="label">启动方式</span>
           <div className="kickoff-mode-grid">
             <div className="kickoff-mode-card">
-              <strong>完整主链</strong>
-              <p>适合需求已明确，想直接看到故事、分镜、生成与成片预演。</p>
+              <strong>直接出样片</strong>
+              <p>适合方向明确，想直接看到小说、分镜、生成和成片预演。</p>
             </div>
             <div className="kickoff-mode-card">
-              <strong>仅创建项目</strong>
-              <p>适合还在探索题材、节奏或风格，不想马上跑完整执行链。</p>
+              <strong>逐步推进</strong>
+              <p>适合还在探索题材、节奏或风格，想先把主流程一步步走清楚。</p>
             </div>
           </div>
         </div>
