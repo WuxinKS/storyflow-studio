@@ -186,6 +186,101 @@ function getLaneDescription(status: RenderLaneStatus) {
   return '完成项只保留最近沉淀的结果，避免长列表把真正重要的状态淹没。';
 }
 
+function getRenderMission(input: {
+  renderReadyShots: number;
+  jobCount: number;
+  failedCount: number;
+  runningCount: number;
+  queuedCount: number;
+  finalPreviewReady: boolean;
+  projectId: string;
+}) {
+  if (input.renderReadyShots === 0) {
+    return {
+      status: '待补镜头输入',
+      title: '先把镜头补到可生成',
+      guidance: '至少先补齐提示词、镜头备注和参考增强，再创建任务，否则后面只会堆失败记录。',
+      kind: 'link' as const,
+      actionHref: buildProjectHref('/storyboard', input.projectId),
+      actionLabel: '回到分镜板补输入',
+    };
+  }
+
+  if (input.finalPreviewReady) {
+    return {
+      status: '可交给成片预演',
+      title: '进入成片预演',
+      guidance: '已经有视频结果回流进媒体索引，这一站先交给 final cut 检查节奏和拼装质量。',
+      kind: 'link' as const,
+      actionHref: buildProjectHref('/final-cut', input.projectId),
+      actionLabel: '进入成片预演',
+    };
+  }
+
+  if (input.jobCount === 0) {
+    return {
+      status: '待创建任务',
+      title: '创建首批生成任务',
+      guidance: '先把当前可生成镜头落成图片、语音、视频任务，再开始盯队列和产物回流。',
+      kind: 'generate' as const,
+      primaryAction: 'create' as const,
+      primaryLabel: '创建首批生成任务',
+      primaryLoadingLabel: '正在创建首批生成任务…',
+      helperText: '任务创建后，再决定是批量执行，还是先跑单一供应商。',
+    };
+  }
+
+  if (input.failedCount > 0) {
+    return {
+      status: '先清失败任务',
+      title: '重试失败任务',
+      guidance: '失败任务会卡住后面的媒体回流，先把阻塞项清掉，再继续推进这一轮生成。',
+      kind: 'generate' as const,
+      primaryAction: 'retry' as const,
+      primaryLabel: '重试失败任务',
+      primaryLoadingLabel: '正在重试失败任务…',
+      helperText: '如果只想处理单一供应商，可以展开下面的执行选项。',
+    };
+  }
+
+  if (input.runningCount > 0) {
+    return {
+      status: '任务推进中',
+      title: '继续推进执行中任务',
+      guidance: '现在不用再开新任务，先盯住执行中的这批任务，把可回收的结果尽快推进出来。',
+      kind: 'generate' as const,
+      primaryAction: 'advance' as const,
+      primaryLabel: '继续推进执行中任务',
+      primaryLoadingLabel: '正在推进执行中任务…',
+      helperText: '推进完成后，再回来看最新沉淀的图片、音频和视频结果。',
+    };
+  }
+
+  if (input.queuedCount > 0) {
+    return {
+      status: '待执行队列',
+      title: '执行排队中的任务',
+      guidance: '任务已经建好了，现在最重要的是正式跑起来，让产物开始回流。',
+      kind: 'generate' as const,
+      primaryAction: 'run' as const,
+      primaryLabel: '执行排队中的任务',
+      primaryLoadingLabel: '正在执行排队中的任务…',
+      helperText: '如需只跑图像、语音或视频，可展开更多执行选项。',
+    };
+  }
+
+  return {
+    status: '准备下一轮生成',
+    title: '再创建一轮生成任务',
+    guidance: '当前这批任务已经稳定，如果视频覆盖还不够，就再创建一轮新任务继续补齐。',
+    kind: 'generate' as const,
+    primaryAction: 'create' as const,
+    primaryLabel: '再创建一轮生成任务',
+    primaryLoadingLabel: '正在创建新一轮任务…',
+    helperText: '通常先保证关键镜头有视频，再继续把覆盖率往上推。',
+  };
+}
+
 export async function RenderStudioData({ projectId }: { projectId?: string }) {
   const project = await getRenderProject(projectId).catch(() => null);
 
@@ -290,6 +385,15 @@ export async function RenderStudioData({ projectId }: { projectId?: string }) {
     finalCutAssemblePreviewOpen: `/api/render?action=assemble-final-cut-preview&projectId=${project.id}&open=1`,
     productionBundle: `/api/render?action=export-production-bundle&projectId=${project.id}`,
   };
+  const renderMission = getRenderMission({
+    renderReadyShots,
+    jobCount: project.renderJobs.length,
+    failedCount: summary.failed,
+    runningCount: summary.running,
+    queuedCount: summary.queued,
+    finalPreviewReady,
+    projectId: project.id,
+  });
 
   return (
     <div className="page-stack">
@@ -318,25 +422,37 @@ export async function RenderStudioData({ projectId }: { projectId?: string }) {
             <span>模拟执行 {mockCount}</span>
           </div>
 
-          <RenderGenerateButton projectId={project.id} />
-
-          <div className="render-route-strip">
-            <div className="render-route-pill">
-              <span className="label">01 上游检查</span>
-              <strong>{readyShotRate}% 镜头已就绪</strong>
-            </div>
-            <div className="render-route-pill">
-              <span className="label">02 任务执行</span>
-              <strong>{summary.running + summary.queued} 个任务待推进</strong>
-            </div>
-            <div className="render-route-pill">
-              <span className="label">03 产物回流</span>
-              <strong>{mediaCounts.total} 条媒体结果</strong>
-            </div>
-            <div className="render-route-pill">
-              <span className="label">04 成片交接</span>
-              <strong>{finalPreviewReady ? '已能进入成片' : '仍需补视频'}</strong>
-            </div>
+          <div className="asset-tile render-focus-card">
+            <span className="label">当前主任务</span>
+            <h4>{renderMission.title}</h4>
+            <p>{renderMission.guidance}</p>
+            {renderMission.kind === 'generate' ? (
+              <RenderGenerateButton
+                projectId={project.id}
+                primaryAction={renderMission.primaryAction}
+                primaryLabel={renderMission.primaryLabel}
+                primaryLoadingLabel={renderMission.primaryLoadingLabel}
+                helperText={renderMission.helperText}
+              />
+            ) : (
+              <div className="page-stack">
+                <div className="action-row wrap-row">
+                  <a href={renderMission.actionHref} className="button-primary">{renderMission.actionLabel}</a>
+                </div>
+                <details className="workflow-disclosure">
+                  <summary>需要时继续生成任务</summary>
+                  <div className="workflow-disclosure-body">
+                    <RenderGenerateButton
+                      projectId={project.id}
+                      primaryAction="create"
+                      primaryLabel="再创建一轮生成任务"
+                      primaryLoadingLabel="正在创建新一轮任务…"
+                      helperText="如果成片还缺关键镜头，可以在这里继续追加任务。"
+                    />
+                  </div>
+                </details>
+              </div>
+            )}
           </div>
 
           <div className="action-row wrap-row">
@@ -344,6 +460,7 @@ export async function RenderStudioData({ projectId }: { projectId?: string }) {
             <Link href={buildProjectHref('/visual-bible', project.id)} className="button-secondary">查看视觉圣经</Link>
             <Link href={buildProjectHref('/settings', project.id)} className="button-secondary">查看模型设置</Link>
             <Link href={buildProjectHref('/render-runs', project.id)} className="button-secondary">查看运行诊断</Link>
+            {finalPreviewReady ? <Link href={buildProjectHref('/final-cut', project.id)} className="button-secondary">进入成片预演</Link> : null}
           </div>
         </section>
 
@@ -399,8 +516,8 @@ export async function RenderStudioData({ projectId }: { projectId?: string }) {
 
       <SectionCard
         eyebrow="Flow"
-        title="生成推进路线"
-        description="先确认该补哪里，再决定是发起任务、追踪运行，还是把结果交给成片阶段。"
+        title="这一页只看四件事"
+        description="先看输入是否能生成，再看队列、产物和成片交接，不把高级联调信息铺满首页。"
       >
         <div className="render-flow-grid">
           <div className="asset-tile render-flow-card">
@@ -497,130 +614,6 @@ export async function RenderStudioData({ projectId }: { projectId?: string }) {
             </div>
           ))}
         </div>
-      </SectionCard>
-
-      <SectionCard
-        eyebrow="Inputs"
-        title="上游输入与执行约束"
-        description="生成不是只看任务队列，视觉总控、参考绑定和时间线约束会直接影响结果稳定性。"
-        actions={<Link href={buildProjectHref('/visual-bible', project.id)} className="button-ghost">前往视觉总控</Link>}
-      >
-        <div className="render-input-grid">
-          <div className="asset-tile render-highlight-card">
-            <span className="label">视觉圣经</span>
-            <h4>{visualBible?.styleName || '尚未建立视觉总控'}</h4>
-            <p>{visualBible?.visualTone || '建议先生成视觉圣经，让图像与视频使用统一风格约束。'}</p>
-            {visualBible ? (
-              <div className="meta-list">
-                <span>{visualBible.palette}</span>
-                <span>{visualBible.lighting}</span>
-                <span>{visualBible.lensLanguage}</span>
-              </div>
-            ) : null}
-          </div>
-
-          <div className="asset-tile render-highlight-card">
-            <span className="label">参考系统</span>
-            <h4>{referenceProfile.total} 张参考卡</h4>
-            <p>{referenceProfile.titleSummary}</p>
-            <div className="meta-list">
-              <span>构图 {referenceProfile.framing}</span>
-              <span>情绪 {referenceProfile.emotion}</span>
-              <span>动作 {referenceProfile.movement}</span>
-            </div>
-          </div>
-
-          <div className="asset-tile render-highlight-card">
-            <span className="label">定向绑定</span>
-            <h4>{referenceBindings.effectiveShotBindingCount} 个镜头已生效</h4>
-            <p>分场绑定 {referenceBindings.sceneBindingCount} / 镜头直绑 {referenceBindings.shotBindingCount}，当前参考增强覆盖已经可直接喂给 Provider。</p>
-          </div>
-
-          <div className="asset-tile render-highlight-card">
-            <span className="label">时间线约束</span>
-            <h4>{timeline ? timeline.totalDurationLabel : '暂无时间线'}</h4>
-            <p>{timeline ? `当前已有 ${beatMarkedShots} 个节拍标记，${manualDurationShots} 个镜头使用人工修时。` : '建议先进入时间线工作台，补齐时长与节拍。'}</p>
-          </div>
-
-          <div className="asset-tile render-highlight-card">
-            <span className="label">导演语言</span>
-            <h4>{directorReadyCount} / {project.scenes.length} 个分场已准备</h4>
-            <p>带导演语言摘要的分场越多，后续图像和视频生成会越稳定。</p>
-          </div>
-
-          <div className="asset-tile render-highlight-card">
-            <span className="label">镜头分类</span>
-            <h4>{shotKinds.length > 0 ? `${shotKinds.length} 类镜头` : '暂无镜头分类'}</h4>
-            {shotKinds.length > 0 ? (
-              <div className="tag-list">
-                {shotKinds.map((kind) => (
-                  <span key={kind} className="tag-chip">{kind}</span>
-                ))}
-              </div>
-            ) : (
-              <p>先补齐分镜标题与镜头语言，策略卡会更清楚。</p>
-            )}
-          </div>
-        </div>
-      </SectionCard>
-
-      <SectionCard
-        eyebrow="Strategy"
-        title="镜头策略与预设样例"
-        description="把镜头策略和可执行 preset 放在同一个区块里，方便判断这轮生成到底在执行什么。"
-      >
-        {shotKinds.length > 0 ? (
-          <div className="render-strategy-grid">
-            {shotKinds.map((kind) => {
-              const strategy = getRenderStrategy(kind);
-              return (
-                <div key={kind} className="asset-tile render-strategy-card">
-                  <span className="label">镜头策略</span>
-                  <h4>{kind}</h4>
-                  <p><strong>画面：</strong>{strategy.visual}</p>
-                  <p><strong>运动：</strong>{strategy.motion}</p>
-                  <p>{strategy.useCase}</p>
-                </div>
-              );
-            })}
-          </div>
-        ) : null}
-
-        <div className="render-preset-grid">
-          {shotPresets.map((preset) => (
-            <div key={preset.shotId} className="asset-tile render-preset-card">
-              <span className="label">Preset</span>
-              <h4>{preset.shotTitle}</h4>
-              <div className="meta-list">
-                <span>类型 {preset.kind}</span>
-                <span>节奏 {preset.pacing}</span>
-                <span>重点 {preset.emphasis}</span>
-              </div>
-              <p><strong>视觉风格：</strong>{preset.visualStyle}</p>
-              <p><strong>镜头运动：</strong>{preset.cameraMotion}</p>
-              <p><strong>声音重点：</strong>{preset.audioFocus}</p>
-              {preset.referenceTitles && preset.referenceTitles.length > 0 ? (
-                <>
-                  <div className="tag-list">
-                    {preset.referenceTitles.map((title) => (
-                      <span key={`${preset.shotId}-${title}`} className="tag-chip">{title}</span>
-                    ))}
-                  </div>
-                  {preset.referencePromptLine ? <p><strong>定向参考：</strong>{preset.referencePromptLine}</p> : null}
-                  {preset.referenceBindingNote ? <p><strong>绑定说明：</strong>{preset.referenceBindingNote}</p> : null}
-                </>
-              ) : null}
-            </div>
-          ))}
-        </div>
-      </SectionCard>
-
-      <SectionCard
-        eyebrow="Payload"
-        title="Provider 载荷预检"
-        description="进入真实调用前，先确认各供应商载荷是否已经带上参考增强、镜头上下文和模型配置。"
-      >
-        <RenderPayloadPreview projectId={project.id} />
       </SectionCard>
 
       <SectionCard
@@ -778,49 +771,171 @@ export async function RenderStudioData({ projectId }: { projectId?: string }) {
       </SectionCard>
 
       <SectionCard
-        eyebrow="Export"
-        title="导出与交付入口"
-        description="把联调、预演拼装和交付打包入口集中到最后一步，减少在页面之间来回查找。"
+        eyebrow="Advanced"
+        title="高级调试与导出"
+        description="默认先推进任务；只有在需要精查输入、载荷或交付工件时，再展开下面三组内容。"
       >
-        <div className="render-export-grid">
-          <div className="asset-tile render-highlight-card">
-            <span className="label">联调导出</span>
-            <h4>Preset JSON</h4>
-            <p>导出镜头 preset JSON，适合先核对镜头策略和执行参数。</p>
-            <a className="button-ghost" href={exportLinks.presets} target="_blank" rel="noreferrer">打开 Preset JSON</a>
-          </div>
+        <div className="page-stack">
+          <details className="workflow-disclosure">
+            <summary>查看上游输入与镜头策略</summary>
+            <div className="workflow-disclosure-body">
+              <div className="render-input-grid">
+                <div className="asset-tile render-highlight-card">
+                  <span className="label">视觉圣经</span>
+                  <h4>{visualBible?.styleName || '尚未建立视觉总控'}</h4>
+                  <p>{visualBible?.visualTone || '建议先生成视觉圣经，让图像与视频使用统一风格约束。'}</p>
+                  {visualBible ? (
+                    <div className="meta-list">
+                      <span>{visualBible.palette}</span>
+                      <span>{visualBible.lighting}</span>
+                      <span>{visualBible.lensLanguage}</span>
+                    </div>
+                  ) : null}
+                </div>
 
-          <div className="asset-tile render-highlight-card">
-            <span className="label">Provider 导出</span>
-            <h4>可执行 Payload</h4>
-            <p>集中导出 image / voice / video 三类 Provider 载荷。</p>
-            <a className="button-ghost" href={exportLinks.providerPayloads} target="_blank" rel="noreferrer">打开 Provider Payload</a>
-          </div>
+                <div className="asset-tile render-highlight-card">
+                  <span className="label">参考系统</span>
+                  <h4>{referenceProfile.total} 张参考卡</h4>
+                  <p>{referenceProfile.titleSummary}</p>
+                  <div className="meta-list">
+                    <span>构图 {referenceProfile.framing}</span>
+                    <span>情绪 {referenceProfile.emotion}</span>
+                    <span>动作 {referenceProfile.movement}</span>
+                  </div>
+                </div>
 
-          <div className="asset-tile render-highlight-card">
-            <span className="label">成片计划</span>
-            <h4>Final Cut JSON</h4>
-            <p>直接把镜头顺序、视觉来源和音轨覆盖交给成片阶段。</p>
-            <a className="button-ghost" href={exportLinks.finalCut} target="_blank" rel="noreferrer">打开 Final Cut JSON</a>
-          </div>
+                <div className="asset-tile render-highlight-card">
+                  <span className="label">定向绑定</span>
+                  <h4>{referenceBindings.effectiveShotBindingCount} 个镜头已生效</h4>
+                  <p>分场绑定 {referenceBindings.sceneBindingCount} / 镜头直绑 {referenceBindings.shotBindingCount}，当前参考增强覆盖已经可直接喂给 Provider。</p>
+                </div>
 
-          <div className="asset-tile render-highlight-card">
-            <span className="label">预演装配</span>
-            <h4>FFmpeg 预演包</h4>
-            <p>导出装配包后，可以继续执行预演拼装，或者直接打开预演成片。</p>
-            <div className="action-row wrap-row compact-row">
-              <a className="button-ghost" href={exportLinks.finalCutAssembly} target="_blank" rel="noreferrer">打开装配包</a>
-              <a className="button-ghost" href={exportLinks.finalCutAssemblePreview} target="_blank" rel="noreferrer">执行拼装</a>
-              <a className="button-ghost" href={exportLinks.finalCutAssemblePreviewOpen} target="_blank" rel="noreferrer">拼装并打开</a>
+                <div className="asset-tile render-highlight-card">
+                  <span className="label">时间线约束</span>
+                  <h4>{timeline ? timeline.totalDurationLabel : '暂无时间线'}</h4>
+                  <p>{timeline ? `当前已有 ${beatMarkedShots} 个节拍标记，${manualDurationShots} 个镜头使用人工修时。` : '建议先进入时间线工作台，补齐时长与节拍。'}</p>
+                </div>
+
+                <div className="asset-tile render-highlight-card">
+                  <span className="label">导演语言</span>
+                  <h4>{directorReadyCount} / {project.scenes.length} 个分场已准备</h4>
+                  <p>带导演语言摘要的分场越多，后续图像和视频生成会越稳定。</p>
+                </div>
+
+                <div className="asset-tile render-highlight-card">
+                  <span className="label">镜头分类</span>
+                  <h4>{shotKinds.length > 0 ? `${shotKinds.length} 类镜头` : '暂无镜头分类'}</h4>
+                  {shotKinds.length > 0 ? (
+                    <div className="tag-list">
+                      {shotKinds.map((kind) => (
+                        <span key={kind} className="tag-chip">{kind}</span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p>先补齐分镜标题与镜头语言，策略卡会更清楚。</p>
+                  )}
+                </div>
+              </div>
+
+              {shotKinds.length > 0 ? (
+                <div className="render-strategy-grid">
+                  {shotKinds.map((kind) => {
+                    const strategy = getRenderStrategy(kind);
+                    return (
+                      <div key={kind} className="asset-tile render-strategy-card">
+                        <span className="label">镜头策略</span>
+                        <h4>{kind}</h4>
+                        <p><strong>画面：</strong>{strategy.visual}</p>
+                        <p><strong>运动：</strong>{strategy.motion}</p>
+                        <p>{strategy.useCase}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : null}
+
+              <div className="render-preset-grid">
+                {shotPresets.map((preset) => (
+                  <div key={preset.shotId} className="asset-tile render-preset-card">
+                    <span className="label">Preset</span>
+                    <h4>{preset.shotTitle}</h4>
+                    <div className="meta-list">
+                      <span>类型 {preset.kind}</span>
+                      <span>节奏 {preset.pacing}</span>
+                      <span>重点 {preset.emphasis}</span>
+                    </div>
+                    <p><strong>视觉风格：</strong>{preset.visualStyle}</p>
+                    <p><strong>镜头运动：</strong>{preset.cameraMotion}</p>
+                    <p><strong>声音重点：</strong>{preset.audioFocus}</p>
+                    {preset.referenceTitles && preset.referenceTitles.length > 0 ? (
+                      <>
+                        <div className="tag-list">
+                          {preset.referenceTitles.map((title) => (
+                            <span key={`${preset.shotId}-${title}`} className="tag-chip">{title}</span>
+                          ))}
+                        </div>
+                        {preset.referencePromptLine ? <p><strong>定向参考：</strong>{preset.referencePromptLine}</p> : null}
+                        {preset.referenceBindingNote ? <p><strong>绑定说明：</strong>{preset.referenceBindingNote}</p> : null}
+                      </>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          </details>
 
-          <div className="asset-tile render-highlight-card">
-            <span className="label">生产交付</span>
-            <h4>Production Bundle</h4>
-            <p>导出媒体索引、成片计划、装配包和结构数据，方便归档交付。</p>
-            <a className="button-ghost" href={exportLinks.productionBundle} target="_blank" rel="noreferrer">生成并查看交付包</a>
-          </div>
+          <details className="workflow-disclosure">
+            <summary>查看 Provider 载荷预检</summary>
+            <div className="workflow-disclosure-body">
+              <RenderPayloadPreview projectId={project.id} />
+            </div>
+          </details>
+
+          <details className="workflow-disclosure">
+            <summary>查看导出与交付入口</summary>
+            <div className="workflow-disclosure-body">
+              <div className="render-export-grid">
+                <div className="asset-tile render-highlight-card">
+                  <span className="label">联调导出</span>
+                  <h4>Preset JSON</h4>
+                  <p>导出镜头 preset JSON，适合先核对镜头策略和执行参数。</p>
+                  <a className="button-ghost" href={exportLinks.presets} target="_blank" rel="noreferrer">打开 Preset JSON</a>
+                </div>
+
+                <div className="asset-tile render-highlight-card">
+                  <span className="label">Provider 导出</span>
+                  <h4>可执行 Payload</h4>
+                  <p>集中导出 image / voice / video 三类 Provider 载荷。</p>
+                  <a className="button-ghost" href={exportLinks.providerPayloads} target="_blank" rel="noreferrer">打开 Provider Payload</a>
+                </div>
+
+                <div className="asset-tile render-highlight-card">
+                  <span className="label">成片计划</span>
+                  <h4>Final Cut JSON</h4>
+                  <p>直接把镜头顺序、视觉来源和音轨覆盖交给成片阶段。</p>
+                  <a className="button-ghost" href={exportLinks.finalCut} target="_blank" rel="noreferrer">打开 Final Cut JSON</a>
+                </div>
+
+                <div className="asset-tile render-highlight-card">
+                  <span className="label">预演装配</span>
+                  <h4>FFmpeg 预演包</h4>
+                  <p>导出装配包后，可以继续执行预演拼装，或者直接打开预演成片。</p>
+                  <div className="action-row wrap-row compact-row">
+                    <a className="button-ghost" href={exportLinks.finalCutAssembly} target="_blank" rel="noreferrer">打开装配包</a>
+                    <a className="button-ghost" href={exportLinks.finalCutAssemblePreview} target="_blank" rel="noreferrer">执行拼装</a>
+                    <a className="button-ghost" href={exportLinks.finalCutAssemblePreviewOpen} target="_blank" rel="noreferrer">拼装并打开</a>
+                  </div>
+                </div>
+
+                <div className="asset-tile render-highlight-card">
+                  <span className="label">生产交付</span>
+                  <h4>Production Bundle</h4>
+                  <p>导出媒体索引、成片计划、装配包和结构数据，方便归档交付。</p>
+                  <a className="button-ghost" href={exportLinks.productionBundle} target="_blank" rel="noreferrer">生成并查看交付包</a>
+                </div>
+              </div>
+            </div>
+          </details>
         </div>
       </SectionCard>
     </div>

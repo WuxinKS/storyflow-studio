@@ -1166,6 +1166,9 @@ textarea {
 .story-focus-card,
 .character-focus-card,
 .adapt-focus-card,
+.render-focus-card,
+.finalcut-focus-card,
+.delivery-focus-card,
 .story-layer-card,
 .story-beat-item,
 .story-seed-preview-item,
@@ -1284,7 +1287,10 @@ textarea {
 
 .story-focus-card,
 .character-focus-card,
-.adapt-focus-card {
+.adapt-focus-card,
+.render-focus-card,
+.finalcut-focus-card,
+.delivery-focus-card {
   background: rgba(239, 249, 247, 0.72);
   border-color: rgba(18, 110, 104, 0.18);
 }

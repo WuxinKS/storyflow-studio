@@ -12,11 +12,11 @@ export default async function DeliveryCenterPage({
   return (
     <ModulePage
       title="交付中心"
-      lead="集中回看每次生产导出生成的 manifest、provider payload、媒体索引与 zip 归档，让一句话成片链路真正具备交付可追溯性。"
+      lead="这一页只负责收最后结果：先确认最新交付包能不能用，再按需查看历史版本和完整工件。"
       bullets={[
-        '按项目查看最近导出的 production bundle 与 zip 归档',
-        '直接打开 manifest、provider payload、媒体索引和 preset JSON',
-        '结合 QA 与生成工作台，快速回到需要补修的链路位置',
+        '默认只看最新交付包，不把整页变成档案仓库',
+        '需要时再展开历史交付包和完整工件入口',
+        '支持重新导出当前交付包，并快速回跳到成片预演或生成工作台',
       ]}
       currentPath="/delivery-center"
       projectId={projectId}

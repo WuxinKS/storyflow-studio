@@ -83,6 +83,62 @@ function getSceneNextAction(input: {
   return '这一场已经能直接纳入最终成片。';
 }
 
+function getFinalCutMission(input: {
+  shotCount: number;
+  readyForAssembly: boolean;
+  readyForFullVideo: boolean;
+  missingVisualShots: number;
+  projectId: string;
+}) {
+  if (input.shotCount === 0) {
+    return {
+      status: '待建立成片素材',
+      title: '先回去生成镜头素材',
+      guidance: '成片预演没有可装配镜头时，这一页先不继续，回生成工作台补素材更有效。',
+      actionHref: buildProjectHref('/render-studio', input.projectId),
+      actionLabel: '回到生成工作台',
+    };
+  }
+
+  if (input.missingVisualShots > 0) {
+    return {
+      status: '仍被视觉阻塞',
+      title: '先补齐缺失视觉',
+      guidance: '只要还有镜头没有任何视觉结果，final cut 就会被直接卡住，先补镜头比盯时间线更重要。',
+      actionHref: buildProjectHref('/render-studio', input.projectId),
+      actionLabel: '回到生成工作台补镜头',
+    };
+  }
+
+  if (input.readyForFullVideo) {
+    return {
+      status: '完整成片已就绪',
+      title: '进入交付中心',
+      guidance: '镜头视频和场次音轨都已经齐了，这一站可以直接交给交付中心归档和输出。',
+      actionHref: buildProjectHref('/delivery-center', input.projectId),
+      actionLabel: '进入交付中心',
+    };
+  }
+
+  if (input.readyForAssembly) {
+    return {
+      status: '可先拼预演版',
+      title: '一键拼装并打开预演',
+      guidance: '虽然还有图片回退或缺音轨，但已经能先拼一个预演版，优先验证节奏和镜头顺序。',
+      actionHref: `/api/render?action=assemble-final-cut-preview&projectId=${input.projectId}&open=1`,
+      actionLabel: '拼装并打开预演',
+    };
+  }
+
+  return {
+    status: '继续补齐 final cut',
+    title: '返回生成工作台',
+    guidance: '这一轮还不适合直接拼装，先回生成环节把剩余缺口补上。',
+    actionHref: buildProjectHref('/render-studio', input.projectId),
+    actionLabel: '回到生成工作台',
+  };
+}
+
 export async function FinalCutData({ projectId }: { projectId?: string }) {
   const plan = await getFinalCutPlan(projectId).catch(() => null);
 
@@ -102,10 +158,13 @@ export async function FinalCutData({ projectId }: { projectId?: string }) {
     missingVisualShots: plan.summary.missingVisualShots,
     scenesWithoutAudio: plan.summary.scenesWithoutAudio,
   });
-  const sceneReadyForFullVideo = plan.scenes.filter(
-    (scene) => scene.missingVisualShots === 0 && scene.imageFallbackShots === 0 && scene.audioEntry,
-  ).length;
-  const sceneReadyForPreview = plan.scenes.filter((scene) => scene.missingVisualShots === 0).length;
+  const finalCutMission = getFinalCutMission({
+    shotCount: plan.summary.shotCount,
+    readyForAssembly: plan.summary.readyForAssembly,
+    readyForFullVideo: plan.summary.readyForFullVideo,
+    missingVisualShots: plan.summary.missingVisualShots,
+    projectId: plan.projectId,
+  });
   const routeCards = [
     {
       key: 'visual-gap',
@@ -168,29 +227,33 @@ export async function FinalCutData({ projectId }: { projectId?: string }) {
             <span>音轨覆盖 {plan.summary.audioCoverageRate}%</span>
           </div>
 
-          <div className="finalcut-route-strip">
-            <div className="finalcut-route-pill">
-              <span className="label">Scene 全视频</span>
-              <strong>{sceneReadyForFullVideo} / {plan.summary.sceneCount}</strong>
+          <div className="asset-tile finalcut-focus-card">
+            <span className="label">当前主任务</span>
+            <h4>{finalCutMission.title}</h4>
+            <p>{finalCutMission.guidance}</p>
+            <div className="action-row wrap-row">
+              <a
+                className="button-primary"
+                href={finalCutMission.actionHref}
+                target={finalCutMission.actionHref.startsWith('/api/') ? '_blank' : undefined}
+                rel={finalCutMission.actionHref.startsWith('/api/') ? 'noreferrer' : undefined}
+              >
+                {finalCutMission.actionLabel}
+              </a>
             </div>
-            <div className="finalcut-route-pill">
-              <span className="label">Scene 可预演</span>
-              <strong>{sceneReadyForPreview} / {plan.summary.sceneCount}</strong>
-            </div>
-            <div className="finalcut-route-pill">
-              <span className="label">镜头视频覆盖</span>
-              <strong>{plan.summary.readyVideoShots} / {plan.summary.shotCount}</strong>
-            </div>
-            <div className="finalcut-route-pill">
-              <span className="label">场次音轨</span>
-              <strong>{plan.summary.scenesWithAudio} / {plan.summary.sceneCount}</strong>
-            </div>
+            <details className="workflow-disclosure">
+              <summary>更多成片操作</summary>
+              <div className="workflow-disclosure-body">
+                <div className="action-row wrap-row compact-row">
+                  <a className="button-ghost" href={`/api/render?action=assemble-final-cut-preview&projectId=${plan.projectId}&open=1`} target="_blank" rel="noreferrer">一键拼装并打开预演</a>
+                  <a className="button-ghost" href={`/api/render?action=export-final-cut-plan&projectId=${plan.projectId}`} target="_blank" rel="noreferrer">导出 Final Cut JSON</a>
+                </div>
+              </div>
+            </details>
           </div>
 
           <div className="action-row wrap-row">
             <Link href={buildProjectHref('/render-studio', plan.projectId)} className="button-secondary">返回生成工作台</Link>
-            <a className="button-ghost" href={`/api/render?action=assemble-final-cut-preview&projectId=${plan.projectId}&open=1`} target="_blank" rel="noreferrer">一键拼装并打开预演</a>
-            <a className="button-ghost" href={`/api/render?action=export-final-cut-plan&projectId=${plan.projectId}`} target="_blank" rel="noreferrer">导出 Final Cut JSON</a>
             <Link href={buildProjectHref('/render-runs', plan.projectId)} className="button-ghost">查看运行诊断</Link>
             <Link href={buildProjectHref('/delivery-center', plan.projectId)} className="button-ghost">查看交付中心</Link>
           </div>
@@ -236,8 +299,8 @@ export async function FinalCutData({ projectId }: { projectId?: string }) {
 
       <SectionCard
         eyebrow="Decision"
-        title="拼装判断与推进路线"
-        description="先把阻塞点、推荐动作和预演路线摆平，再去看具体场次。"
+        title="成片预演只看这四件事"
+        description="先把阻塞点、推荐动作和预演路线摆平，再决定要不要展开详细装配。"
       >
         <div className="finalcut-route-grid">
           {routeCards.map((card) => (
@@ -326,167 +389,173 @@ export async function FinalCutData({ projectId }: { projectId?: string }) {
       </SectionCard>
 
       <SectionCard
-        eyebrow="Timeline"
-        title="镜头顺序预演"
-        description="这里直接按成片顺序看镜头采用的视频、图片回退和场次音轨，判断预演会长什么样。"
+        eyebrow="Advanced"
+        title="详细装配视图"
+        description="默认不把镜头和场次装配全摊开；只有需要核具体素材时，再展开下面两部分。"
       >
-        <div className="finalcut-timeline-grid">
-          {plan.timelineItems.map((item) => (
-            <div key={`${item.sceneId}-${item.shotId}-${item.orderIndex}`} className="asset-tile finalcut-timeline-item">
-              <div className="finalcut-shot-card-head">
-                <span className="label">#{String(item.orderIndex + 1).padStart(2, '0')}</span>
-                <span className={`finalcut-source-pill finalcut-source-${item.visualSourceKind}`}>
-                  {getVisualSourceLabel(item.visualSourceKind)}
-                </span>
-              </div>
+        <div className="page-stack">
+          <details className="workflow-disclosure">
+            <summary>展开镜头顺序预演</summary>
+            <div className="workflow-disclosure-body">
+              <div className="finalcut-timeline-grid">
+                {plan.timelineItems.map((item) => (
+                  <div key={`${item.sceneId}-${item.shotId}-${item.orderIndex}`} className="asset-tile finalcut-timeline-item">
+                    <div className="finalcut-shot-card-head">
+                      <span className="label">#{String(item.orderIndex + 1).padStart(2, '0')}</span>
+                      <span className={`finalcut-source-pill finalcut-source-${item.visualSourceKind}`}>
+                        {getVisualSourceLabel(item.visualSourceKind)}
+                      </span>
+                    </div>
 
-              <h4>{item.shotTitle}</h4>
-              <p>{item.sceneTitle}</p>
+                    <h4>{item.shotTitle}</h4>
+                    <p>{item.sceneTitle}</p>
 
-              <div className="meta-list">
-                <span>类型 {item.kind}</span>
-                <span>时长 {formatSeconds(item.duration)}</span>
-                <span>{formatSeconds(item.startAt)} → {formatSeconds(item.endAt)}</span>
-                <span>音轨 {item.sceneAudioEntry ? '已配' : '缺失'}</span>
-              </div>
-
-              {item.warnings.length > 0 ? (
-                <div className="tag-list">
-                  {item.warnings.map((warning) => (
-                    <span key={`${item.shotId}-${warning}`} className="tag-chip tag-chip-active">{warning}</span>
-                  ))}
-                </div>
-              ) : (
-                <div className="tag-list">
-                  <span className="tag-chip">可直接进入拼装</span>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </SectionCard>
-
-      <SectionCard
-        eyebrow="Scenes"
-        title="场次装配时间线"
-        description="每个场次都拆成一张装配卡：先看场次状态，再看每个镜头最终采用的视频、图片回退和音轨关联。"
-      >
-        <div className="finalcut-scene-stack">
-          {plan.scenes.map((scene, index) => {
-            const sceneState = getSceneAssemblyState(scene);
-
-            return (
-              <section key={scene.sceneId} className="snapshot-card finalcut-scene-card">
-                <div className="finalcut-scene-head">
-                  <div className="finalcut-scene-copy">
-                    <p className="eyebrow">Scene {String(index + 1).padStart(2, '0')}</p>
-                    <h3>{scene.title}</h3>
-                    <p>{scene.summary || '暂无场次摘要'}</p>
-                  </div>
-
-                  <div className="finalcut-scene-side">
-                    <span className="status-pill status-pill-subtle">{getAssemblyStateLabel(sceneState)}</span>
                     <div className="meta-list">
-                      <span>时间 {formatSeconds(scene.startAt)} → {formatSeconds(scene.endAt)}</span>
-                      <span>时长 {formatSeconds(scene.duration)}</span>
-                      <span>情绪 {scene.emotion}</span>
-                      <span>视频 {scene.readyVideoShots}</span>
-                      <span>回退 {scene.imageFallbackShots}</span>
-                      <span>缺失 {scene.missingVisualShots}</span>
+                      <span>类型 {item.kind}</span>
+                      <span>时长 {formatSeconds(item.duration)}</span>
+                      <span>{formatSeconds(item.startAt)} → {formatSeconds(item.endAt)}</span>
+                      <span>音轨 {item.sceneAudioEntry ? '已配' : '缺失'}</span>
                     </div>
-                  </div>
-                </div>
 
-                <div className={`finalcut-scene-audio ${scene.audioEntry ? '' : 'finalcut-scene-audio-missing'}`}>
-                  {scene.audioEntry ? (
-                    <>
-                      <div>
-                        <span className="label">场次音轨</span>
-                        <h4>{scene.audioEntry.title}</h4>
-                        <p>{getSceneNextAction(scene)}</p>
-                      </div>
-                      <div className="action-row wrap-row compact-row">
-                        <span className="tag-chip">音轨已匹配</span>
-                        {scene.audioEntry.localPath ? (
-                          <a className="button-ghost" href={buildLocalMediaPreviewHref(scene.audioEntry.localPath)} target="_blank" rel="noreferrer">打开音轨工件</a>
-                        ) : null}
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div>
-                        <span className="label">场次音轨</span>
-                        <h4>当前还没有匹配音轨</h4>
-                        <p>{getSceneNextAction(scene)}</p>
-                      </div>
+                    {item.warnings.length > 0 ? (
                       <div className="tag-list">
-                        <span className="tag-chip tag-chip-active">建议先补音轨</span>
+                        {item.warnings.map((warning) => (
+                          <span key={`${item.shotId}-${warning}`} className="tag-chip tag-chip-active">{warning}</span>
+                        ))}
                       </div>
-                    </>
-                  )}
-                </div>
-
-                <div className="finalcut-shot-grid">
-                  {scene.shots.map((shot) => (
-                    <div key={shot.shotId} className="asset-tile scene-tile finalcut-shot-card">
-                      <MediaPreview
-                        kind={shot.visualEntry ? getPreviewKindFromGeneratedType(shot.visualEntry.type) : null}
-                        title={shot.visualEntry?.title || shot.shotTitle}
-                        sourceUrl={shot.visualEntry?.sourceUrl}
-                        localPath={shot.visualEntry?.localPath}
-                        fallbackLabel={shot.shotTitle}
-                      />
-
-                      <div className="finalcut-shot-card-head">
-                        <span className={`finalcut-source-pill finalcut-source-${shot.visualSourceKind}`}>
-                          {getVisualSourceLabel(shot.visualSourceKind)}
-                        </span>
-                        {shot.beatType ? <span className="tag-chip">{shot.beatType}</span> : null}
+                    ) : (
+                      <div className="tag-list">
+                        <span className="tag-chip">可直接进入拼装</span>
                       </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </details>
 
-                      <h4>{shot.shotTitle}</h4>
-                      <p>{shot.visualEntry?.summary || '当前镜头还没有可用视觉产物。'}</p>
+          <details className="workflow-disclosure">
+            <summary>展开场次装配细节</summary>
+            <div className="workflow-disclosure-body">
+              <div className="finalcut-scene-stack">
+                {plan.scenes.map((scene, index) => {
+                  const sceneState = getSceneAssemblyState(scene);
 
-                      <div className="meta-list">
-                        <span>类型 {shot.kind}</span>
-                        <span>时长 {formatSeconds(shot.duration)}</span>
-                        <span>时间 {formatSeconds(shot.startAt)} → {formatSeconds(shot.endAt)}</span>
-                        <span>情绪 {shot.emotion}</span>
-                      </div>
-
-                      {shot.referenceTitles.length > 0 ? (
-                        <div className="tag-list">
-                          {shot.referenceTitles.map((title) => (
-                            <span key={`${shot.shotId}-${title}`} className="tag-chip">{title}</span>
-                          ))}
+                  return (
+                    <section key={scene.sceneId} className="snapshot-card finalcut-scene-card">
+                      <div className="finalcut-scene-head">
+                        <div className="finalcut-scene-copy">
+                          <p className="eyebrow">Scene {String(index + 1).padStart(2, '0')}</p>
+                          <h3>{scene.title}</h3>
+                          <p>{scene.summary || '暂无场次摘要'}</p>
                         </div>
-                      ) : null}
 
-                      {shot.referencePromptLine ? <p><strong>定向参考：</strong>{shot.referencePromptLine}</p> : null}
-                      {shot.referenceNote ? <p><strong>绑定说明：</strong>{shot.referenceNote}</p> : null}
-
-                      {shot.warnings.length > 0 ? (
-                        <div className="tag-list">
-                          {shot.warnings.map((warning) => (
-                            <span key={`${shot.shotId}-${warning}`} className="tag-chip tag-chip-active">{warning}</span>
-                          ))}
+                        <div className="finalcut-scene-side">
+                          <span className="status-pill status-pill-subtle">{getAssemblyStateLabel(sceneState)}</span>
+                          <div className="meta-list">
+                            <span>时间 {formatSeconds(scene.startAt)} → {formatSeconds(scene.endAt)}</span>
+                            <span>时长 {formatSeconds(scene.duration)}</span>
+                            <span>情绪 {scene.emotion}</span>
+                            <span>视频 {scene.readyVideoShots}</span>
+                            <span>回退 {scene.imageFallbackShots}</span>
+                            <span>缺失 {scene.missingVisualShots}</span>
+                          </div>
                         </div>
-                      ) : null}
-
-                      <div className="action-row wrap-row compact-row">
-                        {shot.visualEntry?.localPath ? (
-                          <a className="button-ghost" href={buildLocalMediaPreviewHref(shot.visualEntry.localPath)} target="_blank" rel="noreferrer">打开视觉工件</a>
-                        ) : null}
-                        {shot.sceneAudioEntry?.localPath ? (
-                          <a className="button-ghost" href={buildLocalMediaPreviewHref(shot.sceneAudioEntry.localPath)} target="_blank" rel="noreferrer">打开场次音轨</a>
-                        ) : null}
                       </div>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            );
-          })}
+
+                      <div className={`finalcut-scene-audio ${scene.audioEntry ? '' : 'finalcut-scene-audio-missing'}`}>
+                        {scene.audioEntry ? (
+                          <>
+                            <div>
+                              <span className="label">场次音轨</span>
+                              <h4>{scene.audioEntry.title}</h4>
+                              <p>{getSceneNextAction(scene)}</p>
+                            </div>
+                            <div className="action-row wrap-row compact-row">
+                              <span className="tag-chip">音轨已匹配</span>
+                              {scene.audioEntry.localPath ? (
+                                <a className="button-ghost" href={buildLocalMediaPreviewHref(scene.audioEntry.localPath)} target="_blank" rel="noreferrer">打开音轨工件</a>
+                              ) : null}
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div>
+                              <span className="label">场次音轨</span>
+                              <h4>当前还没有匹配音轨</h4>
+                              <p>{getSceneNextAction(scene)}</p>
+                            </div>
+                            <div className="tag-list">
+                              <span className="tag-chip tag-chip-active">建议先补音轨</span>
+                            </div>
+                          </>
+                        )}
+                      </div>
+
+                      <div className="finalcut-shot-grid">
+                        {scene.shots.map((shot) => (
+                          <div key={shot.shotId} className="asset-tile scene-tile finalcut-shot-card">
+                            <MediaPreview
+                              kind={shot.visualEntry ? getPreviewKindFromGeneratedType(shot.visualEntry.type) : null}
+                              title={shot.visualEntry?.title || shot.shotTitle}
+                              sourceUrl={shot.visualEntry?.sourceUrl}
+                              localPath={shot.visualEntry?.localPath}
+                              fallbackLabel={shot.shotTitle}
+                            />
+
+                            <div className="finalcut-shot-card-head">
+                              <span className={`finalcut-source-pill finalcut-source-${shot.visualSourceKind}`}>
+                                {getVisualSourceLabel(shot.visualSourceKind)}
+                              </span>
+                              {shot.beatType ? <span className="tag-chip">{shot.beatType}</span> : null}
+                            </div>
+
+                            <h4>{shot.shotTitle}</h4>
+                            <p>{shot.visualEntry?.summary || '当前镜头还没有可用视觉产物。'}</p>
+
+                            <div className="meta-list">
+                              <span>类型 {shot.kind}</span>
+                              <span>时长 {formatSeconds(shot.duration)}</span>
+                              <span>时间 {formatSeconds(shot.startAt)} → {formatSeconds(shot.endAt)}</span>
+                              <span>情绪 {shot.emotion}</span>
+                            </div>
+
+                            {shot.referenceTitles.length > 0 ? (
+                              <div className="tag-list">
+                                {shot.referenceTitles.map((title) => (
+                                  <span key={`${shot.shotId}-${title}`} className="tag-chip">{title}</span>
+                                ))}
+                              </div>
+                            ) : null}
+
+                            {shot.referencePromptLine ? <p><strong>定向参考：</strong>{shot.referencePromptLine}</p> : null}
+                            {shot.referenceNote ? <p><strong>绑定说明：</strong>{shot.referenceNote}</p> : null}
+
+                            {shot.warnings.length > 0 ? (
+                              <div className="tag-list">
+                                {shot.warnings.map((warning) => (
+                                  <span key={`${shot.shotId}-${warning}`} className="tag-chip tag-chip-active">{warning}</span>
+                                ))}
+                              </div>
+                            ) : null}
+
+                            <div className="action-row wrap-row compact-row">
+                              {shot.visualEntry?.localPath ? (
+                                <a className="button-ghost" href={buildLocalMediaPreviewHref(shot.visualEntry.localPath)} target="_blank" rel="noreferrer">打开视觉工件</a>
+                              ) : null}
+                              {shot.sceneAudioEntry?.localPath ? (
+                                <a className="button-ghost" href={buildLocalMediaPreviewHref(shot.sceneAudioEntry.localPath)} target="_blank" rel="noreferrer">打开场次音轨</a>
+                              ) : null}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  );
+                })}
+              </div>
+            </div>
+          </details>
         </div>
       </SectionCard>
     </div>
