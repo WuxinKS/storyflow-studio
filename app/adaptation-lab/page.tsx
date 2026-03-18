@@ -1,7 +1,6 @@
-import Link from 'next/link';
 import { AdaptationData } from '@/components/adaptation-data';
 import { ModulePage } from '@/components/module-page';
-import { buildProjectHref, normalizeProjectId } from '@/lib/project-links';
+import { normalizeProjectId } from '@/lib/project-links';
 
 export default async function AdaptationLabPage({
   searchParams,
@@ -23,10 +22,6 @@ export default async function AdaptationLabPage({
       projectId={projectId}
     >
       <AdaptationData projectId={projectId} />
-      <div className="action-row">
-        <Link href={buildProjectHref('/chapter-studio', projectId)} className="button-ghost">返回章节工作台</Link>
-        <Link href={buildProjectHref('/storyboard', projectId)} className="button-secondary">前往分镜板</Link>
-      </div>
     </ModulePage>
   );
 }

@@ -1261,6 +1261,191 @@ textarea {
   border: 1px solid rgba(161, 77, 44, 0.16);
 }
 
+.adapt-command-grid,
+.board-command-grid,
+.timeline-command-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+  gap: 18px;
+}
+
+.adapt-command-card,
+.board-command-card,
+.timeline-command-card,
+.adapt-kpi-card,
+.board-kpi-card,
+.timeline-kpi-card,
+.adapt-highlight-card,
+.board-highlight-card,
+.timeline-highlight-card,
+.adapt-scene-card,
+.adapt-shot-card,
+.board-scene-card,
+.board-reference-card,
+.board-shot-card,
+.timeline-editor-card,
+.timeline-edit-scene-card,
+.timeline-scene-card,
+.timeline-shot-card {
+  display: grid;
+  gap: 14px;
+}
+
+.adapt-panel-head,
+.board-panel-head,
+.timeline-panel-head,
+.adapt-scene-head,
+.board-scene-head,
+.timeline-scene-head,
+.timeline-edit-scene-head,
+.board-shot-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.adapt-command-side,
+.board-command-side,
+.timeline-command-side,
+.adapt-kpi-grid,
+.board-kpi-grid,
+.timeline-kpi-grid,
+.adapt-readiness-grid,
+.adapt-scene-grid,
+.adapt-shot-grid,
+.board-health-grid,
+.board-scene-stack,
+.board-shot-grid,
+.timeline-health-grid,
+.timeline-edit-scene-stack,
+.timeline-edit-shot-grid,
+.timeline-field-grid,
+.timeline-curve-list,
+.timeline-scene-stack,
+.timeline-shot-grid {
+  display: grid;
+  gap: 18px;
+}
+
+.adapt-command-side,
+.board-command-side,
+.timeline-command-side {
+  align-content: start;
+}
+
+.adapt-kpi-grid,
+.board-kpi-grid,
+.timeline-kpi-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.adapt-readiness-grid,
+.board-health-grid,
+.timeline-health-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.adapt-scene-grid,
+.board-scene-stack,
+.timeline-scene-stack,
+.timeline-edit-scene-stack {
+  grid-template-columns: 1fr;
+}
+
+.adapt-shot-grid,
+.board-shot-grid,
+.timeline-shot-grid,
+.timeline-edit-shot-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.adapt-kpi-card,
+.board-kpi-card,
+.timeline-kpi-card,
+.adapt-highlight-card,
+.board-highlight-card,
+.timeline-highlight-card,
+.adapt-shot-card,
+.board-reference-card,
+.board-shot-card,
+.timeline-edit-scene-card,
+.timeline-shot-card {
+  background: rgba(255, 255, 255, 0.48);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 18px;
+}
+
+.adapt-kpi-card h4,
+.board-kpi-card h4,
+.timeline-kpi-card h4 {
+  font-size: 1.5rem;
+  line-height: 1.1;
+}
+
+.adapt-kpi-card p,
+.board-kpi-card p,
+.timeline-kpi-card p,
+.adapt-highlight-card p,
+.board-highlight-card p,
+.timeline-highlight-card p,
+.adapt-scene-copy p,
+.adapt-shot-card p,
+.board-scene-copy p,
+.board-reference-card p,
+.board-shot-card p,
+.timeline-scene-copy p,
+.timeline-shot-card p,
+.timeline-curve-item small {
+  line-height: 1.7;
+  color: var(--muted);
+}
+
+.adapt-scene-side,
+.board-scene-side,
+.timeline-scene-side {
+  display: grid;
+  gap: 12px;
+  justify-items: end;
+}
+
+.board-reference-card {
+  border: 1px solid rgba(18, 110, 104, 0.18);
+  background: rgba(239, 249, 247, 0.7);
+}
+
+.timeline-editor-card {
+  padding: 28px 30px;
+}
+
+.timeline-edit-field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.timeline-curve-list {
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.timeline-curve-item {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.timeline-curve-item span {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: var(--accent-3);
+  font-family: var(--font-display);
+}
+
 @keyframes riseFade {
   from {
     opacity: 0;
@@ -1291,6 +1476,9 @@ textarea {
   .asset-grid.three-up,
   .dashboard-split,
   .story-layer-grid,
+  .adapt-readiness-grid,
+  .board-health-grid,
+  .timeline-health-grid,
   .render-ops-grid,
   .render-strategy-grid,
   .render-export-grid,
@@ -1330,6 +1518,9 @@ textarea {
   .hero-grid,
   .kickoff-grid,
   .story-control-grid,
+  .adapt-command-grid,
+  .board-command-grid,
+  .timeline-command-grid,
   .render-command-grid,
   .finalcut-command-grid,
   .finalcut-scene-head,
@@ -1344,6 +1535,10 @@ textarea {
   }
 
   .scene-seed-grid,
+  .adapt-shot-grid,
+  .board-shot-grid,
+  .timeline-edit-shot-grid,
+  .timeline-shot-grid,
   .render-input-grid,
   .render-preset-grid,
   .render-media-grid,
@@ -1374,6 +1569,13 @@ textarea {
   .asset-grid.two-up,
   .kickoff-mode-grid,
   .story-health-grid,
+  .adapt-kpi-grid,
+  .board-kpi-grid,
+  .timeline-kpi-grid,
+  .adapt-readiness-grid,
+  .board-health-grid,
+  .timeline-health-grid,
+  .timeline-edit-field-grid,
   .render-kpi-grid,
   .render-stage-list,
   .render-ops-grid,
@@ -1387,6 +1589,10 @@ textarea {
   .finalcut-alert-grid,
   .scene-seed-grid,
   .story-layer-grid,
+  .adapt-shot-grid,
+  .board-shot-grid,
+  .timeline-edit-shot-grid,
+  .timeline-shot-grid,
   .finalcut-shot-grid {
     grid-template-columns: 1fr;
   }
