@@ -1088,6 +1088,12 @@ textarea {
   grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
 }
 
+.story-command-side {
+  display: grid;
+  gap: 18px;
+  align-content: start;
+}
+
 .kickoff-form-panel,
 .story-command-card,
 .render-command-card,
@@ -1116,6 +1122,7 @@ textarea {
 
 .kickoff-action-bar,
 .kickoff-side-panel,
+.story-primary-action,
 .kickoff-mode-grid,
 .story-health-grid,
 .story-layer-grid,
@@ -1144,12 +1151,21 @@ textarea {
   align-items: center;
 }
 
+.story-primary-action {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
 .kickoff-side-panel {
   align-content: start;
 }
 
 .kickoff-side-card,
 .kickoff-mode-card,
+.story-focus-card,
+.character-focus-card,
+.adapt-focus-card,
 .story-layer-card,
 .story-beat-item,
 .story-seed-preview-item,
@@ -1264,6 +1280,37 @@ textarea {
 
 .story-seed-preview-item small {
   font-size: 13px;
+}
+
+.story-focus-card,
+.character-focus-card,
+.adapt-focus-card {
+  background: rgba(239, 249, 247, 0.72);
+  border-color: rgba(18, 110, 104, 0.18);
+}
+
+.workflow-disclosure {
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.42);
+  padding: 14px 16px;
+}
+
+.workflow-disclosure summary {
+  cursor: pointer;
+  list-style: none;
+  font-weight: 700;
+  color: var(--accent-3);
+}
+
+.workflow-disclosure summary::-webkit-details-marker {
+  display: none;
+}
+
+.workflow-disclosure-body {
+  display: grid;
+  gap: 14px;
+  margin-top: 14px;
 }
 
 .render-highlight-card .meta-list,
@@ -1947,6 +1994,10 @@ textarea {
   font-weight: 800;
   color: var(--accent-3);
   font-family: var(--font-display);
+}
+
+.module-anchor {
+  scroll-margin-top: 120px;
 }
 
 @keyframes riseFade {

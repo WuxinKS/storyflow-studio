@@ -60,6 +60,41 @@ function resolveAdaptationSource(chapters: Array<{ title: string }>) {
   };
 }
 
+function getAdaptationMission(input: {
+  hasSource: boolean;
+  hasOutput: boolean;
+  projectId: string;
+}) {
+  if (!input.hasSource) {
+    return {
+      status: '待补可改编正文',
+      title: '先回去补故事正文',
+      guidance: '自动分镜优先吃正文，没有可改编文本时，这一页先不要继续往下推。',
+      kind: 'link' as const,
+      actionHref: buildProjectHref('/story-setup', input.projectId),
+      actionLabel: '回到故事设定',
+    };
+  }
+
+  if (!input.hasOutput) {
+    return {
+      status: '待生成自动分镜',
+      title: '先生成首版自动分镜',
+      guidance: '把最新正文拆成 scene / shot，后面图片和视频生成才会有稳定输入。',
+      kind: 'generate' as const,
+    };
+  }
+
+  return {
+    status: '可进入分镜板',
+    title: '进入分镜板精修',
+    guidance: 'scene / shot 已经生成，这里可以先交给分镜板做逐镜头精修和参考绑定。',
+    kind: 'link' as const,
+    actionHref: buildProjectHref('/storyboard', input.projectId),
+    actionLabel: '进入分镜板',
+  };
+}
+
 export async function AdaptationData({ projectId }: { projectId?: string }) {
   const project = await getLatestProjectWithChapters(projectId).catch(() => null);
 
@@ -85,6 +120,13 @@ export async function AdaptationData({ projectId }: { projectId?: string }) {
   const shotCount = project.shots.length;
   const directorRate = toPercent(directorReadyCount, project.scenes.length);
   const averageShotsPerScene = project.scenes.length > 0 ? Math.round((shotCount / project.scenes.length) * 10) / 10 : 0;
+  const hasAdaptationSource = adaptationSource.label !== '暂无可用源';
+  const hasAdaptationOutput = project.scenes.length > 0 && shotCount > 0;
+  const adaptationMission = getAdaptationMission({
+    hasSource: hasAdaptationSource,
+    hasOutput: hasAdaptationOutput,
+    projectId: project.id,
+  });
 
   return (
     <div className="page-stack">
@@ -110,12 +152,32 @@ export async function AdaptationData({ projectId }: { projectId?: string }) {
             <span>镜头类型 {dynamicShotKinds.length}</span>
           </div>
 
-          <AdaptationGenerateButton projectId={project.id} />
+          <div className="asset-tile adapt-focus-card">
+            <span className="label">当前主任务</span>
+            <h4>{adaptationMission.title}</h4>
+            <p>{adaptationMission.guidance}</p>
+            {adaptationMission.kind === 'generate' ? (
+              <AdaptationGenerateButton projectId={project.id} mode="create" />
+            ) : (
+              <div className="page-stack">
+                <div className="action-row wrap-row">
+                  <a href={adaptationMission.actionHref} className="button-primary">{adaptationMission.actionLabel}</a>
+                </div>
+                {hasAdaptationSource ? (
+                  <details className="workflow-disclosure">
+                    <summary>需要时刷新自动分镜</summary>
+                    <div className="workflow-disclosure-body">
+                      <AdaptationGenerateButton projectId={project.id} mode="refresh" />
+                    </div>
+                  </details>
+                ) : null}
+              </div>
+            )}
+          </div>
 
           <div className="action-row wrap-row">
             <Link href={buildProjectHref('/chapter-studio', project.id)} className="button-ghost">返回章节工作台</Link>
             <Link href={buildProjectHref('/reference-lab', project.id)} className="button-secondary">管理参考素材</Link>
-            <Link href={buildProjectHref('/storyboard', project.id)} className="button-secondary">继续到分镜板</Link>
           </div>
         </section>
 
@@ -159,8 +221,8 @@ export async function AdaptationData({ projectId }: { projectId?: string }) {
 
       <SectionCard
         eyebrow="Readiness"
-        title="改编准备度"
-        description="先看上游输入够不够稳，再看这轮改编是否适合继续推进分镜。"
+        title="自动分镜先看这四件事"
+        description="不再先读大段文本，而是先判断来源、输出密度、参考和镜头语言是否可用。"
       >
         <div className="adapt-readiness-grid">
           <div className="asset-tile adapt-highlight-card">
@@ -199,8 +261,8 @@ export async function AdaptationData({ projectId }: { projectId?: string }) {
 
       <SectionCard
         eyebrow="Scene Breakdown"
-        title="分场拆解"
-        description="每个分场只保留真正影响后续分镜的信息：场次摘要、导演语言状态和镜头清单。"
+        title="场次总览"
+        description="默认先看每场是否成立，只有需要时再展开镜头细节。"
       >
         <div className="adapt-scene-grid">
           {groupedShots.length === 0 ? (
@@ -228,16 +290,23 @@ export async function AdaptationData({ projectId }: { projectId?: string }) {
                   </div>
                 </div>
 
-                <div className="adapt-shot-grid">
-                  {shots.map((shot, index) => (
-                    <div key={shot.id} className="asset-tile adapt-shot-card">
-                      <span className="label">镜头 {String(index + 1).padStart(2, '0')}</span>
-                      <h4>{shot.title}</h4>
-                      <p>{shot.cameraNotes || '暂无镜头备注'}</p>
-                      <p><strong>提示词：</strong>{shot.prompt || '暂无镜头提示词'}</p>
+                {shots.length > 0 ? (
+                  <details className="workflow-disclosure">
+                    <summary>查看本场 {shots.length} 个镜头</summary>
+                    <div className="workflow-disclosure-body">
+                      <div className="adapt-shot-grid">
+                        {shots.map((shot, index) => (
+                          <div key={shot.id} className="asset-tile adapt-shot-card">
+                            <span className="label">镜头 {String(index + 1).padStart(2, '0')}</span>
+                            <h4>{shot.title}</h4>
+                            <p>{shot.cameraNotes || '暂无镜头备注'}</p>
+                            <p><strong>提示词：</strong>{shot.prompt || '暂无镜头提示词'}</p>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  ))}
-                </div>
+                  </details>
+                ) : null}
               </section>
             ))
           )}

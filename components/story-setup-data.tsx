@@ -12,6 +12,75 @@ import { SyncNoticeCard } from '@/components/sync-notice-card';
 import { getProjectStageLabel } from '@/lib/display';
 import { buildProjectHref } from '@/lib/project-links';
 
+function getStoryMission(input: {
+  hasSynopsis: boolean;
+  hasBeats: boolean;
+  hasScenes: boolean;
+  hasAiNovel: boolean;
+  projectId: string;
+}) {
+  if (!input.hasSynopsis) {
+    return {
+      status: '待建立方向',
+      title: '先生成故事梗概',
+      guidance: '先把故事总方向拉出来，确认 premise、冲突和人物命运有没有站稳。',
+      kind: 'generate' as const,
+      primaryAction: 'generate-synopsis' as const,
+      primaryLabel: '生成故事梗概',
+      primaryLoadingLabel: '正在生成故事梗概…',
+      helperText: '这一步只定总方向，暂时不动节拍和正文。',
+    };
+  }
+
+  if (!input.hasBeats) {
+    return {
+      status: '待拉清节奏',
+      title: '把故事推进成节拍',
+      guidance: '现在已经有故事方向，下一步先把起承转合和关键反转拉清楚。',
+      kind: 'generate' as const,
+      primaryAction: 'generate-beats' as const,
+      primaryLabel: '生成结构节拍',
+      primaryLoadingLabel: '正在生成结构节拍…',
+      helperText: '只补节拍层，不会重做下游正文。',
+    };
+  }
+
+  if (!input.hasScenes) {
+    return {
+      status: '待拆成场次',
+      title: '把节拍拆成分场种子',
+      guidance: '把故事节拍落成可执行的场次，后面角色、自动分镜和图片生成才有明确抓手。',
+      kind: 'generate' as const,
+      primaryAction: 'generate-scenes' as const,
+      primaryLabel: '生成分场种子',
+      primaryLoadingLabel: '正在生成分场种子…',
+      helperText: '这一步会把结构变成场次，不会直接重写完整小说。',
+    };
+  }
+
+  if (!input.hasAiNovel) {
+    return {
+      status: '待补正文',
+      title: '生成可改编的 AI 小说正文',
+      guidance: '角色与自动分镜优先吃正文，所以这里先把故事骨架推成一版可读正文。',
+      kind: 'generate' as const,
+      primaryAction: 'generate-chapters' as const,
+      primaryLabel: '生成 AI 小说正文',
+      primaryLoadingLabel: '正在生成 AI 小说正文…',
+      helperText: '有了正文后，后续自动分镜会更稳定。',
+    };
+  }
+
+  return {
+    status: '故事包已就绪',
+    title: '进入角色与视觉',
+    guidance: '梗概、节拍、分场和 AI 正文已经齐了，这一页先交棒给角色与视觉去继续统一人物和风格。',
+    kind: 'link' as const,
+    actionHref: buildProjectHref('/character-studio', input.projectId),
+    actionLabel: '进入角色与视觉',
+  };
+}
+
 export async function StorySetupData({ projectId }: { projectId?: string }) {
   const project = await getLatestProject(projectId).catch(() => null);
 
@@ -33,13 +102,67 @@ export async function StorySetupData({ projectId }: { projectId?: string }) {
   const manualChapterCount = visibleChapters.length - aiChapterCount;
   const storyDraft = getStoryDraftBundle(project);
   const syncStatus = await getSyncStatus(project.id).catch(() => null);
+  const ideaInput = idea?.input?.trim() || '';
+  const hasIdeaInput = Boolean(ideaInput);
+  const hasSynopsis = project.outlines.some((item) => item.title === 'Story Engine Synopsis');
+  const hasBeats = project.chapters.some((item) => item.title === 'Story Engine Beat Sheet');
+  const hasScenes = project.chapters.some((item) => item.title === 'Story Engine Scene Seeds');
+  const hasAiNovel = aiChapterCount > 0;
+  const storyPackageCount = [hasSynopsis, hasBeats, hasScenes, hasAiNovel].filter(Boolean).length;
+  const storyPackagePercent = Math.round((storyPackageCount / 4) * 100);
+  const storyMission = getStoryMission({
+    hasSynopsis,
+    hasBeats,
+    hasScenes,
+    hasAiNovel,
+    projectId: project.id,
+  });
+  const packageCards = [
+    {
+      label: '故事梗概',
+      ready: hasSynopsis,
+      title: hasSynopsis ? '方向已稳定' : '待生成',
+      detail: hasSynopsis
+        ? storyDraft.synopsis
+        : '先明确故事总方向，再决定节拍和分场。',
+    },
+    {
+      label: '结构节拍',
+      ready: hasBeats,
+      title: hasBeats ? `${storyDraft.beats.length} 条节拍` : '待生成',
+      detail: hasBeats
+        ? '当前已经可以判断故事节奏是否顺畅。'
+        : '把起承转合拉清楚，后续人物和改编才更稳。',
+    },
+    {
+      label: '分场种子',
+      ready: hasScenes,
+      title: hasScenes ? `${storyDraft.scenes.length} 个场次` : '待生成',
+      detail: hasScenes
+        ? '现在已经能直接预览场次目标、冲突和情绪。'
+        : '先拆成场次，再继续自动分镜和图片生成。',
+    },
+    {
+      label: 'AI 小说正文',
+      ready: hasAiNovel,
+      title: hasAiNovel ? `${aiChapterCount} 章正文` : '待生成',
+      detail: hasAiNovel
+        ? '自动分镜会优先以这版正文作为主输入。'
+        : '有了正文后，角色与自动分镜会更稳定。',
+    },
+  ];
 
   return (
     <div className="page-stack">
       <div className="story-control-grid">
-        <div className="snapshot-card story-command-card">
-          <p className="eyebrow">当前项目</p>
-          <h3>{project.title}</h3>
+        <section className="snapshot-card story-command-card">
+          <div className="story-layer-head">
+            <div>
+              <p className="eyebrow">Story Mission</p>
+              <h3>{project.title}</h3>
+            </div>
+            <span className="status-pill status-pill-subtle">{storyMission.status}</span>
+          </div>
           <p>{project.premise || '暂无故事前提'}</p>
           <div className="meta-list">
             <span>题材：{project.genre || '未设定'}</span>
@@ -47,31 +170,66 @@ export async function StorySetupData({ projectId }: { projectId?: string }) {
             <span>手写章节：{manualChapterCount}</span>
             <span>AI 小说：{aiChapterCount}</span>
           </div>
-          <StoryGenerateButton projectId={project.id} />
+          <div className="asset-tile story-focus-card">
+            <span className="label">当前主任务</span>
+            <h4>{storyMission.title}</h4>
+            <p>{storyMission.guidance}</p>
+            {storyMission.kind === 'generate' ? (
+              <StoryGenerateButton
+                projectId={project.id}
+                primaryAction={storyMission.primaryAction}
+                primaryLabel={storyMission.primaryLabel}
+                primaryLoadingLabel={storyMission.primaryLoadingLabel}
+                helperText={storyMission.helperText}
+              />
+            ) : (
+              <div className="page-stack">
+                <div className="action-row wrap-row">
+                  <a href={storyMission.actionHref} className="button-primary">{storyMission.actionLabel}</a>
+                </div>
+                <details className="workflow-disclosure">
+                  <summary>刚改过故事？这里刷新正文</summary>
+                  <div className="workflow-disclosure-body">
+                    <StoryGenerateButton
+                      projectId={project.id}
+                      primaryAction="generate-chapters"
+                      primaryLabel="按最新故事刷新 AI 小说"
+                      primaryLoadingLabel="正在刷新 AI 小说…"
+                      helperText="如果上游梗概或分场已经调整，这里刷新一次正文即可。"
+                    />
+                  </div>
+                </details>
+              </div>
+            )}
+          </div>
           <div className="action-row wrap-row">
             <Link href={buildProjectHref('/idea-lab', project.id)} className="button-ghost">修改创意</Link>
             <Link href={buildProjectHref('/chapter-studio', project.id)} className="button-secondary">查看小说章节</Link>
-            <Link href={buildProjectHref('/adaptation-lab', project.id)} className="button-secondary">进入改编工作台</Link>
           </div>
-        </div>
+        </section>
 
-        <div className="story-health-grid">
-          <div className="asset-tile">
-            <span className="label">世界观输入</span>
-            <h4>{idea?.input ? '已写入' : '待补充'}</h4>
-            <p>{idea?.input || '先明确世界观输入，后面的梗概和角色会更稳定。'}</p>
+        <aside className="story-command-side">
+          <div className="story-health-grid">
+            <div className="asset-tile">
+              <span className="label">世界观输入</span>
+              <h4>{hasIdeaInput ? '已写入' : '待补充'}</h4>
+              <p>{ideaInput || '先把故事输入写清楚，后面的梗概和角色才不会飘。'}</p>
+            </div>
+            <div className="asset-tile">
+              <span className="label">故事包进度</span>
+              <h4>{storyPackageCount} / 4</h4>
+              <div className="progress-strip">
+                <span className="progress-fill progress-fill-accent-2" style={{ width: `${storyPackagePercent}%` }} />
+              </div>
+              <p>这一页只看四件事：梗概、节拍、分场、正文。</p>
+            </div>
+            <div className="asset-tile">
+              <span className="label">下一站</span>
+              <h4>{hasAiNovel ? '角色与视觉' : '先补正文'}</h4>
+              <p>{hasAiNovel ? '故事包已经能交给角色与视觉继续稳定人物和风格。' : '正文没出来前，自动分镜与生成链的稳定性都会打折。'} </p>
+            </div>
           </div>
-          <div className="asset-tile">
-            <span className="label">风格方向</span>
-            <h4>{project.genre || '未定义题材'}</h4>
-            <p>{idea?.styleNotes || project.description || '建议补齐风格、节奏和输出取向。'}</p>
-          </div>
-          <div className="asset-tile">
-            <span className="label">正文状态</span>
-            <h4>{aiChapterCount} 章 AI 小说</h4>
-            <p>{manualChapterCount > 0 ? `另有 ${manualChapterCount} 章人工章节，可一起进入改编链。` : '当前还没有人工章节，适合先用 AI 正文拉出初稿。'}</p>
-          </div>
-        </div>
+        </aside>
       </div>
 
       {syncStatus ? (
@@ -81,106 +239,98 @@ export async function StorySetupData({ projectId }: { projectId?: string }) {
       ) : null}
 
       <SectionCard
-        eyebrow="Story Layers"
-        title="三层故事骨架"
-        description="故事设定页的核心不是堆信息，而是先把上游三层稳定下来，减少下游返工。"
+        eyebrow="Story Package"
+        title="这一页只确认四件事"
+        description="不再堆满故事层级报告，只判断故事包是否能安全交给下游。"
       >
-        <div className="story-layer-grid">
-          <div className="asset-tile story-layer-card">
-            <div className="story-layer-head">
-              <span className="story-layer-index">01</span>
-              <div>
-                <p className="eyebrow">Synopsis</p>
-                <h4>故事梗概</h4>
-              </div>
-            </div>
-            <p>{storyDraft.synopsis}</p>
-            <div className="meta-list">
-              <span>定义故事总方向</span>
-              <span>建议优先稳定</span>
-            </div>
-          </div>
-
-          <div className="asset-tile story-layer-card">
-            <div className="story-layer-head">
-              <span className="story-layer-index">02</span>
-              <div>
-                <p className="eyebrow">Beats</p>
-                <h4>结构节拍</h4>
-              </div>
-            </div>
-            <div className="story-beat-list">
-              {storyDraft.beats.length > 0 ? storyDraft.beats.map((beat, index) => (
-                <div key={`${index}-${beat.slice(0, 12)}`} className="story-beat-item">
-                  <strong>节拍 {index + 1}</strong>
-                  <span>{beat}</span>
+        <div className="asset-grid">
+          {packageCards.map((item) => (
+            <div key={item.label} className="asset-tile story-package-card">
+              <div className="story-layer-head">
+                <div>
+                  <span className="label">{item.label}</span>
+                  <h4>{item.title}</h4>
                 </div>
-              )) : <p>还没有生成结构节拍。</p>}
-            </div>
-          </div>
-
-          <div className="asset-tile story-layer-card">
-            <div className="story-layer-head">
-              <span className="story-layer-index">03</span>
-              <div>
-                <p className="eyebrow">Scene Seeds</p>
-                <h4>分场种子</h4>
+                <span className="status-pill status-pill-subtle">{item.ready ? '已就绪' : '待处理'}</span>
               </div>
+              <p>{item.detail}</p>
             </div>
-            <div className="story-seed-preview-list">
-              {storyDraft.scenes.length > 0 ? storyDraft.scenes.slice(0, 3).map((scene, index) => (
-                <div key={`${index}-${scene.title}`} className="story-seed-preview-item">
-                  <strong>场次 {index + 1} · {scene.title}</strong>
-                  <span>{scene.summary}</span>
-                  <small>目标：{scene.goal}</small>
-                </div>
-              )) : <p>还没有生成分场种子。</p>}
-            </div>
-          </div>
+          ))}
         </div>
       </SectionCard>
 
       <SectionCard
-        eyebrow="Scene Seeds"
-        title="完整分场种子"
-        description="这里直接看每个场次的目标、冲突和情绪，方便快速判断是否适合进入改编。"
+        eyebrow="Scene Preview"
+        title="先看前三场有没有跑偏"
+        description="这一步只判断方向、冲突和情绪是否成立，不在这里卷细节。"
       >
-        <div className="scene-seed-grid">
-          {storyDraft.scenes.length > 0 ? storyDraft.scenes.map((scene, index) => (
-            <div key={`${index}-${scene.title}-full`} className="asset-tile scene-seed-card">
-              <span className="label">场次 {index + 1}</span>
-              <h4>{scene.title}</h4>
-              <p>{scene.summary}</p>
-              <div className="meta-list">
-                <span>目标：{scene.goal}</span>
-                <span>冲突：{scene.conflict}</span>
-                <span>情绪：{scene.emotion}</span>
-              </div>
+        {storyDraft.scenes.length > 0 ? (
+          <div className="page-stack">
+            <div className="scene-seed-grid">
+              {storyDraft.scenes.slice(0, 3).map((scene, index) => (
+                <div key={`${index}-${scene.title}`} className="asset-tile scene-seed-card">
+                  <span className="label">场次 {index + 1}</span>
+                  <h4>{scene.title}</h4>
+                  <p>{scene.summary}</p>
+                  <div className="meta-list">
+                    <span>目标：{scene.goal}</span>
+                    <span>冲突：{scene.conflict}</span>
+                    <span>情绪：{scene.emotion}</span>
+                  </div>
+                </div>
+              ))}
             </div>
-          )) : <p>还没有生成分场种子。</p>}
-        </div>
+            {storyDraft.scenes.length > 3 ? (
+              <details className="workflow-disclosure">
+                <summary>展开完整分场种子（{storyDraft.scenes.length} 场）</summary>
+                <div className="workflow-disclosure-body">
+                  <div className="scene-seed-grid">
+                    {storyDraft.scenes.map((scene, index) => (
+                      <div key={`${index}-${scene.title}-all`} className="asset-tile scene-seed-card">
+                        <span className="label">场次 {index + 1}</span>
+                        <h4>{scene.title}</h4>
+                        <p>{scene.summary}</p>
+                        <div className="meta-list">
+                          <span>目标：{scene.goal}</span>
+                          <span>冲突：{scene.conflict}</span>
+                          <span>情绪：{scene.emotion}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </details>
+            ) : null}
+          </div>
+        ) : (
+          <div className="asset-tile">
+            <span className="label">空状态</span>
+            <h4>还没有分场种子</h4>
+            <p>先完成故事梗概和结构节拍，再把节拍拆成场次。</p>
+          </div>
+        )}
       </SectionCard>
 
       <SectionCard
-        eyebrow="Impact"
-        title="下游会继承这些设定"
-        description="这里改动的内容会直接传到角色、视觉、改编和生成链，所以页面重点是判断影响，而不是单纯看文案。"
+        eyebrow="Downstream"
+        title="完成这一页后，下游会怎么接力"
+        description="只要这四件事稳定，后面就不再反复猜故事。"
       >
         <div className="asset-grid three-up">
           <div className="asset-tile">
-            <span className="label">层级控制</span>
-            <h4>重生逻辑</h4>
-            <p>方向不满意就优先重生梗概；结构不顺再动节拍；只想改改编基础时，再局部重生分场种子。</p>
-          </div>
-          <div className="asset-tile">
             <span className="label">角色与视觉</span>
-            <h4>后续模块会继续读取</h4>
-            <p>角色与视觉不会只从镜头反推，而是继续围绕这里的故事骨架继承设定。</p>
+            <h4>人物和风格会继承故事骨架</h4>
+            <p>角色卡、视觉圣经都会直接吃这里的梗概和分场，不再各自猜故事。</p>
           </div>
           <div className="asset-tile">
-            <span className="label">建议路线</span>
-            <h4>当前建议</h4>
-            <p>先把三层骨架调顺，再批量生成小说正文，最后进入改编实验室和生成链。</p>
+            <span className="label">自动分镜</span>
+            <h4>正文会优先进入 scene / shot</h4>
+            <p>只要 AI 小说正文生成出来，自动分镜就能更稳定地拆成场次与镜头。</p>
+          </div>
+          <div className="asset-tile">
+            <span className="label">建议推进</span>
+            <h4>一页只做一步</h4>
+            <p>先补齐故事包，再进角色与视觉，然后再去自动分镜和生成工作台。</p>
           </div>
         </div>
       </SectionCard>

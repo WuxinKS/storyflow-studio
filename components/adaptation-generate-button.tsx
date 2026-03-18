@@ -3,10 +3,25 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-export function AdaptationGenerateButton({ projectId }: { projectId: string }) {
+export function AdaptationGenerateButton({
+  projectId,
+  mode = 'refresh',
+}: {
+  projectId: string;
+  mode?: 'create' | 'refresh';
+}) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const copy = mode === 'create'
+    ? {
+        button: '生成首版自动分镜',
+        loading: '正在生成首版自动分镜…',
+      }
+    : {
+        button: '按最新正文刷新自动分镜',
+        loading: '正在刷新自动分镜…',
+      };
 
   const onGenerate = async () => {
     setLoading(true);
@@ -29,10 +44,12 @@ export function AdaptationGenerateButton({ projectId }: { projectId: string }) {
   };
 
   return (
-    <div className="action-row">
-      <button type="button" className="button-primary" onClick={onGenerate} disabled={loading}>
-        {loading ? '正在生成改编结构…' : '从最新章节生成 scene / shot'}
-      </button>
+    <div className="page-stack">
+      <div className="action-row wrap-row">
+        <button type="button" className="button-primary" onClick={onGenerate} disabled={loading}>
+          {loading ? copy.loading : copy.button}
+        </button>
+      </div>
       {message ? <span className="success-text">{message}</span> : null}
     </div>
   );

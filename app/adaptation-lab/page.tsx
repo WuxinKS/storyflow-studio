@@ -11,12 +11,12 @@ export default async function AdaptationLabPage({
 
   return (
     <ModulePage
-      title="改编实验室"
-      lead="把小说、文章或剧本母本转为 scene / shot 级的结构化镜头规划。"
+      title="自动分镜"
+      lead="这一页只负责把正文拆成 scene / shot，先判断能不能继续，再决定是否进入逐镜头精修。"
       bullets={[
-        '基于最新章节生成导演语言增强版 scene / shot 结构',
-        '让输出可直接流向分镜板和视频生成主链',
-        '当前已支持参考素材注入 + 动态镜头类型生成',
+        '优先确认有没有可改编正文，再生成首版自动分镜',
+        '默认先看场次是否成立，不把镜头细节一次性全展开',
+        '能继续时直接进入分镜板精修，不能继续就回补上游输入',
       ]}
       currentPath="/adaptation-lab"
       projectId={projectId}
