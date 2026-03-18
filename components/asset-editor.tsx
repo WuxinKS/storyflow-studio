@@ -76,14 +76,19 @@ export function AssetEditor({ projectId, options }: AssetEditorProps) {
   };
 
   return (
-    <form className="snapshot-card" onSubmit={onSubmit}>
-      <p className="eyebrow">手动录入资产</p>
-      <h3>资产中心 v1 录入口</h3>
-      <p>可手动补充角色、场景、道具、风格板和参考图资产，并绑定到场景、镜头或角色，供后续渲染和复用链路消费。</p>
-      <div className="form-grid">
+    <form className="form-card library-form-card" onSubmit={onSubmit}>
+      <div className="library-form-head">
+        <div>
+          <p className="eyebrow">Asset Intake</p>
+          <h3>手动录入资产</h3>
+        </div>
+        <p>把角色、场景、道具、风格板和参考图作为正式资产录入，并绑定到角色 / 场景 / 镜头，方便后续持续复用。</p>
+      </div>
+
+      <div className="form-grid library-form-grid">
         <label>
           <span>资产类型</span>
-          <select value={form.type} onChange={(event) => updateField('type', event.target.value)}>
+          <select value={form.type} onChange={(event) => updateField('type', event.target.value as AssetType)}>
             <option value="character">角色</option>
             <option value="scene">场景</option>
             <option value="prop">道具</option>
@@ -91,22 +96,27 @@ export function AssetEditor({ projectId, options }: AssetEditorProps) {
             <option value="reference-image">参考图</option>
           </select>
         </label>
+
         <label>
           <span>资产标题</span>
           <input value={form.title} onChange={(event) => updateField('title', event.target.value)} placeholder="例如：主角工牌 / 机房走廊 / 冷色风格板" />
         </label>
+
         <label className="full-width">
           <span>资产摘要</span>
           <textarea rows={4} value={form.summary} onChange={(event) => updateField('summary', event.target.value)} placeholder="写清用途、视觉特征或叙事作用。" />
         </label>
+
         <label>
           <span>标签（逗号分隔）</span>
           <input value={form.tags} onChange={(event) => updateField('tags', event.target.value)} placeholder="例如：冷光, 金属, 主角" />
         </label>
+
         <label>
           <span>来源</span>
           <input value={form.source} onChange={(event) => updateField('source', event.target.value)} placeholder="例如：导演手动补录 / 外部素材库" />
         </label>
+
         <label>
           <span>关联场景</span>
           <select value={form.sceneId} onChange={(event) => updateField('sceneId', event.target.value)}>
@@ -116,6 +126,7 @@ export function AssetEditor({ projectId, options }: AssetEditorProps) {
             ))}
           </select>
         </label>
+
         <label>
           <span>关联镜头</span>
           <select value={form.shotId} onChange={(event) => updateField('shotId', event.target.value)}>
@@ -125,7 +136,8 @@ export function AssetEditor({ projectId, options }: AssetEditorProps) {
             ))}
           </select>
         </label>
-        <label>
+
+        <label className="full-width">
           <span>关联角色</span>
           <select value={form.characterName} onChange={(event) => updateField('characterName', event.target.value)}>
             <option value="">不绑定</option>
@@ -135,6 +147,7 @@ export function AssetEditor({ projectId, options }: AssetEditorProps) {
           </select>
         </label>
       </div>
+
       <div className="action-row wrap-row">
         <button type="submit" className="button-primary" disabled={loading}>
           {loading ? '保存资产中…' : '保存资产条目'}

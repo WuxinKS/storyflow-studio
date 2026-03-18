@@ -1261,6 +1261,8 @@ textarea {
   border: 1px solid rgba(161, 77, 44, 0.16);
 }
 
+.character-command-grid,
+.library-command-grid,
 .ops-command-grid,
 .visual-command-grid,
 .reference-command-grid,
@@ -1272,6 +1274,16 @@ textarea {
   gap: 18px;
 }
 
+.character-command-card,
+.character-kpi-card,
+.character-highlight-card,
+.character-card,
+.character-editor-command,
+.character-edit-card,
+.library-command-card,
+.library-kpi-card,
+.library-highlight-card,
+.library-card,
 .ops-command-card,
 .ops-kpi-card,
 .ops-detail-card,
@@ -1314,6 +1326,11 @@ textarea {
   gap: 14px;
 }
 
+.character-panel-head,
+.character-editor-head,
+.character-card-head,
+.library-panel-head,
+.library-card-head,
 .ops-command-head,
 .ops-provider-head,
 .visual-panel-head,
@@ -1336,6 +1353,16 @@ textarea {
   flex-wrap: wrap;
 }
 
+.character-command-side,
+.character-kpi-grid,
+.character-health-grid,
+.character-card-grid,
+.character-editor-stack,
+.character-editor-grid,
+.library-command-side,
+.library-kpi-grid,
+.library-health-grid,
+.library-card-grid,
 .ops-command-side,
 .ops-kpi-grid,
 .ops-overview-grid,
@@ -1385,6 +1412,8 @@ textarea {
   gap: 18px;
 }
 
+.character-command-side,
+.library-command-side,
 .ops-command-side,
 .visual-command-side,
 .reference-command-side,
@@ -1394,6 +1423,8 @@ textarea {
   align-content: start;
 }
 
+.character-kpi-grid,
+.library-kpi-grid,
 .ops-kpi-grid,
 .visual-kpi-grid,
 .visual-lock-grid,
@@ -1405,10 +1436,19 @@ textarea {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.character-health-grid,
+.library-health-grid,
+.ops-overview-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .ops-overview-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.character-card-grid,
+.character-editor-grid,
+.library-card-grid,
 .ops-provider-grid,
 .ops-check-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1439,6 +1479,7 @@ textarea {
 .timeline-edit-scene-stack,
 .reference-binding-stack,
 .ops-run-stack,
+.character-editor-stack,
 .visual-editor-stack {
   grid-template-columns: 1fr;
 }
@@ -1450,6 +1491,16 @@ textarea {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.character-command-card,
+.character-kpi-card,
+.character-highlight-card,
+.character-card,
+.character-editor-command,
+.character-edit-card,
+.library-command-card,
+.library-kpi-card,
+.library-highlight-card,
+.library-card,
 .ops-command-card,
 .ops-kpi-card,
 .ops-detail-card,
@@ -1487,6 +1538,8 @@ textarea {
   padding: 18px;
 }
 
+.character-kpi-card h4,
+.library-kpi-card h4,
 .ops-kpi-card h4,
 .visual-kpi-card h4,
 .reference-kpi-card h4,
@@ -1497,6 +1550,14 @@ textarea {
   line-height: 1.1;
 }
 
+.character-kpi-card p,
+.character-highlight-card p,
+.character-card p,
+.character-edit-card p,
+.library-kpi-card p,
+.library-highlight-card p,
+.library-card p,
+.library-form-head p,
 .ops-kpi-card p,
 .ops-detail-card p,
 .ops-provider-card p,
@@ -1528,6 +1589,10 @@ textarea {
 .timeline-curve-item small {
   line-height: 1.7;
   color: var(--muted);
+}
+
+.character-editor-command {
+  padding: 24px;
 }
 
 .reference-card-head,
@@ -1687,6 +1752,8 @@ textarea {
 
   .asset-grid.three-up,
   .dashboard-split,
+  .character-health-grid,
+  .library-health-grid,
   .ops-overview-grid,
   .ops-provider-grid,
   .ops-check-grid,
@@ -1736,6 +1803,8 @@ textarea {
   .hero-grid,
   .kickoff-grid,
   .story-control-grid,
+  .character-command-grid,
+  .library-command-grid,
   .ops-command-grid,
   .visual-command-grid,
   .reference-command-grid,
@@ -1756,6 +1825,9 @@ textarea {
   }
 
   .scene-seed-grid,
+  .character-card-grid,
+  .character-editor-grid,
+  .library-card-grid,
   .ops-provider-grid,
   .ops-check-grid,
   .visual-system-grid,
@@ -1795,6 +1867,13 @@ textarea {
   .asset-grid.three-up,
   .asset-grid.two-up,
   .kickoff-mode-grid,
+  .character-kpi-grid,
+  .character-health-grid,
+  .character-card-grid,
+  .character-editor-grid,
+  .library-kpi-grid,
+  .library-health-grid,
+  .library-card-grid,
   .ops-kpi-grid,
   .ops-overview-grid,
   .ops-provider-grid,

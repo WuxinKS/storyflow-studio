@@ -30,6 +30,12 @@ const LOCK_LABELS: Record<keyof CharacterLocks, string> = {
   conflict: '核心冲突',
 };
 
+function roleLabel(role: string) {
+  if (role === 'protagonist') return '主角';
+  if (role === 'antagonist') return '对手';
+  return '关键配角';
+}
+
 export function CharacterEditor({
   projectId,
   initialCharacters,
@@ -47,6 +53,10 @@ export function CharacterEditor({
   }, [initialCharacters]);
 
   const hasCharacters = useMemo(() => characters.length > 0, [characters]);
+  const totalLockedFields = useMemo(
+    () => characters.reduce((sum, character) => sum + Object.values(character.locks).filter(Boolean).length, 0),
+    [characters],
+  );
 
   const updateField = (index: number, field: keyof CharacterDraft, value: string) => {
     setCharacters((current) => current.map((item, itemIndex) => (
@@ -105,11 +115,21 @@ export function CharacterEditor({
   if (!hasCharacters) return null;
 
   return (
-    <div className="page-stack">
-      <div className="snapshot-card">
-        <p className="eyebrow">角色修订</p>
-        <h3>手动定稿与锁定入口</h3>
-        <p>可直接修订角色字段，并锁定角色名、定位、原型、目标和冲突；之后整套重生或局部重生时，已锁定字段不会被覆盖。</p>
+    <div className="character-editor-stack">
+      <div className="snapshot-card character-editor-command">
+        <div className="character-editor-head">
+          <div>
+            <p className="eyebrow">Character Control</p>
+            <h3>角色定稿与局部重生</h3>
+          </div>
+          <span className="status-pill status-pill-subtle">{totalLockedFields} 项已锁定</span>
+        </div>
+
+        <p>
+          建议顺序是先统一三类角色的定位，再锁住角色名、原型、目标和冲突，最后只对需要变化的角色做局部重生。
+          这样角色关系不会在后续改编和分镜阶段漂移。
+        </p>
+
         <div className="action-row wrap-row">
           <button type="button" className="button-primary" onClick={onSave} disabled={Boolean(loadingAction)}>
             {loadingAction === 'save' ? '保存角色中…' : '保存角色修订'}
@@ -121,16 +141,19 @@ export function CharacterEditor({
         </div>
       </div>
 
-      <div className="asset-grid">
+      <div className="character-editor-grid">
         {characters.map((character, index) => {
           const lockedFields = Object.entries(character.locks)
             .filter(([, locked]) => locked)
             .map(([field]) => LOCK_LABELS[field as keyof CharacterLocks]);
 
           return (
-            <div key={`${character.role}-${index}`} className="asset-tile scene-tile">
-              <div className="action-row wrap-row compact-row">
-                <span className="label">角色编辑</span>
+            <div key={`${character.role}-${index}`} className="asset-tile scene-tile character-edit-card">
+              <div className="character-card-head">
+                <div>
+                  <span className="label">{roleLabel(character.role)}</span>
+                  <h4>{character.name || `角色 ${index + 1}`}</h4>
+                </div>
                 <button
                   type="button"
                   className="button-ghost"
@@ -140,13 +163,15 @@ export function CharacterEditor({
                   {loadingAction === `generate:${character.role}` ? '重生中…' : '只重生这个角色'}
                 </button>
               </div>
+
               {lockedFields.length > 0 ? (
                 <div className="tag-list">
                   {lockedFields.map((field) => (
-                    <span key={`${character.role}-${field}`} className="tag-chip">已锁定：{field}</span>
+                    <span key={`${character.role}-${field}`} className="tag-chip">{field}</span>
                   ))}
                 </div>
               ) : null}
+
               <div className="shot-list">
                 <label className="shot-item">
                   <div className="field-head">
@@ -157,6 +182,7 @@ export function CharacterEditor({
                   </div>
                   <input value={character.name} onChange={(event) => updateField(index, 'name', event.target.value)} />
                 </label>
+
                 <label className="shot-item">
                   <div className="field-head">
                     <strong>角色定位</strong>
@@ -164,8 +190,13 @@ export function CharacterEditor({
                       {character.locks.role ? '已锁定' : '锁定'}
                     </button>
                   </div>
-                  <input value={character.role} onChange={(event) => updateField(index, 'role', event.target.value)} />
+                  <select value={character.role} onChange={(event) => updateField(index, 'role', event.target.value)}>
+                    <option value="protagonist">主角</option>
+                    <option value="antagonist">对手</option>
+                    <option value="support">关键配角</option>
+                  </select>
                 </label>
+
                 <label className="shot-item">
                   <div className="field-head">
                     <strong>角色原型</strong>
@@ -173,8 +204,9 @@ export function CharacterEditor({
                       {character.locks.archetype ? '已锁定' : '锁定'}
                     </button>
                   </div>
-                  <textarea value={character.archetype} onChange={(event) => updateField(index, 'archetype', event.target.value)} />
+                  <textarea value={character.archetype} onChange={(event) => updateField(index, 'archetype', event.target.value)} rows={4} />
                 </label>
+
                 <label className="shot-item">
                   <div className="field-head">
                     <strong>剧情目标</strong>
@@ -182,8 +214,9 @@ export function CharacterEditor({
                       {character.locks.goal ? '已锁定' : '锁定'}
                     </button>
                   </div>
-                  <textarea value={character.goal} onChange={(event) => updateField(index, 'goal', event.target.value)} />
+                  <textarea value={character.goal} onChange={(event) => updateField(index, 'goal', event.target.value)} rows={4} />
                 </label>
+
                 <label className="shot-item">
                   <div className="field-head">
                     <strong>核心冲突</strong>
@@ -191,15 +224,17 @@ export function CharacterEditor({
                       {character.locks.conflict ? '已锁定' : '锁定'}
                     </button>
                   </div>
-                  <textarea value={character.conflict} onChange={(event) => updateField(index, 'conflict', event.target.value)} />
+                  <textarea value={character.conflict} onChange={(event) => updateField(index, 'conflict', event.target.value)} rows={4} />
                 </label>
+
                 <label className="shot-item">
                   <strong>说话方式</strong>
-                  <textarea value={character.voiceStyle} onChange={(event) => updateField(index, 'voiceStyle', event.target.value)} />
+                  <textarea value={character.voiceStyle} onChange={(event) => updateField(index, 'voiceStyle', event.target.value)} rows={4} />
                 </label>
+
                 <label className="shot-item">
                   <strong>视觉锚点</strong>
-                  <textarea value={character.visualAnchor} onChange={(event) => updateField(index, 'visualAnchor', event.target.value)} />
+                  <textarea value={character.visualAnchor} onChange={(event) => updateField(index, 'visualAnchor', event.target.value)} rows={4} />
                 </label>
               </div>
             </div>
