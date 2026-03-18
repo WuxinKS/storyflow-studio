@@ -1661,6 +1661,41 @@ textarea {
   background: rgba(239, 249, 247, 0.82);
 }
 
+.library-browser,
+.library-filter-actions {
+  display: grid;
+  gap: 18px;
+}
+
+.library-search-field {
+  display: grid;
+  gap: 8px;
+}
+
+.library-filter-actions {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.filter-chip {
+  min-height: 42px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.5);
+  color: var(--text);
+  font-weight: 700;
+  transition: transform 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+
+.filter-chip:hover {
+  transform: translateY(-1px);
+}
+
+.filter-chip.is-active {
+  border-color: rgba(18, 110, 104, 0.22);
+  background: rgba(239, 249, 247, 0.82);
+  color: var(--accent-2);
+}
+
 .reference-check-section {
   gap: 12px;
 }
@@ -1874,6 +1909,7 @@ textarea {
   .library-kpi-grid,
   .library-health-grid,
   .library-card-grid,
+  .library-filter-actions,
   .ops-kpi-grid,
   .ops-overview-grid,
   .ops-provider-grid,

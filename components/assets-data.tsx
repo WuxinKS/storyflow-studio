@@ -1,21 +1,9 @@
 import Link from 'next/link';
 import { AssetEditor } from '@/components/asset-editor';
-import { MediaPreview } from '@/components/media-preview';
+import { AssetLibraryBrowser } from '@/components/asset-library-browser';
 import { SectionCard } from '@/components/section-card';
-import { resolvePreviewSource } from '@/lib/media-preview';
 import { getAssetBundle, getAssetEditorOptions, getLatestAssetProject } from '@/features/assets/service';
 import { buildProjectHref } from '@/lib/project-links';
-
-function typeLabel(type: string) {
-  if (type === 'character') return '角色资产';
-  if (type === 'scene') return '场景资产';
-  if (type === 'prop') return '道具资产';
-  if (type === 'style-board') return '风格资产';
-  if (type === 'generated-image') return '生成图片';
-  if (type === 'generated-audio') return '生成音频';
-  if (type === 'generated-video') return '生成视频';
-  return '参考资产';
-}
 
 function getAssetCategoryLabel(count: number) {
   if (count >= 8) return '资产沉淀较完整';
@@ -187,59 +175,7 @@ export async function AssetsData({ projectId }: { projectId?: string }) {
           <p>先生成角色、视觉圣经或参考分析，或直接手动录入第一批资产。</p>
         </div>
       ) : (
-        assetSections.map((section) => (
-          <SectionCard
-            key={section.key}
-            eyebrow={section.eyebrow}
-            title={section.title}
-            description={section.description}
-          >
-            <div className="library-card-grid">
-              {section.items.map((asset) => {
-                const previewHref = asset.previewKind ? resolvePreviewSource({ kind: asset.previewKind, sourceUrl: asset.sourceUrl, localPath: asset.localPath }) : null;
-
-                return (
-                  <article key={asset.id} className="asset-tile scene-tile library-card">
-                    {asset.previewKind ? (
-                      <MediaPreview
-                        kind={asset.previewKind}
-                        title={asset.title}
-                        sourceUrl={asset.sourceUrl}
-                        localPath={asset.localPath}
-                        fallbackLabel={asset.previewKind === 'video' ? '视频资产' : asset.previewKind === 'audio' ? '音频资产' : '图片资产'}
-                      />
-                    ) : null}
-
-                    <div className="library-card-head">
-                      <div>
-                        <span className="label">{typeLabel(asset.type)}</span>
-                        <h4>{asset.title}</h4>
-                      </div>
-                      <span className="status-pill status-pill-subtle">{asset.mode === 'manual' ? '手动录入' : '自动聚合'}</span>
-                    </div>
-
-                    <p>{asset.summary}</p>
-
-                    <div className="tag-list">
-                      {asset.tags.map((tag) => (
-                        <span key={`${asset.id}-${tag}`} className="tag-chip">{tag}</span>
-                      ))}
-                    </div>
-
-                    <div className="meta-list">
-                      <span>来源 {asset.source}</span>
-                      {asset.links.map((link) => (
-                        <span key={`${asset.id}-${link}`}>{link}</span>
-                      ))}
-                    </div>
-
-                    {previewHref ? <a className="button-ghost" href={previewHref} target="_blank" rel="noreferrer">打开预览</a> : null}
-                  </article>
-                );
-              })}
-            </div>
-          </SectionCard>
-        ))
+        <AssetLibraryBrowser sections={assetSections} />
       )}
     </div>
   );
