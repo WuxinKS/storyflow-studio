@@ -1261,6 +1261,95 @@ textarea {
   border: 1px solid rgba(161, 77, 44, 0.16);
 }
 
+.render-route-strip,
+.finalcut-route-strip,
+.render-flow-grid,
+.render-provider-grid,
+.render-media-summary-grid,
+.render-job-board,
+.render-job-list,
+.finalcut-route-grid,
+.finalcut-scene-summary-grid,
+.finalcut-timeline-grid {
+  display: grid;
+  gap: 18px;
+}
+
+.render-route-strip,
+.finalcut-route-strip {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.render-route-pill,
+.finalcut-route-pill,
+.render-flow-card,
+.render-provider-card,
+.render-media-summary-card,
+.render-job-lane,
+.finalcut-route-card,
+.finalcut-scene-summary-card,
+.finalcut-timeline-item {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  border-radius: 24px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.48);
+}
+
+.render-flow-grid,
+.render-provider-grid,
+.render-media-summary-grid,
+.finalcut-route-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.render-job-board {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+}
+
+.finalcut-scene-summary-grid,
+.finalcut-timeline-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.render-job-list {
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+
+.render-route-pill strong,
+.finalcut-route-pill strong,
+.render-flow-card h4,
+.render-provider-card h4,
+.render-media-summary-card h4,
+.render-job-lane h4,
+.finalcut-route-card h4,
+.finalcut-scene-summary-card h4,
+.finalcut-timeline-item h4 {
+  font-size: 1.15rem;
+  line-height: 1.3;
+}
+
+.render-route-pill strong,
+.finalcut-route-pill strong {
+  font-family: var(--font-display);
+}
+
+.render-flow-card p,
+.render-provider-card p,
+.render-media-summary-card p,
+.render-job-lane > p,
+.finalcut-route-card p,
+.finalcut-scene-summary-card p,
+.finalcut-timeline-item p,
+.muted-copy {
+  line-height: 1.7;
+  color: var(--muted);
+}
+
 .character-command-grid,
 .library-command-grid,
 .ops-command-grid,
@@ -1799,10 +1888,17 @@ textarea {
   .board-health-grid,
   .timeline-health-grid,
   .reference-binding-grid,
+  .render-flow-grid,
+  .render-provider-grid,
+  .render-media-summary-grid,
   .render-ops-grid,
   .render-strategy-grid,
   .render-export-grid,
-  .finalcut-alert-grid {
+  .render-job-board,
+  .finalcut-alert-grid,
+  .finalcut-route-grid,
+  .finalcut-scene-summary-grid,
+  .finalcut-timeline-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -1874,10 +1970,19 @@ textarea {
   .reference-ops-grid,
   .reference-card-grid,
   .render-input-grid,
+  .render-flow-grid,
+  .render-provider-grid,
   .render-preset-grid,
+  .render-media-summary-grid,
   .render-media-grid,
   .render-job-grid,
-  .finalcut-shot-grid {
+  .render-job-board,
+  .finalcut-route-grid,
+  .finalcut-scene-summary-grid,
+  .finalcut-timeline-grid,
+  .finalcut-shot-grid,
+  .render-route-strip,
+  .finalcut-route-strip {
     grid-template-columns: 1fr;
   }
 }
@@ -1935,22 +2040,31 @@ textarea {
   .timeline-health-grid,
   .timeline-edit-field-grid,
   .render-kpi-grid,
+  .render-flow-grid,
   .render-stage-list,
   .render-ops-grid,
+  .render-provider-grid,
   .render-input-grid,
   .render-strategy-grid,
   .render-preset-grid,
+  .render-media-summary-grid,
   .render-media-grid,
   .render-job-grid,
+  .render-job-board,
   .render-export-grid,
   .finalcut-kpi-grid,
   .finalcut-alert-grid,
+  .finalcut-route-grid,
+  .finalcut-scene-summary-grid,
+  .finalcut-timeline-grid,
   .scene-seed-grid,
   .story-layer-grid,
   .adapt-shot-grid,
   .board-shot-grid,
   .timeline-edit-shot-grid,
   .timeline-shot-grid,
+  .render-route-strip,
+  .finalcut-route-strip,
   .finalcut-shot-grid {
     grid-template-columns: 1fr;
   }
