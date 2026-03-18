@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { ReferenceAnalysisForm } from '@/components/reference-analysis-form';
 import { ReferenceBindingForm } from '@/components/reference-binding-form';
+import { SectionCard } from '@/components/section-card';
 import {
   buildReferenceBindingSnapshot,
   buildReferenceProfile,
@@ -9,6 +10,13 @@ import {
 } from '@/features/reference/service';
 import { getProjectStageLabel, getReferenceSourceTypeLabel } from '@/lib/display';
 import { buildProjectHref } from '@/lib/project-links';
+
+function getBindingCoverageLabel(effectiveCount: number) {
+  if (effectiveCount >= 8) return '覆盖充分';
+  if (effectiveCount >= 3) return '局部覆盖';
+  if (effectiveCount > 0) return '刚开始绑定';
+  return '待建立覆盖';
+}
 
 export async function ReferenceLabData({ projectId }: { projectId?: string }) {
   const project = await getReferenceProject(projectId).catch(() => null);
@@ -26,165 +34,260 @@ export async function ReferenceLabData({ projectId }: { projectId?: string }) {
   const insights = getReferenceInsights(project.references);
   const profile = buildReferenceProfile(project.references);
   const bindings = buildReferenceBindingSnapshot(project);
+  const bindingCoverageLabel = getBindingCoverageLabel(bindings.effectiveShotBindingCount);
 
   return (
     <div className="page-stack">
-      <div className="snapshot-card">
-        <p className="eyebrow">参考工作台</p>
-        <h3>{project.title}</h3>
-        <p>把参考图、截图或样片拆成可复用的镜头语言、情绪标签和风格卡，并直接为改编、分镜与渲染链提供全局约束和镜头级定向参考。</p>
-        <div className="meta-list">
-          <span>参考条目：{project.references.length}</span>
-          <span>图片：{profile.imageCount}</span>
-          <span>视频：{profile.videoCount}</span>
-          <span>定向分场：{bindings.sceneBindingCount}</span>
-          <span>定向镜头：{bindings.shotBindingCount}</span>
-          <span>生效镜头：{bindings.effectiveShotBindingCount}</span>
-          <span>项目阶段：{getProjectStageLabel(project.stage)}</span>
-        </div>
-        <div className="action-row wrap-row">
-          <Link href={buildProjectHref('/storyboard', project.id)} className="button-ghost">查看分镜板</Link>
-          <Link href={buildProjectHref('/render-studio', project.id)} className="button-secondary">查看生成工作台</Link>
-          <Link href={buildProjectHref('/render-runs', project.id)} className="button-secondary">查看运行诊断</Link>
-        </div>
-      </div>
-
-      <ReferenceAnalysisForm projectId={project.id} />
-
-      {insights.length > 0 && (project.scenes.length > 0 || project.shots.length > 0) ? (
-        <ReferenceBindingForm
-          projectId={project.id}
-          references={insights.map((item) => ({ id: item.id, title: item.title }))}
-          scenes={project.scenes.map((scene) => ({ id: scene.id, title: scene.title }))}
-          shots={project.shots.map((shot) => ({ id: shot.id, title: shot.title, sceneTitle: project.scenes.find((scene) => scene.id === shot.sceneId)?.title || '未分场' }))}
-          currentBindings={bindings.bindings.map((binding) => ({
-            targetType: binding.targetType === 'scene' ? 'scene' : 'shot',
-            targetId: binding.targetId,
-            targetLabel: binding.targetLabel,
-            referenceIds: binding.referenceIds,
-            referenceTitles: binding.referenceTitles,
-            note: binding.note,
-            promptLine: binding.promptLine,
-          }))}
-        />
-      ) : null}
-
-      <div className="asset-grid three-up">
-        <div className="asset-tile">
-          <span className="label">构图画像</span>
-          <h4>当前构图偏好</h4>
-          <p>{profile.framing}</p>
-        </div>
-        <div className="asset-tile">
-          <span className="label">情绪画像</span>
-          <h4>当前情绪方向</h4>
-          <p>{profile.emotion}</p>
-        </div>
-        <div className="asset-tile">
-          <span className="label">节奏画像</span>
-          <h4>当前动作 / 节奏</h4>
-          <p>{profile.movement}</p>
-        </div>
-      </div>
-
-      <div className="asset-grid three-up">
-        <div className="asset-tile">
-          <span className="label">参考锚点</span>
-          <h4>主要参考标题</h4>
-          <p>{profile.titleSummary}</p>
-        </div>
-        <div className="asset-tile">
-          <span className="label">补充说明</span>
-          <h4>可迁移说明</h4>
-          <p>{profile.noteSummary}</p>
-        </div>
-        <div className="asset-tile">
-          <span className="label">参考源</span>
-          <h4>{profile.hasSourceMedia ? '已带入真实参考源' : '当前仅结构化笔记'}</h4>
-          <p>{profile.sourceSummary}</p>
-        </div>
-      </div>
-
-      <div className="asset-grid three-up">
-        <div className="asset-tile">
-          <span className="label">定向绑定</span>
-          <h4>分场绑定</h4>
-          <p>当前已有 {bindings.sceneBindingCount} 个分场直接绑定了参考素材，可把同一场的镜头风格拉到一条线上。</p>
-        </div>
-        <div className="asset-tile">
-          <span className="label">定向绑定</span>
-          <h4>镜头绑定</h4>
-          <p>当前已有 {bindings.shotBindingCount} 个镜头直接绑定了参考素材，适合做关键镜头、高潮镜头和特定构图控制。</p>
-        </div>
-        <div className="asset-tile">
-          <span className="label">生效覆盖</span>
-          <h4>镜头生效数</h4>
-          <p>综合分场继承与镜头直绑后，当前共有 {bindings.effectiveShotBindingCount} 个镜头已经带上定向参考。</p>
-        </div>
-      </div>
-
-      <div className="asset-grid">
-        {bindings.bindings.length === 0 ? (
-          <div className="asset-tile">
-            <span className="label">空状态</span>
-            <h4>还没有定向绑定</h4>
-            <p>录入参考后，可以把指定参考绑定到分场或镜头，让后续渲染与分镜更精确地继承某个样片的构图、情绪和节奏。</p>
+      <div className="reference-command-grid">
+        <section className="snapshot-card reference-command-card">
+          <div className="reference-panel-head">
+            <div>
+              <p className="eyebrow">Reference Command</p>
+              <h3>{project.title}</h3>
+            </div>
+            <span className="status-pill status-pill-subtle">{bindingCoverageLabel}</span>
           </div>
-        ) : (
-          bindings.bindings.map((binding) => (
-            <div key={`${binding.targetType}-${binding.targetId}`} className="asset-tile scene-tile">
-              <span className="label">{binding.targetType === 'scene' ? '分场绑定' : '镜头绑定'}</span>
-              <h4>{binding.targetLabel}</h4>
-              <p>{binding.promptLine || '当前绑定尚未形成提示词摘要。'}</p>
-              {binding.note ? <p><strong>绑定说明：</strong>{binding.note}</p> : null}
-              <div className="tag-list">
-                {binding.referenceTitles.map((title) => (
-                  <span key={`${binding.targetId}-${title}`} className="tag-chip">{title}</span>
+
+          <p>
+            这里不只是“存参考图”，而是把截图、样片和视频参考拆成能被改编、分镜、图片生成和视频生成直接消费的约束卡。
+            我们先沉淀全局风格，再把关键参考绑定到具体分场和镜头。
+          </p>
+
+          <div className="meta-list">
+            <span>项目阶段 {getProjectStageLabel(project.stage)}</span>
+            <span>参考条目 {profile.total}</span>
+            <span>图片 {profile.imageCount}</span>
+            <span>视频 {profile.videoCount}</span>
+            <span>分场绑定 {bindings.sceneBindingCount}</span>
+            <span>镜头绑定 {bindings.shotBindingCount}</span>
+            <span>生效镜头 {bindings.effectiveShotBindingCount}</span>
+          </div>
+
+          <div className="action-row wrap-row">
+            <Link href={buildProjectHref('/visual-bible', project.id)} className="button-ghost">返回视觉圣经</Link>
+            <Link href={buildProjectHref('/storyboard', project.id)} className="button-secondary">查看分镜板</Link>
+            <Link href={buildProjectHref('/render-studio', project.id)} className="button-secondary">查看生成工作台</Link>
+            <Link href={buildProjectHref('/render-runs', project.id)} className="button-secondary">查看运行诊断</Link>
+          </div>
+        </section>
+
+        <aside className="reference-command-side">
+          <div className="reference-kpi-grid">
+            <div className="asset-tile reference-kpi-card">
+              <span className="label">全局画像</span>
+              <h4>{profile.total > 0 ? '已建立' : '待录入'}</h4>
+              <p>{profile.total > 0 ? profile.promptLine : '先录入 1-3 个关键参考，后续画像就会自动成型。'} </p>
+            </div>
+
+            <div className="asset-tile reference-kpi-card">
+              <span className="label">真实素材</span>
+              <h4>{profile.hasSourceMedia ? '已带源' : '仅结构笔记'}</h4>
+              <p>{profile.sourceSummary}</p>
+            </div>
+
+            <div className="asset-tile reference-kpi-card">
+              <span className="label">定向覆盖</span>
+              <h4>{bindings.effectiveShotBindingCount}</h4>
+              <p>综合分场继承与镜头直绑后，已有 {bindings.effectiveShotBindingCount} 个镜头能带着参考约束进入生成链。</p>
+            </div>
+
+            <div className="asset-tile reference-kpi-card">
+              <span className="label">主要参考</span>
+              <h4>{profile.titleSummary}</h4>
+              <p>{profile.noteSummary}</p>
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      <SectionCard
+        eyebrow="Capture"
+        title="参考采集与绑定"
+        description="先录入参考卡，再把它们指向分场或镜头。这个区域只做输入，不和结果展示混在一起。"
+      >
+        <div className="reference-ops-grid">
+          <ReferenceAnalysisForm projectId={project.id} />
+          {insights.length > 0 && (project.scenes.length > 0 || project.shots.length > 0) ? (
+            <ReferenceBindingForm
+              projectId={project.id}
+              references={insights.map((item) => ({ id: item.id, title: item.title }))}
+              scenes={project.scenes.map((scene) => ({ id: scene.id, title: scene.title }))}
+              shots={project.shots.map((shot) => ({
+                id: shot.id,
+                title: shot.title,
+                sceneTitle: project.scenes.find((scene) => scene.id === shot.sceneId)?.title || '未分场',
+              }))}
+              currentBindings={bindings.bindings.map((binding) => ({
+                targetType: binding.targetType === 'scene' ? 'scene' : 'shot',
+                targetId: binding.targetId,
+                targetLabel: binding.targetLabel,
+                referenceIds: binding.referenceIds,
+                referenceTitles: binding.referenceTitles,
+                note: binding.note,
+                promptLine: binding.promptLine,
+              }))}
+            />
+          ) : (
+            <div className="asset-tile reference-empty-card">
+              <span className="label">绑定前置条件</span>
+              <h4>先准备参考或镜头</h4>
+              <p>只有当参考卡与分场 / 镜头已经存在时，系统才会开放定向绑定入口。</p>
+            </div>
+          )}
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        eyebrow="Profile"
+        title="全局参考画像"
+        description="这里是项目级风格总结，帮助我们快速判断当前参考更偏什么构图、情绪与节奏。"
+      >
+        <div className="reference-profile-grid">
+          <div className="asset-tile reference-profile-card">
+            <span className="label">构图画像</span>
+            <h4>{profile.framing}</h4>
+            <p>这是当前最常出现的景别 / 构图取向，会直接影响分镜和生图提示词。</p>
+          </div>
+
+          <div className="asset-tile reference-profile-card">
+            <span className="label">情绪画像</span>
+            <h4>{profile.emotion}</h4>
+            <p>这部分会和故事张力一起进入镜头提示与情绪曲线设计。</p>
+          </div>
+
+          <div className="asset-tile reference-profile-card">
+            <span className="label">节奏画像</span>
+            <h4>{profile.movement}</h4>
+            <p>动作与节奏描述会优先进入导演语言和镜头运动约束。</p>
+          </div>
+
+          <div className="asset-tile reference-profile-card">
+            <span className="label">高频锚点</span>
+            <h4>{profile.titleSummary}</h4>
+            {profile.highlights.length > 0 ? (
+              <div className="reference-highlight-list">
+                {profile.highlights.map((item) => (
+                  <span key={item} className="tag-chip">{item}</span>
                 ))}
               </div>
-              <p>参考源：{binding.sourceSummary}</p>
-            </div>
-          ))
-        )}
-      </div>
-
-      <div className="asset-grid">
-        {insights.length === 0 ? (
-          <div className="asset-tile">
-            <span className="label">空状态</span>
-            <h4>还没有参考分析</h4>
-            <p>先录入一个参考镜头，后续会把它直接迁移到改编实验室、分镜板和渲染工作台。</p>
+            ) : (
+              <p>当前还没有足够的参考卡来形成稳定锚点。</p>
+            )}
           </div>
-        ) : (
-          insights.map((item) => {
-            const usage = bindings.usageByReferenceId.get(item.id);
-            return (
-              <div key={item.id} className="asset-tile ref-tile scene-tile">
-                <span className="label">{getReferenceSourceTypeLabel(item.sourceType)}</span>
-                <h4>{item.title}</h4>
-                <p>{item.notes}</p>
-                <div className="tag-list">
-                  <span className="tag-chip">构图：{item.framing}</span>
-                  <span className="tag-chip">情绪：{item.emotion}</span>
-                  <span className="tag-chip">节奏：{item.movement}</span>
-                  {item.sourceUrl ? <span className="tag-chip">已记录 URL</span> : null}
-                  {item.localPath ? <span className="tag-chip">已记录本地路径</span> : null}
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        eyebrow="Coverage"
+        title="定向绑定覆盖"
+        description="全局画像之外，我们还需要把关键参考推给关键场次和关键镜头，确保后续生成不跑偏。"
+      >
+        <div className="reference-binding-grid">
+          <div className="asset-tile reference-binding-card">
+            <span className="label">分场绑定</span>
+            <h4>{bindings.sceneBindingCount}</h4>
+            <p>适合给同一场的整体气质、色彩和构图方向设总约束。</p>
+          </div>
+
+          <div className="asset-tile reference-binding-card">
+            <span className="label">镜头绑定</span>
+            <h4>{bindings.shotBindingCount}</h4>
+            <p>适合高潮镜头、关键情绪镜头或需要精准复用样片构图的场景。</p>
+          </div>
+
+          <div className="asset-tile reference-binding-card">
+            <span className="label">生效镜头</span>
+            <h4>{bindings.effectiveShotBindingCount}</h4>
+            <p>这是最终真正会带着参考约束进入渲染链的镜头数量。</p>
+          </div>
+        </div>
+
+        <div className="reference-binding-stack">
+          {bindings.bindings.length === 0 ? (
+            <div className="asset-tile">
+              <span className="label">空状态</span>
+              <h4>还没有定向绑定</h4>
+              <p>录入参考后，把它们绑定到分场或镜头，后续分镜与生成就会更精准。</p>
+            </div>
+          ) : (
+            bindings.bindings.map((binding) => (
+              <div key={`${binding.targetType}-${binding.targetId}`} className="asset-tile reference-binding-detail-card">
+                <div className="reference-binding-detail-head">
+                  <div>
+                    <span className="label">{binding.targetType === 'scene' ? '分场绑定' : '镜头绑定'}</span>
+                    <h4>{binding.targetLabel}</h4>
+                  </div>
+                  <span className="status-pill status-pill-subtle">{binding.referenceTitles.length} 条参考</span>
                 </div>
-                {usage && (usage.scenes.length > 0 || usage.shots.length > 0) ? (
-                  <>
-                    {usage.scenes.length > 0 ? <p>已绑分场：{usage.scenes.join(' / ')}</p> : null}
-                    {usage.shots.length > 0 ? <p>已绑镜头：{usage.shots.join(' / ')}</p> : null}
-                  </>
-                ) : (
-                  <p>当前还没有定向绑定，默认只参与全局参考画像。</p>
-                )}
-                {item.sourceUrl ? <p>参考 URL：{item.sourceUrl}</p> : null}
-                {item.localPath ? <p>本地路径：{item.localPath}</p> : null}
+                <p>{binding.promptLine || '当前绑定尚未形成提示词摘要。'}</p>
+                {binding.note ? <p><strong>绑定说明：</strong>{binding.note}</p> : null}
+                <div className="tag-list">
+                  {binding.referenceTitles.map((title) => (
+                    <span key={`${binding.targetId}-${title}`} className="tag-chip">{title}</span>
+                  ))}
+                </div>
+                <p>参考源：{binding.sourceSummary}</p>
               </div>
-            );
-          })
-        )}
-      </div>
+            ))
+          )}
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        eyebrow="Library"
+        title="参考卡库"
+        description="每张参考卡都是一个可复用的风格组件：既能服务全局画像，也能服务某个具体镜头。"
+      >
+        <div className="reference-card-grid">
+          {insights.length === 0 ? (
+            <div className="asset-tile">
+              <span className="label">空状态</span>
+              <h4>还没有参考分析</h4>
+              <p>先录入一个参考镜头，后续会把它直接迁移到改编实验室、分镜板和渲染工作台。</p>
+            </div>
+          ) : (
+            insights.map((item) => {
+              const usage = bindings.usageByReferenceId.get(item.id);
+
+              return (
+                <div key={item.id} className="asset-tile reference-card scene-tile">
+                  <div className="reference-card-head">
+                    <div>
+                      <span className="label">{getReferenceSourceTypeLabel(item.sourceType)}</span>
+                      <h4>{item.title}</h4>
+                    </div>
+                    <span className="status-pill status-pill-subtle">
+                      {usage && (usage.scenes.length > 0 || usage.shots.length > 0) ? '已参与定向绑定' : '仅参与全局画像'}
+                    </span>
+                  </div>
+
+                  <p>{item.notes}</p>
+
+                  <div className="tag-list">
+                    <span className="tag-chip">构图：{item.framing}</span>
+                    <span className="tag-chip">情绪：{item.emotion}</span>
+                    <span className="tag-chip">节奏：{item.movement}</span>
+                    {item.sourceUrl ? <span className="tag-chip">已记录 URL</span> : null}
+                    {item.localPath ? <span className="tag-chip">已记录本地路径</span> : null}
+                  </div>
+
+                  {usage && (usage.scenes.length > 0 || usage.shots.length > 0) ? (
+                    <div className="reference-usage-grid">
+                      {usage.scenes.length > 0 ? <p><strong>已绑分场：</strong>{usage.scenes.join(' / ')}</p> : null}
+                      {usage.shots.length > 0 ? <p><strong>已绑镜头：</strong>{usage.shots.join(' / ')}</p> : null}
+                    </div>
+                  ) : (
+                    <p>当前还没有定向绑定，默认只参与全局参考画像。</p>
+                  )}
+
+                  {item.sourceUrl ? <p><strong>参考 URL：</strong>{item.sourceUrl}</p> : null}
+                  {item.localPath ? <p><strong>本地路径：</strong>{item.localPath}</p> : null}
+                </div>
+              );
+            })
+          )}
+        </div>
+      </SectionCard>
     </div>
   );
 }

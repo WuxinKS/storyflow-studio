@@ -131,8 +131,16 @@ export function ReferenceBindingForm({
   };
 
   return (
-    <form className="form-card" onSubmit={onSubmit}>
-      <div className="form-grid">
+    <form className="form-card reference-form-card" onSubmit={onSubmit}>
+      <div className="reference-form-head">
+        <div>
+          <p className="eyebrow">Reference Routing</p>
+          <h3>分场 / 镜头定向绑定</h3>
+        </div>
+        <p>给关键场次或关键镜头指定参考约束，让后面的分镜和生成模型不要跑偏。</p>
+      </div>
+
+      <div className="form-grid reference-form-grid">
         <label>
           <span>绑定层级</span>
           <select value={targetType} onChange={(event) => setTargetType(event.target.value === 'scene' ? 'scene' : 'shot')}>
@@ -149,14 +157,24 @@ export function ReferenceBindingForm({
             ))}
           </select>
         </label>
-        <div className="full-width asset-tile scene-tile">
-          <span className="label">当前目标</span>
-          <h4>{currentBinding?.targetLabel || targetOptions.find((item) => item.value === targetId)?.label || '请选择一个目标'}</h4>
+
+        <div className="full-width asset-tile scene-tile reference-target-summary">
+          <div className="reference-binding-detail-head">
+            <div>
+              <span className="label">当前目标</span>
+              <h4>{currentBinding?.targetLabel || targetOptions.find((item) => item.value === targetId)?.label || '请选择一个目标'}</h4>
+            </div>
+            <span className="status-pill status-pill-subtle">
+              {currentBinding ? `已绑 ${currentBinding.referenceTitles.length} 条参考` : '尚未绑定'}
+            </span>
+          </div>
+
           <p>
             {currentBinding
-              ? '这个目标已经有定向参考，可直接在下方回填修改，也可以一键清空。'
-              : '这个目标目前还没有定向绑定，提交后会把所选参考直接注入到分镜和渲染链。'}
+              ? '系统已经回填这个目标的当前绑定，你可以直接增删参考，或清空后重新指定。'
+              : '这个目标目前还没有定向绑定，保存后它就会在后续分镜与生成时优先继承这里选中的参考。'}
           </p>
+
           {currentBinding?.referenceTitles.length ? (
             <div className="tag-list">
               {currentBinding.referenceTitles.map((title) => (
@@ -164,32 +182,35 @@ export function ReferenceBindingForm({
               ))}
             </div>
           ) : null}
+
           {currentBinding?.promptLine ? <p><strong>当前摘要：</strong>{currentBinding.promptLine}</p> : null}
         </div>
+
         <label className="full-width">
           <span>绑定说明（可选）</span>
-          <textarea value={note} onChange={(event) => setNote(event.target.value)} rows={3} placeholder="例如：这一镜优先参考雨夜追逐的压迫构图与人物湿冷质感。" />
+          <textarea value={note} onChange={(event) => setNote(event.target.value)} rows={4} placeholder="例如：这一镜优先参考雨夜追逐的压迫构图与人物湿冷质感。" />
         </label>
-        <div className="full-width page-stack">
+
+        <div className="full-width reference-check-section">
           <span>选择参考（可多选）</span>
-          <div className="tag-list">
+          <div className="reference-check-grid">
             {references.map((reference) => (
-              <label key={reference.id} className="tag-chip" style={{ cursor: 'pointer' }}>
+              <label key={reference.id} className={selectedReferenceIds.includes(reference.id) ? 'reference-check-chip is-active' : 'reference-check-chip'}>
                 <input
                   type="checkbox"
                   name="referenceIds"
                   value={reference.id}
                   checked={selectedReferenceIds.includes(reference.id)}
                   onChange={(event) => onToggleReference(reference.id, event.target.checked)}
-                  style={{ marginRight: 6 }}
                 />
-                {reference.title}
+                <span>{reference.title}</span>
               </label>
             ))}
           </div>
-          <p className="helper-text">提示：当前会优先回填已有绑定；不勾选任何参考并提交，或点“清空当前绑定”，都会移除这个目标的定向参考。</p>
+          <p className="helper-text">不勾选任何参考并保存，或点击“清空当前绑定”，都会移除这个目标的定向参考。</p>
         </div>
       </div>
+
       <div className="action-row wrap-row">
         <button type="submit" className="button-primary" disabled={submitting || targetOptions.length === 0 || !targetId}>
           {submitting ? '正在保存…' : '保存定向绑定'}

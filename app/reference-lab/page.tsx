@@ -11,12 +11,12 @@ export default async function ReferenceLabPage({
 
   return (
     <ModulePage
-      title="Reference Lab"
-      lead="从截图、样片和参考视频中提炼镜头语言、动作设计与风格约束。"
+      title="参考工作台"
+      lead="把截图、样片和参考视频拆成可复用的风格卡与定向约束，直接服务改编、分镜、图片生成和视频生成。"
       bullets={[
-        '录入参考镜头的景别、情绪、动作和补充说明',
-        '把参考素材转成可复用的风格卡与镜头语言标签',
-        '为后续改编实验室 / 分镜板提供迁移依据',
+        '录入参考镜头的构图、情绪、节奏和补充说明',
+        '形成项目级参考画像，并支持把参考定向绑定到分场 / 镜头',
+        '为后续改编实验室、分镜板和生成工作台提供稳定参考约束',
       ]}
       currentPath="/reference-lab"
       projectId={projectId}

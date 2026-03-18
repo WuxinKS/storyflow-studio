@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 type VisualLocks = {
@@ -22,6 +22,16 @@ type VisualBibleDraft = {
   locks: VisualLocks;
 };
 
+type EditableField = Exclude<keyof VisualBibleDraft, 'locks'>;
+type RegenerateFocus = 'all' | 'palette' | 'lighting' | 'lensLanguage' | 'motionLanguage';
+
+const REGENERATE_ACTIONS: Array<{ focus: RegenerateFocus; label: string; pendingLabel: string }> = [
+  { focus: 'palette', label: '只重生色彩策略', pendingLabel: '重生色彩中…' },
+  { focus: 'lighting', label: '只重生光线策略', pendingLabel: '重生光线中…' },
+  { focus: 'lensLanguage', label: '只重生镜头语言', pendingLabel: '重生镜头中…' },
+  { focus: 'motionLanguage', label: '只重生运动语言', pendingLabel: '重生运动中…' },
+];
+
 export function VisualBibleEditor({
   projectId,
   initialDraft,
@@ -38,7 +48,36 @@ export function VisualBibleEditor({
     setDraft(initialDraft);
   }, [initialDraft]);
 
-  const updateField = (field: keyof VisualBibleDraft, value: string) => {
+  const lockSummary = useMemo(() => ([
+    {
+      key: 'palette',
+      label: '色彩策略',
+      description: '控制整体色彩基调与关键颜色刺点。',
+      locked: draft.locks.palette,
+    },
+    {
+      key: 'lighting',
+      label: '光线策略',
+      description: '控制亮暗关系、异常光源与画面照度。',
+      locked: draft.locks.lighting,
+    },
+    {
+      key: 'lensLanguage',
+      label: '镜头语言',
+      description: '控制景别偏好、观察距离和镜头组织方式。',
+      locked: draft.locks.lensLanguage,
+    },
+    {
+      key: 'motionLanguage',
+      label: '运动语言',
+      description: '控制推拉摇移、跟拍强度和镜头节奏。',
+      locked: draft.locks.motionLanguage,
+    },
+  ]), [draft.locks.lensLanguage, draft.locks.lighting, draft.locks.motionLanguage, draft.locks.palette]);
+
+  const lockedCount = lockSummary.filter((item) => item.locked).length;
+
+  const updateField = (field: EditableField, value: string) => {
     setDraft((current) => ({ ...current, [field]: value }));
   };
 
@@ -72,7 +111,7 @@ export function VisualBibleEditor({
     }
   };
 
-  const onRegenerate = async (focus: 'all' | 'palette' | 'lighting' | 'lensLanguage' | 'motionLanguage') => {
+  const onRegenerate = async (focus: RegenerateFocus) => {
     setLoadingAction(`generate:${focus}`);
     setMessage('');
     try {
@@ -93,11 +132,39 @@ export function VisualBibleEditor({
   };
 
   return (
-    <div className="page-stack">
-      <div className="snapshot-card">
-        <p className="eyebrow">视觉修订</p>
-        <h3>视觉总控定稿与锁定入口</h3>
-        <p>这里可以修订风格名、色彩、光线、镜头语言、运动语言与材质关键词；锁定色彩、光线、镜头语言、运动语言后，整套或局部重生都不会覆盖这些字段。</p>
+    <div className="visual-editor-stack">
+      <div className="snapshot-card visual-editor-command">
+        <div className="visual-editor-head">
+          <div>
+            <p className="eyebrow">Visual Control</p>
+            <h3>视觉定稿与锁定</h3>
+          </div>
+          <span className="status-pill status-pill-subtle">{lockedCount} / 4 已锁定</span>
+        </div>
+
+        <p>
+          推荐顺序是先人工修订风格，再锁住光色 / 镜头 / 运动规则，最后根据需要做整套或局部重生。
+          这样后续图片和视频模型会更稳定地继承同一套视觉边界。
+        </p>
+
+        <div className="visual-lock-grid">
+          {lockSummary.map((item) => (
+            <div key={item.key} className="asset-tile visual-lock-card">
+              <div className="field-head">
+                <strong>{item.label}</strong>
+                <button
+                  type="button"
+                  className={item.locked ? 'lock-toggle is-locked' : 'lock-toggle'}
+                  onClick={() => toggleLock(item.key as keyof VisualLocks)}
+                >
+                  {item.locked ? '已锁定' : '锁定'}
+                </button>
+              </div>
+              <p>{item.description}</p>
+            </div>
+          ))}
+        </div>
+
         <div className="action-row wrap-row">
           <button type="button" className="button-primary" onClick={onSave} disabled={Boolean(loadingAction)}>
             {loadingAction === 'save' ? '保存视觉圣经中…' : '保存视觉修订'}
@@ -107,33 +174,40 @@ export function VisualBibleEditor({
           </button>
           {message ? <span className="success-text">{message}</span> : null}
         </div>
-        <div className="action-row wrap-row compact-row">
-          <button type="button" className="button-ghost" onClick={() => onRegenerate('palette')} disabled={Boolean(loadingAction)}>
-            {loadingAction === 'generate:palette' ? '重生色彩中…' : '只重生色彩策略'}
-          </button>
-          <button type="button" className="button-ghost" onClick={() => onRegenerate('lighting')} disabled={Boolean(loadingAction)}>
-            {loadingAction === 'generate:lighting' ? '重生光线中…' : '只重生光线策略'}
-          </button>
-          <button type="button" className="button-ghost" onClick={() => onRegenerate('lensLanguage')} disabled={Boolean(loadingAction)}>
-            {loadingAction === 'generate:lensLanguage' ? '重生镜头中…' : '只重生镜头语言'}
-          </button>
-          <button type="button" className="button-ghost" onClick={() => onRegenerate('motionLanguage')} disabled={Boolean(loadingAction)}>
-            {loadingAction === 'generate:motionLanguage' ? '重生运动中…' : '只重生运动语言'}
-          </button>
+
+        <div className="visual-regenerate-grid">
+          {REGENERATE_ACTIONS.map((item) => (
+            <button
+              key={item.focus}
+              type="button"
+              className="button-ghost"
+              onClick={() => onRegenerate(item.focus)}
+              disabled={Boolean(loadingAction)}
+            >
+              {loadingAction === `generate:${item.focus}` ? item.pendingLabel : item.label}
+            </button>
+          ))}
         </div>
       </div>
 
-      <div className="asset-grid two-up">
-        <div className="asset-tile scene-tile">
-          <div className="shot-list">
+      <div className="visual-editor-grid">
+        <div className="asset-tile scene-tile visual-editor-card">
+          <span className="label">风格与基调</span>
+          <div className="visual-field-stack">
             <label className="shot-item">
               <strong>风格名</strong>
               <input value={draft.styleName} onChange={(event) => updateField('styleName', event.target.value)} />
             </label>
             <label className="shot-item">
               <strong>整体气质</strong>
-              <textarea value={draft.visualTone} onChange={(event) => updateField('visualTone', event.target.value)} />
+              <textarea value={draft.visualTone} onChange={(event) => updateField('visualTone', event.target.value)} rows={5} />
             </label>
+          </div>
+        </div>
+
+        <div className="asset-tile scene-tile visual-editor-card">
+          <span className="label">光色系统</span>
+          <div className="visual-field-stack">
             <label className="shot-item">
               <div className="field-head">
                 <strong>色彩策略</strong>
@@ -141,7 +215,7 @@ export function VisualBibleEditor({
                   {draft.locks.palette ? '已锁定' : '锁定'}
                 </button>
               </div>
-              <textarea value={draft.palette} onChange={(event) => updateField('palette', event.target.value)} />
+              <textarea value={draft.palette} onChange={(event) => updateField('palette', event.target.value)} rows={5} />
             </label>
             <label className="shot-item">
               <div className="field-head">
@@ -150,38 +224,53 @@ export function VisualBibleEditor({
                   {draft.locks.lighting ? '已锁定' : '锁定'}
                 </button>
               </div>
-              <textarea value={draft.lighting} onChange={(event) => updateField('lighting', event.target.value)} />
+              <textarea value={draft.lighting} onChange={(event) => updateField('lighting', event.target.value)} rows={5} />
             </label>
           </div>
         </div>
 
-        <div className="asset-tile scene-tile">
-          <div className="shot-list">
+        <div className="asset-tile scene-tile visual-editor-card">
+          <span className="label">摄影规则</span>
+          <div className="visual-field-stack">
             <label className="shot-item">
               <div className="field-head">
                 <strong>镜头语言</strong>
-                <button type="button" className={draft.locks.lensLanguage ? 'lock-toggle is-locked' : 'lock-toggle'} onClick={() => toggleLock('lensLanguage')}>
+                <button
+                  type="button"
+                  className={draft.locks.lensLanguage ? 'lock-toggle is-locked' : 'lock-toggle'}
+                  onClick={() => toggleLock('lensLanguage')}
+                >
                   {draft.locks.lensLanguage ? '已锁定' : '锁定'}
                 </button>
               </div>
-              <textarea value={draft.lensLanguage} onChange={(event) => updateField('lensLanguage', event.target.value)} />
+              <textarea value={draft.lensLanguage} onChange={(event) => updateField('lensLanguage', event.target.value)} rows={5} />
             </label>
             <label className="shot-item">
               <div className="field-head">
                 <strong>运动语言</strong>
-                <button type="button" className={draft.locks.motionLanguage ? 'lock-toggle is-locked' : 'lock-toggle'} onClick={() => toggleLock('motionLanguage')}>
+                <button
+                  type="button"
+                  className={draft.locks.motionLanguage ? 'lock-toggle is-locked' : 'lock-toggle'}
+                  onClick={() => toggleLock('motionLanguage')}
+                >
                   {draft.locks.motionLanguage ? '已锁定' : '锁定'}
                 </button>
               </div>
-              <textarea value={draft.motionLanguage} onChange={(event) => updateField('motionLanguage', event.target.value)} />
+              <textarea value={draft.motionLanguage} onChange={(event) => updateField('motionLanguage', event.target.value)} rows={5} />
             </label>
+          </div>
+        </div>
+
+        <div className="asset-tile scene-tile visual-editor-card">
+          <span className="label">材质与空间</span>
+          <div className="visual-field-stack">
             <label className="shot-item">
               <strong>材质关键词</strong>
-              <textarea value={draft.textureKeywords} onChange={(event) => updateField('textureKeywords', event.target.value)} />
+              <textarea value={draft.textureKeywords} onChange={(event) => updateField('textureKeywords', event.target.value)} rows={4} />
             </label>
             <label className="shot-item">
               <strong>空间设计</strong>
-              <textarea value={draft.sceneDesign} onChange={(event) => updateField('sceneDesign', event.target.value)} />
+              <textarea value={draft.sceneDesign} onChange={(event) => updateField('sceneDesign', event.target.value)} rows={5} />
             </label>
           </div>
         </div>

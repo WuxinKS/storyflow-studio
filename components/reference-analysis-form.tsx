@@ -43,8 +43,16 @@ export function ReferenceAnalysisForm({ projectId }: { projectId: string }) {
   };
 
   return (
-    <form className="form-card" onSubmit={onSubmit}>
-      <div className="form-grid">
+    <form className="form-card reference-form-card" onSubmit={onSubmit}>
+      <div className="reference-form-head">
+        <div>
+          <p className="eyebrow">Reference Intake</p>
+          <h3>录入参考卡</h3>
+        </div>
+        <p>把一张图、一个视频片段或一条样片笔记，拆成构图、情绪、节奏和补充说明。</p>
+      </div>
+
+      <div className="form-grid reference-form-grid">
         <label>
           <span>参考标题</span>
           <input name="title" placeholder="例如：红衣人物恐惧特写" />
@@ -72,15 +80,16 @@ export function ReferenceAnalysisForm({ projectId }: { projectId: string }) {
           <span>参考 URL（可选）</span>
           <input name="sourceUrl" placeholder="https://example.com/reference.jpg" />
         </label>
-        <label>
+        <label className="full-width">
           <span>本地路径（可选）</span>
           <input name="localPath" placeholder="/Users/hema/Desktop/reference-frame.png" />
         </label>
         <label className="full-width">
           <span>补充说明</span>
-          <textarea name="notes" rows={4} placeholder="可记录色调、灯光、镜头语言、适合迁移到哪个场景。" />
+          <textarea name="notes" rows={5} placeholder="可记录色调、灯光、镜头语言、适合迁移到哪个场景。" />
         </label>
       </div>
+
       <div className="action-row wrap-row">
         <button type="submit" className="button-primary" disabled={submitting}>
           {submitting ? '正在保存…' : '保存参考分析'}

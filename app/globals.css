@@ -1261,6 +1261,8 @@ textarea {
   border: 1px solid rgba(161, 77, 44, 0.16);
 }
 
+.visual-command-grid,
+.reference-command-grid,
 .adapt-command-grid,
 .board-command-grid,
 .timeline-command-grid {
@@ -1269,6 +1271,20 @@ textarea {
   gap: 18px;
 }
 
+.visual-command-card,
+.visual-kpi-card,
+.visual-highlight-card,
+.visual-system-card,
+.visual-editor-command,
+.visual-editor-card,
+.visual-lock-card,
+.reference-command-card,
+.reference-kpi-card,
+.reference-profile-card,
+.reference-binding-card,
+.reference-binding-detail-card,
+.reference-card,
+.reference-empty-card,
 .adapt-command-card,
 .board-command-card,
 .timeline-command-card,
@@ -1291,6 +1307,11 @@ textarea {
   gap: 14px;
 }
 
+.visual-panel-head,
+.visual-editor-head,
+.reference-panel-head,
+.reference-card-head,
+.reference-binding-detail-head,
 .adapt-panel-head,
 .board-panel-head,
 .timeline-panel-head,
@@ -1306,6 +1327,26 @@ textarea {
   flex-wrap: wrap;
 }
 
+.visual-command-side,
+.reference-command-side,
+.visual-kpi-grid,
+.visual-health-grid,
+.visual-system-grid,
+.visual-editor-stack,
+.visual-editor-grid,
+.visual-lock-grid,
+.visual-regenerate-grid,
+.visual-field-stack,
+.reference-kpi-grid,
+.reference-ops-grid,
+.reference-profile-grid,
+.reference-binding-grid,
+.reference-binding-stack,
+.reference-card-grid,
+.reference-highlight-list,
+.reference-usage-grid,
+.reference-check-section,
+.reference-check-grid,
 .adapt-command-side,
 .board-command-side,
 .timeline-command-side,
@@ -1329,28 +1370,49 @@ textarea {
   gap: 18px;
 }
 
+.visual-command-side,
+.reference-command-side,
 .adapt-command-side,
 .board-command-side,
 .timeline-command-side {
   align-content: start;
 }
 
+.visual-kpi-grid,
+.visual-lock-grid,
+.reference-kpi-grid,
+.reference-binding-grid,
 .adapt-kpi-grid,
 .board-kpi-grid,
 .timeline-kpi-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.visual-health-grid,
+.reference-profile-grid,
 .adapt-readiness-grid,
 .board-health-grid,
 .timeline-health-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.visual-system-grid,
+.visual-editor-grid,
+.reference-ops-grid,
+.reference-card-grid,
 .adapt-scene-grid,
 .board-scene-stack,
 .timeline-scene-stack,
 .timeline-edit-scene-stack {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.adapt-scene-grid,
+.board-scene-stack,
+.timeline-scene-stack,
+.timeline-edit-scene-stack,
+.reference-binding-stack,
+.visual-editor-stack {
   grid-template-columns: 1fr;
 }
 
@@ -1361,6 +1423,20 @@ textarea {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.visual-command-card,
+.visual-kpi-card,
+.visual-highlight-card,
+.visual-system-card,
+.visual-editor-command,
+.visual-editor-card,
+.visual-lock-card,
+.reference-command-card,
+.reference-kpi-card,
+.reference-profile-card,
+.reference-binding-card,
+.reference-binding-detail-card,
+.reference-card,
+.reference-empty-card,
 .adapt-kpi-card,
 .board-kpi-card,
 .timeline-kpi-card,
@@ -1378,6 +1454,8 @@ textarea {
   padding: 18px;
 }
 
+.visual-kpi-card h4,
+.reference-kpi-card h4,
 .adapt-kpi-card h4,
 .board-kpi-card h4,
 .timeline-kpi-card h4 {
@@ -1385,6 +1463,16 @@ textarea {
   line-height: 1.1;
 }
 
+.visual-kpi-card p,
+.reference-kpi-card p,
+.visual-highlight-card p,
+.visual-system-card p,
+.visual-lock-card p,
+.reference-profile-card p,
+.reference-binding-card p,
+.reference-binding-detail-card p,
+.reference-card p,
+.reference-form-head p,
 .adapt-kpi-card p,
 .board-kpi-card p,
 .timeline-kpi-card p,
@@ -1401,6 +1489,87 @@ textarea {
 .timeline-curve-item small {
   line-height: 1.7;
   color: var(--muted);
+}
+
+.reference-card-head,
+.reference-binding-detail-head {
+  align-items: flex-start;
+}
+
+.visual-editor-command {
+  padding: 24px;
+}
+
+.visual-field-stack {
+  gap: 12px;
+}
+
+.visual-regenerate-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.reference-usage-grid {
+  gap: 10px;
+}
+
+.reference-highlight-list {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.reference-check-grid {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.reference-check-chip {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.46);
+  cursor: pointer;
+  transition: transform 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+
+.reference-check-chip:hover {
+  transform: translateY(-1px);
+}
+
+.reference-check-chip input {
+  width: auto;
+  margin-top: 4px;
+}
+
+.reference-check-chip span {
+  color: var(--text);
+  line-height: 1.6;
+  font-weight: 600;
+}
+
+.reference-check-chip.is-active {
+  border-color: rgba(18, 110, 104, 0.22);
+  background: rgba(239, 249, 247, 0.82);
+}
+
+.reference-check-section {
+  gap: 12px;
+}
+
+.reference-form-head {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 2px;
+}
+
+.reference-form-grid {
+  align-items: start;
+}
+
+.reference-target-summary {
+  background: rgba(239, 249, 247, 0.7);
+  border-color: rgba(18, 110, 104, 0.18);
 }
 
 .adapt-scene-side,
@@ -1475,10 +1644,13 @@ textarea {
 
   .asset-grid.three-up,
   .dashboard-split,
+  .visual-health-grid,
+  .reference-profile-grid,
   .story-layer-grid,
   .adapt-readiness-grid,
   .board-health-grid,
   .timeline-health-grid,
+  .reference-binding-grid,
   .render-ops-grid,
   .render-strategy-grid,
   .render-export-grid,
@@ -1518,6 +1690,8 @@ textarea {
   .hero-grid,
   .kickoff-grid,
   .story-control-grid,
+  .visual-command-grid,
+  .reference-command-grid,
   .adapt-command-grid,
   .board-command-grid,
   .timeline-command-grid,
@@ -1535,10 +1709,14 @@ textarea {
   }
 
   .scene-seed-grid,
+  .visual-system-grid,
+  .visual-editor-grid,
   .adapt-shot-grid,
   .board-shot-grid,
   .timeline-edit-shot-grid,
   .timeline-shot-grid,
+  .reference-ops-grid,
+  .reference-card-grid,
   .render-input-grid,
   .render-preset-grid,
   .render-media-grid,
@@ -1568,6 +1746,18 @@ textarea {
   .asset-grid.three-up,
   .asset-grid.two-up,
   .kickoff-mode-grid,
+  .visual-kpi-grid,
+  .visual-health-grid,
+  .visual-system-grid,
+  .visual-editor-grid,
+  .visual-lock-grid,
+  .visual-regenerate-grid,
+  .reference-kpi-grid,
+  .reference-ops-grid,
+  .reference-profile-grid,
+  .reference-binding-grid,
+  .reference-card-grid,
+  .reference-check-grid,
   .story-health-grid,
   .adapt-kpi-grid,
   .board-kpi-grid,
