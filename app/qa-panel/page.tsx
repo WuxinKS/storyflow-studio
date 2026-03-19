@@ -12,11 +12,11 @@ export default async function QaPanelPage({
   return (
     <ModulePage
       title="质量检查"
-      lead="对当前一句话成片主链做交付前质检，检查结构、同步状态、渲染任务与导出闭环是否真正可交付。"
+      lead="先判断当前能不能交付、最该先修哪里，再按需展开其余检查分组。"
       bullets={[
-        '检查是否稳定为 5 场 / 20 镜头 / 每场 4 镜头',
-        '检查上下游链路是否过期，并标出阻断交付项',
-        '检查角色命名、视觉圣经、渲染任务与导出链是否接通',
+        '先看阻断项和成熟度',
+        '再用快速修复入口处理主问题',
+        '最后按需展开其他检查分组',
       ]}
       currentPath="/qa-panel"
       projectId={projectId}
