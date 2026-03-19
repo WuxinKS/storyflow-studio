@@ -517,6 +517,7 @@ code {
 
 .workflow-command-grid,
 .workflow-context-grid,
+.workflow-context-inline,
 .workflow-kpi-grid,
 .workflow-stage-grid,
 .workflow-support-grid {
@@ -530,6 +531,10 @@ code {
 
 .workflow-context-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.workflow-context-inline {
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.9fr);
 }
 
 .workflow-command-card,
@@ -615,6 +620,10 @@ code {
 .workflow-context-card {
   display: grid;
   gap: 18px;
+}
+
+.project-switcher {
+  padding-top: 10px;
 }
 
 .module-hero-meta {
@@ -2098,6 +2107,7 @@ textarea {
   .section-header,
   .project-context-head,
   .workflow-command-grid,
+  .workflow-context-inline,
   .workflow-context-grid,
   .dashboard-split,
   .snapshot-grid,

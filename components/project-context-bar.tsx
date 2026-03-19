@@ -4,6 +4,11 @@ import { getStageToneLabel, getWorkflowGuide } from '@/features/workflow/service
 import { getNavigationItem, getRelatedPrimaryNavigation } from '@/lib/app-meta';
 import { buildProjectHref, normalizeProjectId } from '@/lib/project-links';
 
+function truncateText(value: string, limit: number) {
+  if (value.length <= limit) return value;
+  return `${value.slice(0, limit).trim()}…`;
+}
+
 export async function ProjectContextBar({
   currentPath,
   projectId,
@@ -26,6 +31,13 @@ export async function ProjectContextBar({
   const currentStage = workflow?.stages.find((stage) => stage.href === (currentItem.priority === 'support' ? relatedPrimary?.href : currentItem.href)) || null;
   const nextAction = workflow?.nextAction || null;
   const currentBadges = currentStage?.badges.slice(0, 3) || [];
+  const projectSummary = truncateText(
+    workflow?.project.premise
+      || effectiveProject.premise
+      || effectiveProject.description
+      || '先固定当前项目，再沿着同一条主流程推进。',
+    96,
+  );
 
   return (
     <section className="project-context-card workflow-context-card">
@@ -33,12 +45,7 @@ export async function ProjectContextBar({
         <div>
           <p className="eyebrow">当前项目</p>
           <h3>{effectiveProject.title}</h3>
-          <p className="project-context-copy">
-            {workflow?.project.premise
-              || effectiveProject.premise
-              || effectiveProject.description
-              || '先固定当前项目，再沿着同一条主流程推进。'}
-          </p>
+          <p className="project-context-copy">{projectSummary}</p>
         </div>
 
         <div className="project-context-status">
@@ -51,11 +58,11 @@ export async function ProjectContextBar({
         </div>
       </div>
 
-      <div className="workflow-context-grid">
-        <div className="asset-tile workflow-context-panel">
+      <div className="workflow-context-inline">
+        <div className="asset-tile workflow-context-panel workflow-context-stage">
           <span className="label">当前所处阶段</span>
           <h4>{currentStage?.title || relatedPrimary?.label || currentItem.label}</h4>
-          <p>{currentStage?.detail || currentItem.summary}</p>
+          <p>{truncateText(currentStage?.detail || currentItem.summary, 88)}</p>
           <div className="tag-list">
             {currentBadges.map((badge) => (
               <span key={`${currentStage?.key || currentItem.href}-${badge}`} className="tag-chip">{badge}</span>
@@ -66,10 +73,10 @@ export async function ProjectContextBar({
           </div>
         </div>
 
-        <div className="asset-tile workflow-context-panel">
+        <div className="asset-tile workflow-context-panel workflow-context-next">
           <span className="label">下一步建议</span>
           <h4>{nextAction?.title || '继续主流程'}</h4>
-          <p>{nextAction?.description || '按当前主流程继续往下一步推进。'}</p>
+          <p>{truncateText(nextAction?.description || '按当前主流程继续往下一步推进。', 88)}</p>
           <div className="action-row wrap-row compact-row">
             {nextAction ? (
               <Link href={buildProjectHref(nextAction.href, effectiveProject.id)} className="button-primary">
@@ -89,17 +96,22 @@ export async function ProjectContextBar({
         </div>
       </div>
 
-      <div className="project-chip-row">
-        {projects.slice(0, 8).map((project) => (
-          <Link
-            key={project.id}
-            href={buildProjectHref(currentPath, project.id)}
-            className={project.id === effectiveProject.id ? 'tag-chip tag-chip-active' : 'tag-chip'}
-          >
-            {project.title}
-          </Link>
-        ))}
-      </div>
+      <details className="workflow-disclosure project-switcher">
+        <summary>切换项目</summary>
+        <div className="workflow-disclosure-body">
+          <div className="project-chip-row">
+            {projects.slice(0, 8).map((project) => (
+              <Link
+                key={project.id}
+                href={buildProjectHref(currentPath, project.id)}
+                className={project.id === effectiveProject.id ? 'tag-chip tag-chip-active' : 'tag-chip'}
+              >
+                {project.title}
+              </Link>
+            ))}
+          </div>
+        </div>
+      </details>
     </section>
   );
 }
