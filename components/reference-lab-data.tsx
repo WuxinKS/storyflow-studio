@@ -18,6 +18,56 @@ function getBindingCoverageLabel(effectiveCount: number) {
   return '待建立覆盖';
 }
 
+function truncateText(value: string, limit: number) {
+  if (value.length <= limit) return value;
+  return `${value.slice(0, limit).trim()}…`;
+}
+
+function getReferenceMission(input: {
+  referenceCount: number;
+  hasTargets: boolean;
+  effectiveShotBindingCount: number;
+  projectId: string;
+}) {
+  if (input.referenceCount === 0) {
+    return {
+      status: '待录入首张参考卡',
+      title: '先录入第一张参考卡',
+      guidance: '先给项目建立第一条参考约束，后面的参考画像和定向绑定才会有基础。',
+      actionHref: '#reference-intake',
+      actionLabel: '去录入参考卡',
+    };
+  }
+
+  if (!input.hasTargets) {
+    return {
+      status: '待建立可绑定目标',
+      title: '先回自动分镜补 scene / shot',
+      guidance: '没有分场或镜头目标时，参考只能停留在全局画像层，先回自动分镜补结构更有效。',
+      actionHref: buildProjectHref('/adaptation-lab', input.projectId),
+      actionLabel: '回到自动分镜',
+    };
+  }
+
+  if (input.effectiveShotBindingCount === 0) {
+    return {
+      status: '建议做关键绑定',
+      title: '把关键参考绑定到镜头',
+      guidance: '先把最关键的构图、情绪或节奏参考绑给重点镜头，后面的图片和视频生成会更稳。',
+      actionHref: '#reference-binding',
+      actionLabel: '去做定向绑定',
+    };
+  }
+
+  return {
+    status: '参考约束已可下游使用',
+    title: '回到分镜板继续精修',
+    guidance: '全局画像和关键绑定已经建立，这一页先收口，让参考约束跟着分镜和生成继续往下走。',
+    actionHref: buildProjectHref('/storyboard', input.projectId),
+    actionLabel: '回到分镜板',
+  };
+}
+
 export async function ReferenceLabData({ projectId }: { projectId?: string }) {
   const project = await getReferenceProject(projectId).catch(() => null);
 
@@ -35,6 +85,16 @@ export async function ReferenceLabData({ projectId }: { projectId?: string }) {
   const profile = buildReferenceProfile(project.references);
   const bindings = buildReferenceBindingSnapshot(project);
   const bindingCoverageLabel = getBindingCoverageLabel(bindings.effectiveShotBindingCount);
+  const hasTargets = project.scenes.length > 0 || project.shots.length > 0;
+  const referenceMission = getReferenceMission({
+    referenceCount: profile.total,
+    hasTargets,
+    effectiveShotBindingCount: bindings.effectiveShotBindingCount,
+    projectId: project.id,
+  });
+  const showBindingAsPrimary = profile.total > 0 && hasTargets && bindings.effectiveShotBindingCount === 0;
+  const previewInsights = insights.slice(0, 3);
+  const overflowInsights = insights.slice(previewInsights.length);
 
   return (
     <div className="page-stack">
@@ -63,11 +123,24 @@ export async function ReferenceLabData({ projectId }: { projectId?: string }) {
             <span>生效镜头 {bindings.effectiveShotBindingCount}</span>
           </div>
 
-          <div className="action-row wrap-row">
-            <Link href={buildProjectHref('/visual-bible', project.id)} className="button-ghost">返回视觉圣经</Link>
-            <Link href={buildProjectHref('/storyboard', project.id)} className="button-secondary">查看分镜板</Link>
-            <Link href={buildProjectHref('/render-studio', project.id)} className="button-secondary">查看生成工作台</Link>
-            <Link href={buildProjectHref('/render-runs', project.id)} className="button-secondary">查看运行诊断</Link>
+          <div className="asset-tile reference-focus-card">
+            <span className="label">当前主任务</span>
+            <h4>{referenceMission.title}</h4>
+            <p>{referenceMission.guidance}</p>
+            <div className="action-row wrap-row">
+              <a href={referenceMission.actionHref} className="button-primary">{referenceMission.actionLabel}</a>
+            </div>
+            <details className="workflow-disclosure">
+              <summary>需要时打开其他相关入口</summary>
+              <div className="workflow-disclosure-body">
+                <div className="action-row wrap-row">
+                  <Link href={buildProjectHref('/visual-bible', project.id)} className="button-ghost">返回视觉圣经</Link>
+                  <Link href={buildProjectHref('/storyboard', project.id)} className="button-secondary">查看分镜板</Link>
+                  <Link href={buildProjectHref('/render-studio', project.id)} className="button-secondary">查看生成工作台</Link>
+                  <Link href={buildProjectHref('/render-runs', project.id)} className="button-secondary">查看运行诊断</Link>
+                </div>
+              </div>
+            </details>
           </div>
         </section>
 
@@ -103,37 +176,73 @@ export async function ReferenceLabData({ projectId }: { projectId?: string }) {
       <SectionCard
         eyebrow="Capture"
         title="参考采集与绑定"
-        description="先录入参考卡，再把它们指向分场或镜头。这个区域只做输入，不和结果展示混在一起。"
+        description="默认只做当前最需要的输入动作，另一个动作按需展开。"
       >
         <div className="reference-ops-grid">
-          <ReferenceAnalysisForm projectId={project.id} />
-          {insights.length > 0 && (project.scenes.length > 0 || project.shots.length > 0) ? (
-            <ReferenceBindingForm
-              projectId={project.id}
-              references={insights.map((item) => ({ id: item.id, title: item.title }))}
-              scenes={project.scenes.map((scene) => ({ id: scene.id, title: scene.title }))}
-              shots={project.shots.map((shot) => ({
-                id: shot.id,
-                title: shot.title,
-                sceneTitle: project.scenes.find((scene) => scene.id === shot.sceneId)?.title || '未分场',
-              }))}
-              currentBindings={bindings.bindings.map((binding) => ({
-                targetType: binding.targetType === 'scene' ? 'scene' : 'shot',
-                targetId: binding.targetId,
-                targetLabel: binding.targetLabel,
-                referenceIds: binding.referenceIds,
-                referenceTitles: binding.referenceTitles,
-                note: binding.note,
-                promptLine: binding.promptLine,
-              }))}
-            />
-          ) : (
-            <div className="asset-tile reference-empty-card">
-              <span className="label">绑定前置条件</span>
-              <h4>先准备参考或镜头</h4>
-              <p>只有当参考卡与分场 / 镜头已经存在时，系统才会开放定向绑定入口。</p>
+          <div id={showBindingAsPrimary ? 'reference-binding' : 'reference-intake'}>
+            {showBindingAsPrimary ? (
+              <ReferenceBindingForm
+                projectId={project.id}
+                references={insights.map((item) => ({ id: item.id, title: item.title }))}
+                scenes={project.scenes.map((scene) => ({ id: scene.id, title: scene.title }))}
+                shots={project.shots.map((shot) => ({
+                  id: shot.id,
+                  title: shot.title,
+                  sceneTitle: project.scenes.find((scene) => scene.id === shot.sceneId)?.title || '未分场',
+                }))}
+                currentBindings={bindings.bindings.map((binding) => ({
+                  targetType: binding.targetType === 'scene' ? 'scene' : 'shot',
+                  targetId: binding.targetId,
+                  targetLabel: binding.targetLabel,
+                  referenceIds: binding.referenceIds,
+                  referenceTitles: binding.referenceTitles,
+                  note: binding.note,
+                  promptLine: binding.promptLine,
+                }))}
+              />
+            ) : (
+              <ReferenceAnalysisForm projectId={project.id} />
+            )}
+          </div>
+
+          <details className="workflow-disclosure">
+            <summary>{showBindingAsPrimary ? '需要时继续录入参考卡' : '需要时打开定向绑定'}</summary>
+            <div className="workflow-disclosure-body">
+              {showBindingAsPrimary ? (
+                <div id="reference-intake">
+                  <ReferenceAnalysisForm projectId={project.id} />
+                </div>
+              ) : insights.length > 0 && hasTargets ? (
+                <div id="reference-binding">
+                  <ReferenceBindingForm
+                    projectId={project.id}
+                    references={insights.map((item) => ({ id: item.id, title: item.title }))}
+                    scenes={project.scenes.map((scene) => ({ id: scene.id, title: scene.title }))}
+                    shots={project.shots.map((shot) => ({
+                      id: shot.id,
+                      title: shot.title,
+                      sceneTitle: project.scenes.find((scene) => scene.id === shot.sceneId)?.title || '未分场',
+                    }))}
+                    currentBindings={bindings.bindings.map((binding) => ({
+                      targetType: binding.targetType === 'scene' ? 'scene' : 'shot',
+                      targetId: binding.targetId,
+                      targetLabel: binding.targetLabel,
+                      referenceIds: binding.referenceIds,
+                      referenceTitles: binding.referenceTitles,
+                      note: binding.note,
+                      promptLine: binding.promptLine,
+                    }))}
+                  />
+                </div>
+              ) : (
+                <div className="asset-tile reference-empty-card">
+                  <span className="label">绑定前置条件</span>
+                  <h4>先准备参考或镜头</h4>
+                  <p>只有当参考卡与分场 / 镜头已经存在时，系统才会开放定向绑定入口。</p>
+                </div>
+              )}
             </div>
-          )}
+          </details>
         </div>
       </SectionCard>
 
@@ -177,76 +286,81 @@ export async function ReferenceLabData({ projectId }: { projectId?: string }) {
         </div>
       </SectionCard>
 
-      <SectionCard
-        eyebrow="Coverage"
-        title="定向绑定覆盖"
-        description="全局画像之外，我们还需要把关键参考推给关键场次和关键镜头，确保后续生成不跑偏。"
-      >
-        <div className="reference-binding-grid">
-          <div className="asset-tile reference-binding-card">
-            <span className="label">分场绑定</span>
-            <h4>{bindings.sceneBindingCount}</h4>
-            <p>适合给同一场的整体气质、色彩和构图方向设总约束。</p>
-          </div>
-
-          <div className="asset-tile reference-binding-card">
-            <span className="label">镜头绑定</span>
-            <h4>{bindings.shotBindingCount}</h4>
-            <p>适合高潮镜头、关键情绪镜头或需要精准复用样片构图的场景。</p>
-          </div>
-
-          <div className="asset-tile reference-binding-card">
-            <span className="label">生效镜头</span>
-            <h4>{bindings.effectiveShotBindingCount}</h4>
-            <p>这是最终真正会带着参考约束进入渲染链的镜头数量。</p>
-          </div>
-        </div>
-
-        <div className="reference-binding-stack">
-          {bindings.bindings.length === 0 ? (
-            <div className="asset-tile">
-              <span className="label">空状态</span>
-              <h4>还没有定向绑定</h4>
-              <p>录入参考后，把它们绑定到分场或镜头，后续分镜与生成就会更精准。</p>
-            </div>
-          ) : (
-            bindings.bindings.map((binding) => (
-              <div key={`${binding.targetType}-${binding.targetId}`} className="asset-tile reference-binding-detail-card">
-                <div className="reference-binding-detail-head">
-                  <div>
-                    <span className="label">{binding.targetType === 'scene' ? '分场绑定' : '镜头绑定'}</span>
-                    <h4>{binding.targetLabel}</h4>
-                  </div>
-                  <span className="status-pill status-pill-subtle">{binding.referenceTitles.length} 条参考</span>
-                </div>
-                <p>{binding.promptLine || '当前绑定尚未形成提示词摘要。'}</p>
-                {binding.note ? <p><strong>绑定说明：</strong>{binding.note}</p> : null}
-                <div className="tag-list">
-                  {binding.referenceTitles.map((title) => (
-                    <span key={`${binding.targetId}-${title}`} className="tag-chip">{title}</span>
-                  ))}
-                </div>
-                <p>参考源：{binding.sourceSummary}</p>
+      <details className="workflow-disclosure">
+        <summary>按需查看定向绑定覆盖</summary>
+        <div className="workflow-disclosure-body">
+          <SectionCard
+            eyebrow="Coverage"
+            title="定向绑定覆盖"
+            description="全局画像之外，我们还需要把关键参考推给关键场次和关键镜头，确保后续生成不跑偏。"
+          >
+            <div className="reference-binding-grid">
+              <div className="asset-tile reference-binding-card">
+                <span className="label">分场绑定</span>
+                <h4>{bindings.sceneBindingCount}</h4>
+                <p>适合给同一场的整体气质、色彩和构图方向设总约束。</p>
               </div>
-            ))
-          )}
+
+              <div className="asset-tile reference-binding-card">
+                <span className="label">镜头绑定</span>
+                <h4>{bindings.shotBindingCount}</h4>
+                <p>适合高潮镜头、关键情绪镜头或需要精准复用样片构图的场景。</p>
+              </div>
+
+              <div className="asset-tile reference-binding-card">
+                <span className="label">生效镜头</span>
+                <h4>{bindings.effectiveShotBindingCount}</h4>
+                <p>这是最终真正会带着参考约束进入渲染链的镜头数量。</p>
+              </div>
+            </div>
+
+            <div className="reference-binding-stack">
+              {bindings.bindings.length === 0 ? (
+                <div className="asset-tile">
+                  <span className="label">空状态</span>
+                  <h4>还没有定向绑定</h4>
+                  <p>录入参考后，把它们绑定到分场或镜头，后续分镜与生成就会更精准。</p>
+                </div>
+              ) : (
+                bindings.bindings.map((binding) => (
+                  <div key={`${binding.targetType}-${binding.targetId}`} className="asset-tile reference-binding-detail-card">
+                    <div className="reference-binding-detail-head">
+                      <div>
+                        <span className="label">{binding.targetType === 'scene' ? '分场绑定' : '镜头绑定'}</span>
+                        <h4>{binding.targetLabel}</h4>
+                      </div>
+                      <span className="status-pill status-pill-subtle">{binding.referenceTitles.length} 条参考</span>
+                    </div>
+                    <p>{binding.promptLine || '当前绑定尚未形成提示词摘要。'}</p>
+                    {binding.note ? <p><strong>绑定说明：</strong>{binding.note}</p> : null}
+                    <div className="tag-list">
+                      {binding.referenceTitles.map((title) => (
+                        <span key={`${binding.targetId}-${title}`} className="tag-chip">{title}</span>
+                      ))}
+                    </div>
+                    <p>参考源：{binding.sourceSummary}</p>
+                  </div>
+                ))
+              )}
+            </div>
+          </SectionCard>
         </div>
-      </SectionCard>
+      </details>
 
       <SectionCard
         eyebrow="Library"
-        title="参考卡库"
-        description="每张参考卡都是一个可复用的风格组件：既能服务全局画像，也能服务某个具体镜头。"
+        title="默认先看关键参考卡"
+        description="先看最常用的几张参考卡，完整卡库按需展开。"
       >
         <div className="reference-card-grid">
-          {insights.length === 0 ? (
+          {previewInsights.length === 0 ? (
             <div className="asset-tile">
               <span className="label">空状态</span>
               <h4>还没有参考分析</h4>
               <p>先录入一个参考镜头，后续会把它直接迁移到改编实验室、分镜板和渲染工作台。</p>
             </div>
           ) : (
-            insights.map((item) => {
+            previewInsights.map((item) => {
               const usage = bindings.usageByReferenceId.get(item.id);
 
               return (
@@ -261,7 +375,7 @@ export async function ReferenceLabData({ projectId }: { projectId?: string }) {
                     </span>
                   </div>
 
-                  <p>{item.notes}</p>
+                  <p>{truncateText(item.notes, 110)}</p>
 
                   <div className="tag-list">
                     <span className="tag-chip">构图：{item.framing}</span>
@@ -280,13 +394,62 @@ export async function ReferenceLabData({ projectId }: { projectId?: string }) {
                     <p>当前还没有定向绑定，默认只参与全局参考画像。</p>
                   )}
 
-                  {item.sourceUrl ? <p><strong>参考 URL：</strong>{item.sourceUrl}</p> : null}
-                  {item.localPath ? <p><strong>本地路径：</strong>{item.localPath}</p> : null}
+                  {item.sourceUrl ? <p><strong>参考 URL：</strong>{truncateText(item.sourceUrl, 72)}</p> : null}
+                  {item.localPath ? <p><strong>本地路径：</strong>{truncateText(item.localPath, 72)}</p> : null}
                 </div>
               );
             })
           )}
         </div>
+
+        {overflowInsights.length > 0 ? (
+          <details className="workflow-disclosure">
+            <summary>展开剩余 {overflowInsights.length} 张参考卡</summary>
+            <div className="workflow-disclosure-body">
+              <div className="reference-card-grid">
+                {overflowInsights.map((item) => {
+                  const usage = bindings.usageByReferenceId.get(item.id);
+
+                  return (
+                    <div key={`${item.id}-overflow`} className="asset-tile reference-card scene-tile">
+                      <div className="reference-card-head">
+                        <div>
+                          <span className="label">{getReferenceSourceTypeLabel(item.sourceType)}</span>
+                          <h4>{item.title}</h4>
+                        </div>
+                        <span className="status-pill status-pill-subtle">
+                          {usage && (usage.scenes.length > 0 || usage.shots.length > 0) ? '已参与定向绑定' : '仅参与全局画像'}
+                        </span>
+                      </div>
+
+                      <p>{item.notes}</p>
+
+                      <div className="tag-list">
+                        <span className="tag-chip">构图：{item.framing}</span>
+                        <span className="tag-chip">情绪：{item.emotion}</span>
+                        <span className="tag-chip">节奏：{item.movement}</span>
+                        {item.sourceUrl ? <span className="tag-chip">已记录 URL</span> : null}
+                        {item.localPath ? <span className="tag-chip">已记录本地路径</span> : null}
+                      </div>
+
+                      {usage && (usage.scenes.length > 0 || usage.shots.length > 0) ? (
+                        <div className="reference-usage-grid">
+                          {usage.scenes.length > 0 ? <p><strong>已绑分场：</strong>{usage.scenes.join(' / ')}</p> : null}
+                          {usage.shots.length > 0 ? <p><strong>已绑镜头：</strong>{usage.shots.join(' / ')}</p> : null}
+                        </div>
+                      ) : (
+                        <p>当前还没有定向绑定，默认只参与全局参考画像。</p>
+                      )}
+
+                      {item.sourceUrl ? <p><strong>参考 URL：</strong>{item.sourceUrl}</p> : null}
+                      {item.localPath ? <p><strong>本地路径：</strong>{item.localPath}</p> : null}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </details>
+        ) : null}
       </SectionCard>
     </div>
   );

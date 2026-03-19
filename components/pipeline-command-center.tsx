@@ -58,12 +58,17 @@ export async function PipelineCommandCenter({ projectId }: { projectId?: string 
             </div>
           </div>
 
-          <div className="workflow-run-panel">
-            <span className="label">自动推进</span>
-            <h4>方向清楚时，可以直接一键推进</h4>
-            <p>如果你已经确认要走完整链路，可以直接跑自动流程；如果还在调整素材，就按上面的“当前建议”一步步推进。</p>
-            <PipelineRunButton projectId={guide.project.id} />
-          </div>
+          <details className="workflow-disclosure">
+            <summary>方向很清楚时，再打开自动推进</summary>
+            <div className="workflow-disclosure-body">
+              <div className="workflow-run-panel">
+                <span className="label">自动推进</span>
+                <h4>方向清楚时，可以直接一键推进</h4>
+                <p>如果你已经确认要走完整链路，可以直接跑自动流程；如果还在调整素材，就按上面的“当前建议”一步步推进。</p>
+                <PipelineRunButton projectId={guide.project.id} />
+              </div>
+            </div>
+          </details>
         </section>
 
         <aside className="workflow-command-side">
@@ -102,69 +107,79 @@ export async function PipelineCommandCenter({ projectId }: { projectId?: string 
         </aside>
       </div>
 
-      <SectionCard
-        eyebrow="Main Flow"
-        title="先按这 7 步推进"
-        description="每次只盯住一个主阶段。真正会让人迷路的辅助页，都被放到后面按需打开。"
-      >
-        <div className="workflow-stage-grid">
-          {guide.stages.map((stage) => (
-            <article key={stage.key} className={`asset-tile workflow-stage-card workflow-stage-${stage.status}`}>
-              <div className="workflow-stage-head">
-                <div>
-                  <span className="label">{getStageToneLabel(stage.status)}</span>
-                  <h4>{stage.title}</h4>
-                </div>
-                <span className="status-pill status-pill-subtle">{stage.badges[0] || '主流程'}</span>
-              </div>
+      <details className="workflow-disclosure">
+        <summary>展开完整 7 步主流程地图</summary>
+        <div className="workflow-disclosure-body">
+          <SectionCard
+            eyebrow="Main Flow"
+            title="先按这 7 步推进"
+            description="每次只盯住一个主阶段。真正会让人迷路的辅助页，都被放到后面按需打开。"
+          >
+            <div className="workflow-stage-grid">
+              {guide.stages.map((stage) => (
+                <article key={stage.key} className={`asset-tile workflow-stage-card workflow-stage-${stage.status}`}>
+                  <div className="workflow-stage-head">
+                    <div>
+                      <span className="label">{getStageToneLabel(stage.status)}</span>
+                      <h4>{stage.title}</h4>
+                    </div>
+                    <span className="status-pill status-pill-subtle">{stage.badges[0] || '主流程'}</span>
+                  </div>
 
-              <p>{stage.summary}</p>
-              <p className="muted-copy">{stage.detail}</p>
+                  <p>{stage.summary}</p>
+                  <p className="muted-copy">{stage.detail}</p>
 
-              {stage.badges.length > 0 ? (
-                <div className="tag-list">
-                  {stage.badges.map((badge) => (
-                    <span key={`${stage.key}-${badge}`} className="tag-chip">{badge}</span>
-                  ))}
-                </div>
-              ) : null}
+                  {stage.badges.length > 0 ? (
+                    <div className="tag-list">
+                      {stage.badges.map((badge) => (
+                        <span key={`${stage.key}-${badge}`} className="tag-chip">{badge}</span>
+                      ))}
+                    </div>
+                  ) : null}
 
-              <div className="action-row wrap-row compact-row">
-                <Link href={buildProjectHref(stage.href, guide.project.id)} className="button-secondary">进入这一阶段</Link>
-                {stage.supportLinks.map((item) => (
-                  <Link key={`${stage.key}-${item.href}`} href={buildProjectHref(item.href, guide.project.id)} className="button-ghost">
-                    {item.label}
-                  </Link>
-                ))}
-              </div>
-            </article>
-          ))}
-        </div>
-      </SectionCard>
-
-      <SectionCard
-        eyebrow="Support"
-        title="这些工具只在需要时打开"
-        description="当你已经知道自己在主流程的哪一步，再打开这些工具会顺很多。"
-      >
-        <div className="workflow-support-grid">
-          {guide.supportTools.map((tool) => (
-            <div key={tool.href} className="asset-tile workflow-support-card">
-              <div className="workflow-stage-head">
-                <div>
-                  <span className="label">辅助工具</span>
-                  <h4>{tool.label}</h4>
-                </div>
-                <span className="status-pill status-pill-subtle">{tool.badge}</span>
-              </div>
-              <p>{tool.summary}</p>
-              <div className="action-row wrap-row compact-row">
-                <Link href={buildProjectHref(tool.href, guide.project.id)} className="button-ghost">按需打开</Link>
-              </div>
+                  <div className="action-row wrap-row compact-row">
+                    <Link href={buildProjectHref(stage.href, guide.project.id)} className="button-secondary">进入这一阶段</Link>
+                    {stage.supportLinks.map((item) => (
+                      <Link key={`${stage.key}-${item.href}`} href={buildProjectHref(item.href, guide.project.id)} className="button-ghost">
+                        {item.label}
+                      </Link>
+                    ))}
+                  </div>
+                </article>
+              ))}
             </div>
-          ))}
+          </SectionCard>
         </div>
-      </SectionCard>
+      </details>
+
+      <details className="workflow-disclosure">
+        <summary>按需查看辅助工具入口</summary>
+        <div className="workflow-disclosure-body">
+          <SectionCard
+            eyebrow="Support"
+            title="这些工具只在需要时打开"
+            description="当你已经知道自己在主流程的哪一步，再打开这些工具会顺很多。"
+          >
+            <div className="workflow-support-grid">
+              {guide.supportTools.map((tool) => (
+                <div key={tool.href} className="asset-tile workflow-support-card">
+                  <div className="workflow-stage-head">
+                    <div>
+                      <span className="label">辅助工具</span>
+                      <h4>{tool.label}</h4>
+                    </div>
+                    <span className="status-pill status-pill-subtle">{tool.badge}</span>
+                  </div>
+                  <p>{tool.summary}</p>
+                  <div className="action-row wrap-row compact-row">
+                    <Link href={buildProjectHref(tool.href, guide.project.id)} className="button-ghost">按需打开</Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </SectionCard>
+        </div>
+      </details>
     </div>
   );
 }

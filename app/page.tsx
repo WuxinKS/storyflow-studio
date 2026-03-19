@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import { PipelineCommandCenter } from '@/components/pipeline-command-center';
-import { ProjectContextBar } from '@/components/project-context-bar';
 import { ProjectList } from '@/components/project-list';
 import { normalizeProjectId } from '@/lib/project-links';
 
@@ -18,12 +17,12 @@ export default async function HomePage({
           <p className="eyebrow">Studio Overview</p>
           <h1>先知道下一步，再打开对应页面。</h1>
           <p>
-            这一版首页只保留主流程：一句话创意 → 小说与故事 → 自动分镜 → 图片 / 视频生成 → 成片预演 → 交付。
-            辅助工具都退到次级位置，避免一上来就被功能堆叠淹没。
+            首页现在只做两件事：先告诉你当前项目的下一步，再让你切项目。
+            主流程以外的工具不在这里抢注意力。
           </p>
           <div className="action-row wrap-row">
             <Link href="/idea-lab" className="button-primary">开始新项目</Link>
-            <Link href={projectId ? `/?projectId=${projectId}` : '/'} className="button-secondary">查看当前下一步</Link>
+            <Link href={projectId ? `/?projectId=${projectId}` : '/'} className="button-secondary">刷新当前下一步</Link>
             <Link href={projectId ? `/final-cut?projectId=${projectId}` : '/final-cut'} className="button-ghost">直接看成片预演</Link>
           </div>
         </div>
@@ -47,8 +46,8 @@ export default async function HomePage({
             <div className="dashboard-lane">
               <span>02</span>
               <div>
-                <strong>再推进主流程</strong>
-                <p>每次只盯住当前这一阶段，不并行打开一堆工具页。</p>
+                <strong>只推进当前阶段</strong>
+                <p>每次只盯住当前这一页的主任务，不并行打开一堆工具页。</p>
               </div>
             </div>
             <div className="dashboard-lane">
@@ -62,7 +61,6 @@ export default async function HomePage({
         </div>
       </section>
 
-      <ProjectContextBar currentPath="/" projectId={projectId} />
       <PipelineCommandCenter projectId={projectId} />
       <ProjectList />
     </div>

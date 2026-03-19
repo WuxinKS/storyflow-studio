@@ -3,8 +3,15 @@ import { listProjects } from '@/features/project/service';
 import { getProjectStageLabel } from '@/lib/display';
 import { buildProjectHref } from '@/lib/project-links';
 
+function truncateText(value: string, limit: number) {
+  if (value.length <= limit) return value;
+  return `${value.slice(0, limit).trim()}…`;
+}
+
 export async function ProjectList() {
   const projects = await listProjects().catch(() => []);
+  const visibleProjects = projects.slice(0, 4);
+  const overflowProjects = projects.slice(visibleProjects.length);
 
   return (
     <div className="section-card">
@@ -24,11 +31,11 @@ export async function ProjectList() {
             <p>先执行 Prisma 初始化，再在创意工坊里创建第一个项目。</p>
           </div>
         ) : (
-          projects.map((project) => (
+          visibleProjects.map((project) => (
             <div key={project.id} className="asset-tile">
               <span className="label">{getProjectStageLabel(project.stage)}</span>
               <h4>{project.title}</h4>
-              <p>{project.premise || project.description || '暂无摘要'}</p>
+              <p>{truncateText(project.premise || project.description || '暂无摘要', 96)}</p>
               <div className="action-row wrap-row">
                 <Link href={buildProjectHref('/', project.id)} className="button-secondary">继续主流程</Link>
                 <Link href={buildProjectHref('/final-cut', project.id)} className="button-ghost">看成片预演</Link>
@@ -37,6 +44,27 @@ export async function ProjectList() {
           ))
         )}
       </div>
+
+      {overflowProjects.length > 0 ? (
+        <details className="workflow-disclosure">
+          <summary>展开其余 {overflowProjects.length} 个项目</summary>
+          <div className="workflow-disclosure-body">
+            <div className="asset-grid">
+              {overflowProjects.map((project) => (
+                <div key={`${project.id}-overflow`} className="asset-tile">
+                  <span className="label">{getProjectStageLabel(project.stage)}</span>
+                  <h4>{project.title}</h4>
+                  <p>{truncateText(project.premise || project.description || '暂无摘要', 96)}</p>
+                  <div className="action-row wrap-row">
+                    <Link href={buildProjectHref('/', project.id)} className="button-secondary">继续主流程</Link>
+                    <Link href={buildProjectHref('/final-cut', project.id)} className="button-ghost">看成片预演</Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </details>
+      ) : null}
     </div>
   );
 }
