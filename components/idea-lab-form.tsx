@@ -19,6 +19,30 @@ const OUTPUT_HINTS: Record<ProjectDraft['output'], string> = {
   video: '更适合直接沿着一句话到分镜、图片、视频的主链推进。',
 };
 
+function getLaunchPlan(output: ProjectDraft['output']) {
+  if (output === 'video') {
+    return {
+      title: '直接启动“一句话到样片”主链',
+      guidance: '如果这次目标就是先快速看到小说、自动分镜、图片、视频和成片预演，直接跑完整主链最省来回切页。',
+      helper: '视频目标最适合走完整主链；如果还在试方向，就先建项目，后面按步骤推进。',
+    };
+  }
+
+  if (output === 'screenplay') {
+    return {
+      title: '先建项目，再稳定剧情和场次',
+      guidance: '剧本目标通常需要先把故事与结构确认清楚，再进入自动分镜和生成，会更稳。',
+      helper: '如果方向已经非常明确，也可以直接全链路跑一版，先看系统给出的初稿。',
+    };
+  }
+
+  return {
+    title: '先把小说方向站稳',
+    guidance: '小说目标更适合先沉淀故事正文和章节结构，再决定是否往自动分镜和样片方向继续推进。',
+    helper: '如果你的最终目标仍然是视频样片，也可以直接让系统先跑完整主链，回来再精修故事。',
+  };
+}
+
 export function IdeaLabForm() {
   const router = useRouter();
   const { draft, persist, ready } = useProjectDraft();
@@ -29,6 +53,9 @@ export function IdeaLabForm() {
   const current = ready ? draft : defaultProjectDraft;
   const outputLabel = OUTPUT_LABELS[current.output];
   const outputHint = OUTPUT_HINTS[current.output];
+  const launchPlan = getLaunchPlan(current.output);
+  const readyFieldCount = [current.title, current.hook, current.genre, current.style].filter((value) => value.trim()).length;
+  const canRunPrimaryFlow = Boolean(current.title.trim() && current.hook.trim());
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -104,6 +131,32 @@ export function IdeaLabForm() {
           <span className="status-pill status-pill-subtle">当前输出：{outputLabel}</span>
         </div>
 
+        <div className="asset-tile kickoff-focus-card">
+          <span className="label">当前主任务</span>
+          <h4>{canRunPrimaryFlow ? launchPlan.title : '先补齐标题和一句话创意'}</h4>
+          <p>
+            {canRunPrimaryFlow
+              ? launchPlan.guidance
+              : '至少先把项目标题和一句话创意写出来，再决定是直接跑完整主链，还是先创建项目逐步推进。'}
+          </p>
+
+          <div className="kickoff-action-bar">
+            <button type="submit" name="submit-mode" value="pipeline-full" className="button-primary" disabled={Boolean(submittingMode)}>
+              {submittingMode === 'pipeline-full' ? '正在直接生成样片链…' : '创建并直接生成完整样片链'}
+            </button>
+            <button type="submit" name="submit-mode" value="create" className="button-secondary" disabled={Boolean(submittingMode)}>
+              {submittingMode === 'create' ? '正在创建项目…' : '先创建项目，再逐步推进'}
+            </button>
+            <Link href="/story-setup" className="button-ghost">查看最新故事设定</Link>
+            {saved ? <span className="success-text">已保存到本地草稿</span> : null}
+          </div>
+
+          <p className="helper-text">
+            {canRunPrimaryFlow ? launchPlan.helper : '如果现在还在试方向，先创建项目即可；后面每一页都会只要求你做当前这一步。'}
+          </p>
+          {message ? <p className="feedback-text">{message}</p> : null}
+        </div>
+
         <div className="form-grid">
           <label>
             <span>项目标题</span>
@@ -131,19 +184,22 @@ export function IdeaLabForm() {
           </label>
         </div>
 
-        <div className="kickoff-action-bar">
-          <button type="submit" name="submit-mode" value="pipeline-full" className="button-primary" disabled={Boolean(submittingMode)}>
-            {submittingMode === 'pipeline-full' ? '正在直接生成样片链…' : '创建并直接生成完整样片链'}
-          </button>
-          <button type="submit" name="submit-mode" value="create" className="button-secondary" disabled={Boolean(submittingMode)}>
-            {submittingMode === 'create' ? '正在创建项目…' : '先创建项目，再逐步推进'}
-          </button>
-          <Link href="/story-setup" className="button-ghost">查看最新故事设定</Link>
-          {saved ? <span className="success-text">已保存到本地草稿</span> : null}
-        </div>
-
-        <p className="feedback-text">如果目标就是“一句话走到小说、分镜、图片、视频”，直接运行完整样片链即可。</p>
-        {message ? <p className="feedback-text">{message}</p> : null}
+        <details className="workflow-disclosure">
+          <summary>查看启动说明与高级提示</summary>
+          <div className="workflow-disclosure-body">
+            <div className="kickoff-mode-grid">
+              <div className="kickoff-mode-card">
+                <strong>直接出样片</strong>
+                <p>适合方向明确，想直接看到小说、自动分镜、生成产物和成片预演。</p>
+              </div>
+              <div className="kickoff-mode-card">
+                <strong>逐步推进</strong>
+                <p>适合还在探索题材、节奏或风格，希望每一步都人工确认后再继续。</p>
+              </div>
+            </div>
+            <p className="helper-text">如果目标就是“一句话走到小说、分镜、图片、视频”，直接运行完整样片链即可。</p>
+          </div>
+        </details>
       </section>
 
       <aside className="kickoff-side-panel">
@@ -151,6 +207,15 @@ export function IdeaLabForm() {
           <span className="label">目标输出</span>
           <h4>{outputLabel}</h4>
           <p>{outputHint}</p>
+        </div>
+
+        <div className="kickoff-side-card">
+          <span className="label">准备度</span>
+          <h4>{readyFieldCount} / 4</h4>
+          <div className="progress-strip">
+            <span className="progress-fill progress-fill-accent-2" style={{ width: `${Math.round((readyFieldCount / 4) * 100)}%` }} />
+          </div>
+          <p>优先补齐标题、创意、题材、风格；其中标题和一句话创意最影响整条主链的稳定性。</p>
         </div>
 
         <div className="kickoff-side-card">
@@ -167,20 +232,6 @@ export function IdeaLabForm() {
             <div className="module-check-item">
               <span>03</span>
               <p>如果还在试方向，就先落项目，再慢慢迭代。</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="kickoff-side-card">
-          <span className="label">启动方式</span>
-          <div className="kickoff-mode-grid">
-            <div className="kickoff-mode-card">
-              <strong>直接出样片</strong>
-              <p>适合方向明确，想直接看到小说、分镜、生成和成片预演。</p>
-            </div>
-            <div className="kickoff-mode-card">
-              <strong>逐步推进</strong>
-              <p>适合还在探索题材、节奏或风格，想先把主流程一步步走清楚。</p>
             </div>
           </div>
         </div>

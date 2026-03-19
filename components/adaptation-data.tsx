@@ -25,6 +25,11 @@ function toPercent(part: number, total: number) {
   return Math.round((part / total) * 100);
 }
 
+function truncateText(value: string, limit: number) {
+  if (value.length <= limit) return value;
+  return `${value.slice(0, limit).trim()}…`;
+}
+
 function resolveAdaptationSource(chapters: Array<{ title: string }>) {
   const latestAiChapter = chapters.find((chapter) => isGeneratedNovelChapterTitle(chapter.title));
   if (latestAiChapter) {
@@ -122,6 +127,8 @@ export async function AdaptationData({ projectId }: { projectId?: string }) {
   const averageShotsPerScene = project.scenes.length > 0 ? Math.round((shotCount / project.scenes.length) * 10) / 10 : 0;
   const hasAdaptationSource = adaptationSource.label !== '暂无可用源';
   const hasAdaptationOutput = project.scenes.length > 0 && shotCount > 0;
+  const scenePreview = groupedShots.slice(0, 3);
+  const overflowSceneGroups = groupedShots.slice(scenePreview.length);
   const adaptationMission = getAdaptationMission({
     hasSource: hasAdaptationSource,
     hasOutput: hasAdaptationOutput,
@@ -262,23 +269,23 @@ export async function AdaptationData({ projectId }: { projectId?: string }) {
       <SectionCard
         eyebrow="Scene Breakdown"
         title="场次总览"
-        description="默认先看每场是否成立，只有需要时再展开镜头细节。"
+        description="默认先看前三场是否成立，只有需要时再展开每场镜头细节和剩余场次。"
       >
         <div className="adapt-scene-grid">
-          {groupedShots.length === 0 ? (
+          {scenePreview.length === 0 ? (
             <div className="asset-tile">
               <span className="label">空状态</span>
               <h4>还没有分场 / 镜头</h4>
               <p>点击上方按钮，基于当前优先源自动生成第一版结构化改编结果。</p>
             </div>
           ) : (
-            groupedShots.map(({ scene, shots }) => (
+            scenePreview.map(({ scene, shots }) => (
               <section key={scene.id} className="snapshot-card adapt-scene-card">
                 <div className="adapt-scene-head">
                   <div className="adapt-scene-copy">
                     <p className="eyebrow">Scene {String(scene.orderIndex).padStart(2, '0')}</p>
                     <h3>{scene.title}</h3>
-                    <p>{scene.summary || '暂无摘要'}</p>
+                    <p>{scene.summary ? truncateText(scene.summary, 110) : '暂无摘要'}</p>
                   </div>
 
                   <div className="adapt-scene-side">
@@ -296,14 +303,14 @@ export async function AdaptationData({ projectId }: { projectId?: string }) {
                     <div className="workflow-disclosure-body">
                       <div className="adapt-shot-grid">
                         {shots.map((shot, index) => (
-                          <div key={shot.id} className="asset-tile adapt-shot-card">
-                            <span className="label">镜头 {String(index + 1).padStart(2, '0')}</span>
-                            <h4>{shot.title}</h4>
-                            <p>{shot.cameraNotes || '暂无镜头备注'}</p>
-                            <p><strong>提示词：</strong>{shot.prompt || '暂无镜头提示词'}</p>
+                              <div key={shot.id} className="asset-tile adapt-shot-card">
+                                <span className="label">镜头 {String(index + 1).padStart(2, '0')}</span>
+                                <h4>{shot.title}</h4>
+                                <p>{truncateText(shot.cameraNotes || shot.prompt || '暂无镜头备注', 80)}</p>
+                                <p><strong>提示词：</strong>{truncateText(shot.prompt || '暂无镜头提示词', 90)}</p>
+                              </div>
+                            ))}
                           </div>
-                        ))}
-                      </div>
                     </div>
                   </details>
                 ) : null}
@@ -311,6 +318,52 @@ export async function AdaptationData({ projectId }: { projectId?: string }) {
             ))
           )}
         </div>
+        {overflowSceneGroups.length > 0 ? (
+          <details className="workflow-disclosure">
+            <summary>展开剩余 {overflowSceneGroups.length} 场</summary>
+            <div className="workflow-disclosure-body">
+              <div className="adapt-scene-grid">
+                {overflowSceneGroups.map(({ scene, shots }) => (
+                  <section key={`${scene.id}-rest`} className="snapshot-card adapt-scene-card">
+                    <div className="adapt-scene-head">
+                      <div className="adapt-scene-copy">
+                        <p className="eyebrow">Scene {String(scene.orderIndex).padStart(2, '0')}</p>
+                        <h3>{scene.title}</h3>
+                        <p>{scene.summary ? truncateText(scene.summary, 110) : '暂无摘要'}</p>
+                      </div>
+
+                      <div className="adapt-scene-side">
+                        <span className="status-pill status-pill-subtle">{hasDirectorLanguage(scene.summary) ? '导演语言增强' : '基础拆解版'}</span>
+                        <div className="meta-list">
+                          <span>镜头数 {shots.length}</span>
+                          <span>状态 {hasDirectorLanguage(scene.summary) ? '可直接分镜' : '建议继续增强'}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {shots.length > 0 ? (
+                      <details className="workflow-disclosure">
+                        <summary>查看本场 {shots.length} 个镜头</summary>
+                        <div className="workflow-disclosure-body">
+                          <div className="adapt-shot-grid">
+                            {shots.map((shot, index) => (
+                              <div key={`${shot.id}-rest`} className="asset-tile adapt-shot-card">
+                                <span className="label">镜头 {String(index + 1).padStart(2, '0')}</span>
+                                <h4>{shot.title}</h4>
+                                <p>{truncateText(shot.cameraNotes || shot.prompt || '暂无镜头备注', 80)}</p>
+                                <p><strong>提示词：</strong>{truncateText(shot.prompt || '暂无镜头提示词', 90)}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </details>
+                    ) : null}
+                  </section>
+                ))}
+              </div>
+            </div>
+          </details>
+        ) : null}
       </SectionCard>
     </div>
   );

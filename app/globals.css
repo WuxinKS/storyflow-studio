@@ -1163,9 +1163,11 @@ textarea {
 
 .kickoff-side-card,
 .kickoff-mode-card,
+.kickoff-focus-card,
 .story-focus-card,
 .character-focus-card,
 .adapt-focus-card,
+.board-focus-card,
 .render-focus-card,
 .finalcut-focus-card,
 .delivery-focus-card,
@@ -1285,9 +1287,11 @@ textarea {
   font-size: 13px;
 }
 
+.kickoff-focus-card,
 .story-focus-card,
 .character-focus-card,
 .adapt-focus-card,
+.board-focus-card,
 .render-focus-card,
 .finalcut-focus-card,
 .delivery-focus-card {

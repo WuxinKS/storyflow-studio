@@ -105,6 +105,8 @@ export async function CharacterStudioData({ projectId }: { projectId?: string })
   const readinessLabel = getCharacterReadinessLabel(characters.length, totalLockedFields);
   const visualBible = getVisualBibleBundle(project);
   const visualLockCount = visualBible ? Object.values(visualBible.locks).filter(Boolean).length : 0;
+  const castPreview = characters.slice(0, 3);
+  const remainingCast = characters.slice(castPreview.length);
   const characterMission = getCharacterMission({
     characterCount: characters.length,
     totalLockedFields,
@@ -246,11 +248,11 @@ export async function CharacterStudioData({ projectId }: { projectId?: string })
 
           <SectionCard
             eyebrow="Cast"
-            title="角色卡总览"
-            description="每张卡只保留真正影响后续生成的设定：定位、目标、冲突、声线和视觉锚点。"
+            title="先看关键角色卡"
+            description="默认先展示最关键的几张卡，完整角色库和定稿台按需再展开。"
           >
             <div className="character-card-grid">
-              {characters.map((character) => {
+              {castPreview.map((character) => {
                 const lockedFields = getLockedFieldLabels(character);
 
                 return (
@@ -296,60 +298,121 @@ export async function CharacterStudioData({ projectId }: { projectId?: string })
               })}
             </div>
           </SectionCard>
+          {remainingCast.length > 0 ? (
+            <details className="workflow-disclosure">
+              <summary>展开剩余 {remainingCast.length} 张角色卡</summary>
+              <div className="workflow-disclosure-body">
+                <div className="character-card-grid">
+                  {remainingCast.map((character) => {
+                    const lockedFields = getLockedFieldLabels(character);
 
-          <SectionCard
-            eyebrow="Visual Continuity"
-            title="视觉统一摘要"
-            description="不用立刻跳页，也能先判断角色是否已经连上统一的视觉规则。"
-            actions={<Link href={buildProjectHref('/visual-bible', project.id)} className="button-ghost">打开视觉圣经</Link>}
-          >
-            {visualBible ? (
-              <div className="asset-grid two-up">
-                <div className="asset-tile">
-                  <span className="label">风格名</span>
-                  <h4>{visualBible.styleName}</h4>
-                  <p>{visualBible.visualTone}</p>
+                    return (
+                      <article key={`${character.role}-${character.name}-rest`} className="asset-tile scene-tile character-card">
+                        <div className="character-card-head">
+                          <div>
+                            <span className="label">{roleLabel(character.role)}</span>
+                            <h4>{character.name}</h4>
+                          </div>
+                          <span className="status-pill status-pill-subtle">{lockedFields.length > 0 ? `${lockedFields.length} 项已锁定` : '可继续定稿'}</span>
+                        </div>
+
+                        <p>{character.archetype}</p>
+
+                        {lockedFields.length > 0 ? (
+                          <div className="tag-list">
+                            {lockedFields.map((field) => (
+                              <span key={`${character.role}-${field}-rest`} className="tag-chip">{field}</span>
+                            ))}
+                          </div>
+                        ) : null}
+
+                        <div className="shot-list">
+                          <div className="shot-item">
+                            <strong>剧情目标</strong>
+                            <span>{character.goal}</span>
+                          </div>
+                          <div className="shot-item">
+                            <strong>核心冲突</strong>
+                            <span>{character.conflict}</span>
+                          </div>
+                          <div className="shot-item">
+                            <strong>说话方式</strong>
+                            <span>{character.voiceStyle}</span>
+                          </div>
+                          <div className="shot-item">
+                            <strong>视觉锚点</strong>
+                            <span>{character.visualAnchor}</span>
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })}
                 </div>
-                <div className="asset-tile">
-                  <span className="label">核心规则</span>
-                  <div className="shot-list">
-                    <div className="shot-item">
-                      <strong>色彩</strong>
-                      <span>{visualBible.palette}</span>
+              </div>
+            </details>
+          ) : null}
+
+          <details className="workflow-disclosure">
+            <summary>查看视觉统一摘要</summary>
+            <div className="workflow-disclosure-body">
+              <SectionCard
+                eyebrow="Visual Continuity"
+                title="视觉统一摘要"
+                description="不用立刻跳页，也能先判断角色是否已经连上统一的视觉规则。"
+                actions={<Link href={buildProjectHref('/visual-bible', project.id)} className="button-ghost">打开视觉圣经</Link>}
+              >
+                {visualBible ? (
+                  <div className="asset-grid two-up">
+                    <div className="asset-tile">
+                      <span className="label">风格名</span>
+                      <h4>{visualBible.styleName}</h4>
+                      <p>{visualBible.visualTone}</p>
                     </div>
-                    <div className="shot-item">
-                      <strong>光线</strong>
-                      <span>{visualBible.lighting}</span>
-                    </div>
-                    <div className="shot-item">
-                      <strong>镜头语言</strong>
-                      <span>{visualBible.lensLanguage}</span>
-                    </div>
-                    <div className="shot-item">
-                      <strong>运动语言</strong>
-                      <span>{visualBible.motionLanguage}</span>
+                    <div className="asset-tile">
+                      <span className="label">核心规则</span>
+                      <div className="shot-list">
+                        <div className="shot-item">
+                          <strong>色彩</strong>
+                          <span>{visualBible.palette}</span>
+                        </div>
+                        <div className="shot-item">
+                          <strong>光线</strong>
+                          <span>{visualBible.lighting}</span>
+                        </div>
+                        <div className="shot-item">
+                          <strong>镜头语言</strong>
+                          <span>{visualBible.lensLanguage}</span>
+                        </div>
+                        <div className="shot-item">
+                          <strong>运动语言</strong>
+                          <span>{visualBible.motionLanguage}</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </div>
-            ) : (
-              <div className="asset-tile">
-                <span className="label">空状态</span>
-                <h4>还没有视觉统一规则</h4>
-                <p>角色已经有了外形锚点，但还没有统一成一套色彩、光线和镜头语言规则。</p>
-              </div>
-            )}
-          </SectionCard>
+                ) : (
+                  <div className="asset-tile">
+                    <span className="label">空状态</span>
+                    <h4>还没有视觉统一规则</h4>
+                    <p>角色已经有了外形锚点，但还没有统一成一套色彩、光线和镜头语言规则。</p>
+                  </div>
+                )}
+              </SectionCard>
+            </div>
+          </details>
 
-          <div id="character-editor" className="module-anchor">
-            <SectionCard
-              eyebrow="Editor"
-              title="角色定稿台"
-              description="这里负责逐个角色做人工修订、锁定和局部重生，确保故事主角群稳定传递到下游。"
-            >
-              <CharacterEditor projectId={project.id} initialCharacters={characters} />
-            </SectionCard>
-          </div>
+          <details id="character-editor" className="workflow-disclosure module-anchor">
+            <summary>打开角色定稿台</summary>
+            <div className="workflow-disclosure-body">
+              <SectionCard
+                eyebrow="Editor"
+                title="角色定稿台"
+                description="这里负责逐个角色做人工修订、锁定和局部重生，确保故事主角群稳定传递到下游。"
+              >
+                <CharacterEditor projectId={project.id} initialCharacters={characters} />
+              </SectionCard>
+            </div>
+          </details>
         </>
       )}
     </div>

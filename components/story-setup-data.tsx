@@ -12,6 +12,11 @@ import { SyncNoticeCard } from '@/components/sync-notice-card';
 import { getProjectStageLabel } from '@/lib/display';
 import { buildProjectHref } from '@/lib/project-links';
 
+function truncateText(value: string, limit: number) {
+  if (value.length <= limit) return value;
+  return `${value.slice(0, limit).trim()}…`;
+}
+
 function getStoryMission(input: {
   hasSynopsis: boolean;
   hasBeats: boolean;
@@ -117,6 +122,8 @@ export async function StorySetupData({ projectId }: { projectId?: string }) {
     hasAiNovel,
     projectId: project.id,
   });
+  const previewScenes = storyDraft.scenes.slice(0, 2);
+  const overflowSceneCount = Math.max(storyDraft.scenes.length - previewScenes.length, 0);
   const packageCards = [
     {
       label: '故事梗概',
@@ -261,17 +268,17 @@ export async function StorySetupData({ projectId }: { projectId?: string }) {
 
       <SectionCard
         eyebrow="Scene Preview"
-        title="先看前三场有没有跑偏"
-        description="这一步只判断方向、冲突和情绪是否成立，不在这里卷细节。"
+        title="先看前两场有没有跑偏"
+        description="默认只检查最前面的场次方向、冲突和情绪是否成立，完整分场按需再展开。"
       >
         {storyDraft.scenes.length > 0 ? (
           <div className="page-stack">
             <div className="scene-seed-grid">
-              {storyDraft.scenes.slice(0, 3).map((scene, index) => (
+              {previewScenes.map((scene, index) => (
                 <div key={`${index}-${scene.title}`} className="asset-tile scene-seed-card">
                   <span className="label">场次 {index + 1}</span>
                   <h4>{scene.title}</h4>
-                  <p>{scene.summary}</p>
+                  <p>{truncateText(scene.summary, 110)}</p>
                   <div className="meta-list">
                     <span>目标：{scene.goal}</span>
                     <span>冲突：{scene.conflict}</span>
@@ -280,14 +287,14 @@ export async function StorySetupData({ projectId }: { projectId?: string }) {
                 </div>
               ))}
             </div>
-            {storyDraft.scenes.length > 3 ? (
+            {overflowSceneCount > 0 ? (
               <details className="workflow-disclosure">
-                <summary>展开完整分场种子（{storyDraft.scenes.length} 场）</summary>
+                <summary>展开剩余 {overflowSceneCount} 场分场种子</summary>
                 <div className="workflow-disclosure-body">
                   <div className="scene-seed-grid">
-                    {storyDraft.scenes.map((scene, index) => (
+                    {storyDraft.scenes.slice(previewScenes.length).map((scene, index) => (
                       <div key={`${index}-${scene.title}-all`} className="asset-tile scene-seed-card">
-                        <span className="label">场次 {index + 1}</span>
+                        <span className="label">场次 {previewScenes.length + index + 1}</span>
                         <h4>{scene.title}</h4>
                         <p>{scene.summary}</p>
                         <div className="meta-list">
@@ -311,29 +318,34 @@ export async function StorySetupData({ projectId }: { projectId?: string }) {
         )}
       </SectionCard>
 
-      <SectionCard
-        eyebrow="Downstream"
-        title="完成这一页后，下游会怎么接力"
-        description="只要这四件事稳定，后面就不再反复猜故事。"
-      >
-        <div className="asset-grid three-up">
-          <div className="asset-tile">
-            <span className="label">角色与视觉</span>
-            <h4>人物和风格会继承故事骨架</h4>
-            <p>角色卡、视觉圣经都会直接吃这里的梗概和分场，不再各自猜故事。</p>
-          </div>
-          <div className="asset-tile">
-            <span className="label">自动分镜</span>
-            <h4>正文会优先进入 scene / shot</h4>
-            <p>只要 AI 小说正文生成出来，自动分镜就能更稳定地拆成场次与镜头。</p>
-          </div>
-          <div className="asset-tile">
-            <span className="label">建议推进</span>
-            <h4>一页只做一步</h4>
-            <p>先补齐故事包，再进角色与视觉，然后再去自动分镜和生成工作台。</p>
-          </div>
+      <details className="workflow-disclosure">
+        <summary>需要时查看下游接力方式</summary>
+        <div className="workflow-disclosure-body">
+          <SectionCard
+            eyebrow="Downstream"
+            title="完成这一页后，下游会怎么接力"
+            description="只要这四件事稳定，后面就不再反复猜故事。"
+          >
+            <div className="asset-grid three-up">
+              <div className="asset-tile">
+                <span className="label">角色与视觉</span>
+                <h4>人物和风格会继承故事骨架</h4>
+                <p>角色卡、视觉圣经都会直接吃这里的梗概和分场，不再各自猜故事。</p>
+              </div>
+              <div className="asset-tile">
+                <span className="label">自动分镜</span>
+                <h4>正文会优先进入 scene / shot</h4>
+                <p>只要 AI 小说正文生成出来，自动分镜就能更稳定地拆成场次与镜头。</p>
+              </div>
+              <div className="asset-tile">
+                <span className="label">建议推进</span>
+                <h4>一页只做一步</h4>
+                <p>先补齐故事包，再进角色与视觉，然后再去自动分镜和生成工作台。</p>
+              </div>
+            </div>
+          </SectionCard>
         </div>
-      </SectionCard>
+      </details>
     </div>
   );
 }
